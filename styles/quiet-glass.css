@@ -12,9 +12,9 @@ body { color: var(--glass-ink); background: var(--glass-backdrop); background-at
 .brand-badge { filter: none; }
 .brand h1 { color: var(--glass-ink); font-weight: 700; }
 .topbar h2 { font-size: 22px; letter-spacing: -.04em; font-weight: 700; }
-.nav-section-title { font-size: 12px; font-weight: 500; letter-spacing: .03em; }
+.nav-section-title { font-size: 13px; font-weight: 500; letter-spacing: .03em; }
 .nav-section + .nav-section, .sidebar-footer { border-color: var(--glass-line); }
-.nav-item { color: var(--glass-muted); font-size: 13px; font-weight: 500; }
+.nav-item { color: var(--glass-muted); font-size: 15px; font-weight: 500; }
 .nav-item:hover, .nav-item.active {
   color: var(--glass-tint-ink); background: var(--glass-tint);
   border-color: var(--glass-line); box-shadow: var(--glass-shadow); transform: none;
