@@ -5,6 +5,15 @@ const { spawnSync, execFileSync } = require('node:child_process');
 const dotenv = require('dotenv');
 const { updateEnvironment } = require('./windows-env');
 
+for (const [configured, expected] of [['', 'applyhub'], ['existing_database', 'existing_database']]) {
+  const actual = execFileSync(process.execPath, ['-e', 'process.stdout.write(require("./db").getDbConfig().database)'], {
+    cwd: path.resolve(__dirname, '..'), env: { ...process.env, DB_NAME: configured }, encoding: 'utf8',
+  });
+  assert.equal(actual, expected);
+}
+assert.equal(dotenv.parse(fs.readFileSync(path.resolve(__dirname, '../.env.example'))).DB_NAME, 'applyhub');
+console.log('PASS: ApplyHub default database and explicit database override');
+
 const source = '# existing settings\nPORT=3000\nDB_USER=old\nDB_PASSWORD="old # value"\nSMTP_FROM_NAME="입학처"\nSMTP_PASS=keep-this\n';
 for (const password of ['a # b', 'with\\backslash', 'has\'quote', 'has"quote', '한글 & % ! ^', ' spaces ', '', 'line\\ntext']) {
   const updated = updateEnvironment(source, { DB_PASSWORD: password, DB_USER: 'new-user', DB_HOST: '127.0.0.1' });
@@ -136,6 +145,6 @@ const saved = dotenv.parse(fs.readFileSync(path.join(psSetup, '.env')));
 assert.equal(saved.DB_PASSWORD, '한글 # value');
 assert.equal(saved.SMTP_FROM_NAME, '입학처');
 assert.equal(saved.SMTP_PASS, 'keep-this');
-assert.equal(saved.DB_NAME, 'admitcard');
+assert.equal(saved.DB_NAME, 'applyhub');
 assert(!fs.readFileSync(path.join(psSetup, 'log/setup-windows.log'), 'utf8').includes('한글 # value'));
 console.log('PASS: Windows PowerShell setup, real empty dependency install, existing password retention and log redaction');

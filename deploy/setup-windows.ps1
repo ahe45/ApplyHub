@@ -97,7 +97,7 @@ try {
     $portDefault = if ($current.PORT) { $current.PORT } else { '3000' }
     $hostDefault = if ($current.DB_HOST) { $current.DB_HOST } else { '127.0.0.1' }
     $dbPortDefault = if ($current.DB_PORT) { $current.DB_PORT } else { '3306' }
-    $nameDefault = if ($current.DB_NAME) { $current.DB_NAME } else { 'admitcard' }
+    $nameDefault = if ($current.DB_NAME) { $current.DB_NAME } else { 'applyhub' }
     $userDefault = if ($current.DB_USER) { $current.DB_USER } else { 'root' }
     $settings = [ordered]@{
         PORT = Read-Port 'Server port' $portDefault

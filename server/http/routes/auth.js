@@ -21,7 +21,7 @@ function createAuthRoutes(deps) {
 
         return deps.sendJson(response, 200, {
           ok: Number(health?.ok || 0) === 1,
-          database: deps.databaseName || "admit_card",
+          database: deps.databaseName || "applyhub",
         });
       },
       { auth: false },

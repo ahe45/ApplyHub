@@ -20,7 +20,7 @@ function getDbConfig(includeDatabase = true) {
   };
 
   if (includeDatabase) {
-    config.database = process.env.DB_NAME || "admitcard";
+    config.database = process.env.DB_NAME || "applyhub";
   }
 
   return config;

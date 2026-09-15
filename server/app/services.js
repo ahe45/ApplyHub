@@ -88,7 +88,7 @@ function formatDateAsYmd(date) {
 }
 
 function createApplicationServices({ env = process.env, fs, getPool, path, query, rootDir = process.cwd() }) {
-  const databaseName = env.DB_NAME || "admitcard";
+  const databaseName = env.DB_NAME || "applyhub";
   const passwordHelpers = createPasswordHelpers({
     passwordHashPrefix: DEFAULT_PASSWORD_HASH_PREFIX,
   });

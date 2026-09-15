@@ -4,7 +4,7 @@ function createSystemBackupService({
   applicantFileStorageDirName = "uploads/file",
   applicantPhotoStorageDirName = "uploads/photo",
   createHttpError,
-  databaseName = "admitcard",
+  databaseName = "applyhub",
   examineePhotoStorageDirName = "photo",
   fs,
   getPool,
@@ -648,7 +648,7 @@ function createSystemBackupService({
         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
         ORDER BY ORDINAL_POSITION
       `,
-      [String(databaseName || "admitcard").trim() || "admitcard", normalizedTableName],
+      [String(databaseName || "applyhub").trim() || "applyhub", normalizedTableName],
     );
   }
 
@@ -799,7 +799,7 @@ function createSystemBackupService({
     const manifest = {
       schemaVersion: backupSchemaVersion,
       createdAt: createdAtIso,
-      databaseName: String(databaseName || "admitcard").trim() || "admitcard",
+      databaseName: String(databaseName || "applyhub").trim() || "applyhub",
       databaseIncluded: includeDatabase,
       tables: [],
       assets: [],
@@ -863,7 +863,7 @@ function createSystemBackupService({
       ),
     );
 
-    const safeDatabaseName = String(manifest.databaseName || "admitcard")
+    const safeDatabaseName = String(manifest.databaseName || "applyhub")
       .trim()
       .replace(/[^A-Za-z0-9._-]+/g, "-")
       .replace(/-+/g, "-")
@@ -967,7 +967,7 @@ function createSystemBackupService({
     ]);
 
     return {
-      databaseName: String(databaseName || "admitcard").trim() || "admitcard",
+      databaseName: String(databaseName || "applyhub").trim() || "applyhub",
       tableCount: tables.length,
       totalRowCount: tables.reduce((count, tableState) => count + Number(tableState?.rowCount || 0), 0),
       tables,
