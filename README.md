@@ -18,23 +18,27 @@
 
 `git clone`은 소스 파일만 가져옵니다. Node.js, DB 서버, `.env`, 설치된 의존성, 기존 DB 데이터와 업로드 파일은 별도로 준비해야 합니다.
 
-1. Node.js 24와 MySQL 또는 MariaDB를 설치하고 DB 서비스를 실행합니다.
-2. 프로젝트 폴더에서 `.env.example`을 `.env`로 복사합니다. `start-server.bat`도 파일이 없으면 복사한 뒤 설정 안내를 표시합니다.
-3. `.env`의 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`를 서버 PC 환경에 맞게 설정합니다. 기본 DB 이름은 `admitcard`입니다.
-4. 프로젝트 폴더에서 터미널을 열어 최초 설치 명령을 실행합니다.
+1. MySQL 또는 MariaDB를 설치하고 DB 서비스를 실행합니다. 사용할 DB 계정에는 해당 DB와 테이블을 생성·변경할 권한이 필요합니다.
+2. `start-server.bat`을 실행합니다. Node.js, `.env` 또는 의존성이 준비되지 않았다면 `deploy/setup-windows.ps1`이 초기 설정을 시작합니다.
+3. 화면의 질문에 서버 포트, DB 호스트·포트·이름, 계정과 비밀번호를 입력합니다. 기본값은 서버 포트 `3000`, DB 주소 `127.0.0.1:3306`, DB 이름 `admitcard`입니다. Enter를 누르면 현재 값을 유지합니다. 비밀번호 입력은 화면에 표시되지 않습니다.
+4. 초기 설정이 `npm ci`와 `npm run db:setup`을 실행하고 DB 연결을 확인합니다. 완료되면 서버가 자동으로 시작됩니다.
+5. 서버 PC에서 `http://localhost:3000`에 접속합니다. 포트를 바꿨다면 변경한 포트를 사용하세요. 실행 중에는 창을 열어 두세요.
 
-   ```bat
-   npm ci
-   npm run db:setup
-   ```
+Node.js가 없거나 22.13보다 오래된 경우 winget으로 설치를 시도합니다. Windows의 설치 권한 안내가 표시될 수 있습니다. winget을 사용할 수 없다면 Node.js 24를 직접 설치한 후 다시 실행합니다. DB 서버 설치와 계정 생성은 별도로 해야 합니다. 수험표 PDF 생성에는 Microsoft Edge가 필요합니다.
 
-   DB 계정에는 해당 DB와 테이블을 생성·변경할 권한이 필요합니다. 기존 서버의 데이터를 옮기는 경우에는 DB와 업로드 파일도 복원해야 합니다.
+기존 `.env`의 이메일 등 다른 설정은 유지합니다. DB 접속정보를 다시 설정하거나 설치 실패 후 재시도하려면 `start-server.bat --setup`을 실행합니다. 기존 서버의 데이터를 옮기는 경우에는 DB와 업로드 파일도 복원해야 합니다.
 
-5. `start-server.bat`을 실행하고 서버 PC에서 `http://localhost:3000`에 접속합니다. 실행 중에는 창을 열어 두세요.
+오류가 발생하면 창을 유지하고 로그 위치를 안내합니다. 초기 설정 로그는 `log/setup-windows.log`, 실행 전 DB 확인 결과는 `log/startup-check.log`에 저장됩니다. 다른 PC에서 접속하려면 서버 PC의 IP 주소와 `.env`의 `PORT`를 사용하고 Windows 방화벽에서 해당 포트 접근을 허용해야 합니다.
 
-실행 파일은 Node.js, `.env`, DB 연결을 확인하며 의존성 폴더가 없으면 `npm ci`를 실행합니다. 실패하면 오류 메시지를 남기고 키 입력을 기다립니다. 다른 PC에서 접속하려면 서버 PC의 IP 주소와 `.env`의 `PORT`를 사용하고 Windows 방화벽에서 해당 포트 접근을 허용해야 합니다.
+## Windows 서버 업데이트
 
-업데이트는 프로젝트 폴더의 터미널에서 `git pull`과 `npm ci`를 실행한 뒤 서버를 다시 시작합니다.
+1. 실행 중인 서버 창에서 Ctrl+C로 서버를 종료합니다.
+2. `update-server.bat`을 실행하고 안내에 따라 진행합니다.
+3. 완료 메시지가 표시되면 `start-server.bat`을 실행합니다.
+
+업데이트는 현재 브랜치에 대응하는 `origin`의 변경 사항을 가져온 뒤 `npm ci`, `npm run db:setup`, DB 연결 확인을 순서대로 실행합니다. 로컬 파일에 변경이 있거나 브랜치를 자동으로 합칠 수 없는 경우 중단합니다. `.env`, 업로드 파일과 로그는 Git 업데이트 대상에서 제외됩니다. 결과와 오류는 `log/update-server.log`에서 확인할 수 있습니다. 중간 단계가 실패하면 오류 원인을 해결한 후 다시 실행합니다.
+
+Windows 실행·설정·업데이트 동작 검증: `npm run test:windows-launchers`
 
 ## 이메일 인증 발송
 
