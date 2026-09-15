@@ -49,12 +49,18 @@ function Read-Port([string]$label, [string]$currentValue) {
 }
 
 function Read-Password([string]$currentValue) {
-    $hint = if ($currentValue) { 'Enter keeps the existing password' } else { 'Enter uses an empty password' }
-    $secureValue = Read-Host "DB password ($hint)" -AsSecureString
-    if ($secureValue.Length -eq 0) { return $currentValue }
-    $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureValue)
-    try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
-    finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
+    $hint = if ($currentValue) { 'Enter keeps the existing password' } else { 'required' }
+    while ($true) {
+        $secureValue = Read-Host "Q3. DB USER PASSWORD ($hint)" -AsSecureString
+        if ($secureValue.Length -eq 0) {
+            if ($currentValue) { return $currentValue }
+            Write-Warning 'Enter the DB password.'
+            continue
+        }
+        $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureValue)
+        try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
+        finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
+    }
 }
 
 Push-Location $rootDir
@@ -85,7 +91,8 @@ try {
     Write-Step 'Configuring ApplyHub'
     Write-Host 'MySQL or MariaDB must already be installed and running.'
     Write-Host 'Use a DB account with permission to create and update the configured database.'
-    Write-Host 'Press Enter to keep each current value. Existing email and other settings are preserved.'
+    Write-Host 'Default server port: 3000. Database: applyhub at 127.0.0.1:3306.'
+    Write-Host 'Existing email and other settings are preserved.'
     if (-not (Test-Path -LiteralPath $envPath)) {
         Copy-Item -LiteralPath (Join-Path $rootDir '.env.example') -Destination $envPath
     }
@@ -95,16 +102,21 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Could not read .env.' }
     $current = $currentJson | ConvertFrom-Json
     $portDefault = if ($current.PORT) { $current.PORT } else { '3000' }
-    $hostDefault = if ($current.DB_HOST) { $current.DB_HOST } else { '127.0.0.1' }
-    $dbPortDefault = if ($current.DB_PORT) { $current.DB_PORT } else { '3306' }
-    $nameDefault = if ($current.DB_NAME) { $current.DB_NAME } else { 'applyhub' }
-    $userDefault = if ($current.DB_USER) { $current.DB_USER } else { 'root' }
+    $useCustomPort = Read-Host 'Q1. Set a custom server port? (Y/N, default: N)'
+    $serverPort = '3000'
+    if ($useCustomPort.Trim().ToLowerInvariant() -eq 'y') {
+        $serverPort = Read-Port 'Q1-1. Server port' $portDefault
+    }
+    do {
+        $dbUser = Read-Default 'Q2. DB USER ID' $current.DB_USER
+        if (-not $dbUser) { Write-Warning 'Enter the DB user ID.' }
+    } while (-not $dbUser)
     $settings = [ordered]@{
-        PORT = Read-Port 'Server port' $portDefault
-        DB_HOST = Read-Default 'DB host' $hostDefault
-        DB_PORT = Read-Port 'DB port' $dbPortDefault
-        DB_NAME = Read-Default 'DB name' $nameDefault
-        DB_USER = Read-Default 'DB user ID' $userDefault
+        PORT = $serverPort
+        DB_HOST = '127.0.0.1'
+        DB_PORT = '3306'
+        DB_NAME = 'applyhub'
+        DB_USER = $dbUser
         DB_PASSWORD = Read-Password $current.DB_PASSWORD
     }
     # Base64 keeps Unicode intact in PowerShell 5.1's native stdin pipeline.

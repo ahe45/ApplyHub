@@ -130,21 +130,59 @@ assert(!fs.existsSync(path.join(diverged, 'npm-calls.log')));
 assert.match(batch(clean, 'update-server.bat', 1, { APPLYHUB_TEST_NPM_FAIL: '1' }), /update failed/);
 console.log('PASS: self-update, fast-forward, divergent branch, local-change protection, detached branch, dependency failure and ignored logs');
 
-const psSetup = fixture('PowerShell setup');
+for (const scenario of [
+  { name: 'defaults', existing: true, answers: [['Q1.', ''], ['Q2.', ''], ['Q3.', '']], port: '3000', user: 'old', password: '한글 # value' },
+  { name: 'custom port', existing: true, answers: [['Q1.', 'Y'], ['Q1-1.', '70000'], ['Q1-1.', '3100'], ['Q2.', ''], ['Q3.', '']], port: '3100', user: 'old', password: '한글 # value' },
+  { name: 'first setup', existing: false, answers: [['Q1.', 'N'], ['Q2.', ''], ['Q2.', 'applyhub_app'], ['Q3.', ''], ['Q3.', '새 비밀번호 # !']], port: '3000', user: 'applyhub_app', password: '새 비밀번호 # !' },
+]) {
+const psSetup = fixture(`PowerShell setup ${scenario.name}`);
 fs.copyFileSync(path.join(project, 'deploy/setup-windows.ps1'), path.join(psSetup, 'deploy/setup-windows.ps1'));
 fs.copyFileSync(path.join(project, 'scripts/windows-env.js'), path.join(psSetup, 'scripts/windows-env.js'));
-fs.writeFileSync(path.join(psSetup, '.env'), source.replace('old # value', '한글 # value'));
+if (scenario.existing) {
+  fs.writeFileSync(path.join(psSetup, '.env'), source.replace('PORT=3000', 'PORT=4000').replace('old # value', '한글 # value') + 'DB_HOST=old-host\nDB_PORT=3307\nDB_NAME=old_database\n');
+} else {
+  fs.unlinkSync(path.join(psSetup, '.env'));
+  fs.copyFileSync(path.join(project, '.env.example'), path.join(psSetup, '.env.example'));
+}
 fs.writeFileSync(path.join(psSetup, 'package.json'), JSON.stringify({ name: 'launcher-test', version: '1.0.0', scripts: { 'db:setup': 'node scripts/check-startup.js' } }));
 fs.writeFileSync(path.join(psSetup, 'package-lock.json'), JSON.stringify({ name: 'launcher-test', version: '1.0.0', lockfileVersion: 3, packages: { '': { name: 'launcher-test', version: '1.0.0' } } }));
 // Only prompt input is replaced. The real setup, npm ci and environment writer run in this fixture.
-fs.writeFileSync(path.join(psSetup, 'test-setup.ps1'), `function global:Read-Host { param($Prompt, [switch]$AsSecureString) if ($AsSecureString) { return (New-Object Security.SecureString) }; return '' }; & "$PSScriptRoot\\deploy\\setup-windows.ps1"`);
+fs.writeFileSync(path.join(psSetup, 'answers.json'), JSON.stringify(scenario.answers.map(([prefix, value]) => ({ prefix, value }))));
+fs.writeFileSync(path.join(psSetup, 'test-setup.ps1'), `
+$ErrorActionPreference = 'Stop'
+$global:answers = New-Object System.Collections.Queue
+foreach ($answer in (Get-Content -LiteralPath "$PSScriptRoot\\answers.json" -Raw -Encoding UTF8 | ConvertFrom-Json)) { $global:answers.Enqueue($answer) }
+function global:Read-Host {
+  param($Prompt, [switch]$AsSecureString)
+  if ($global:answers.Count -eq 0) { throw "Unexpected prompt: $Prompt" }
+  $answer = $global:answers.Dequeue()
+  if (-not $Prompt.StartsWith($answer.prefix)) { throw "Unexpected prompt: $Prompt" }
+  if ([bool]$AsSecureString -ne ($answer.prefix -eq 'Q3.')) { throw 'Password prompt must be secure' }
+  if ($AsSecureString) {
+    $secureValue = New-Object Security.SecureString
+    foreach ($character in $answer.value.ToCharArray()) { $secureValue.AppendChar($character) }
+    return $secureValue
+  }
+  return $answer.value
+}
+& "$PSScriptRoot\\deploy\\setup-windows.ps1"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+if ($global:answers.Count -ne 0) { throw 'Expected prompts were not asked' }
+`);
 const ps = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(psSetup, 'test-setup.ps1')], { cwd: psSetup, env: process.env, encoding: 'utf8', timeout: 60000 });
 assert.ifError(ps.error);
 assert.equal(ps.status, 0, ps.stdout + ps.stderr);
 const saved = dotenv.parse(fs.readFileSync(path.join(psSetup, '.env')));
-assert.equal(saved.DB_PASSWORD, '한글 # value');
+assert.equal(saved.DB_PASSWORD, scenario.password);
+assert.equal(saved.DB_USER, scenario.user);
+assert.equal(saved.PORT, scenario.port);
+assert.equal(saved.DB_HOST, '127.0.0.1');
+assert.equal(saved.DB_PORT, '3306');
+if (scenario.existing) {
 assert.equal(saved.SMTP_FROM_NAME, '입학처');
 assert.equal(saved.SMTP_PASS, 'keep-this');
+}
 assert.equal(saved.DB_NAME, 'applyhub');
-assert(!fs.readFileSync(path.join(psSetup, 'log/setup-windows.log'), 'utf8').includes('한글 # value'));
-console.log('PASS: Windows PowerShell setup, real empty dependency install, existing password retention and log redaction');
+assert(!fs.readFileSync(path.join(psSetup, 'log/setup-windows.log'), 'utf8').includes(scenario.password));
+console.log(`PASS: Windows PowerShell ${scenario.name}, exact prompt flow, database defaults, password transport and log redaction`);
+}
