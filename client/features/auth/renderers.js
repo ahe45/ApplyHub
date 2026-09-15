@@ -96,6 +96,7 @@
                 type="password"
                 value="${escapeAttribute(passwordValue)}"
                 autocomplete="current-password"
+                placeholder="비밀번호를 입력하세요"
                 ${isDisabled ? "disabled" : ""}
               />
             </label>
