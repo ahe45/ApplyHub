@@ -23,6 +23,7 @@
         const payload = await apiRequest("/api/login-notice");
         applyLoginNoticePayload(payload.html || payload.loginNoticeHtml || "", { scope: "login" });
         applySuperAdminPayload(payload.superAdminSettings || {});
+        state.loginNotice.admissionHomepageUrl = String(payload.admissionHomepageUrl || '').trim();
       } catch (error) {
         // Keep the default in-memory notice when the server payload cannot be loaded.
       } finally {

@@ -71,6 +71,10 @@ async function run() {
       await require('./admin-menu-checks').runAdminMenuChecks({ services, query, base, call });
       return;
     }
+    if (process.argv.includes('--login-header')) {
+      await require('./login-header-checks').runLoginHeaderChecks({ services, base, call });
+      return;
+    }
     const memberPath = "/api/public/members/";
     const password = "MemberTest_12345";
     await members.saveSettings({ birth: "required", phone: "optional", termsEnabled: true, termsTitle: "테스트 약관", termsText: "테스트 약관 내용", extraFields: [{ key: "address", label: "주소", required: true }] });

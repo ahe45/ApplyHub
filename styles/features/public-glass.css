@@ -50,6 +50,11 @@ body.applicant-public-body { background: var(--glass-page); color: var(--glass-i
 .common-login-stage .login-stage-brand-mark { flex-shrink: 0; }
 .common-login-stage .login-stage-brand-copy strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-shell.auth-locked .login-stage-brand-copy strong { font-size: 20px; }
+.common-login-stage .login-stage-header { grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: 8px; }
+.login-stage-header .login-stage-brand { justify-content: center; min-width: 0; }
+.common-login-stage .login-home-link { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; min-height: 44px; padding: 0; text-decoration: none; }
+.login-home-link svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.login-stage-header > applyhub-theme-toggle { margin-left: 0; }
 .public-glass-intro .public-glass-product-name { margin-left: auto; color: var(--glass-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
 .public-glass-intro :is(.login-stage-brand-copy, .applicant-public-brand-copy) span { color: var(--glass-muted); font-size: 10px; letter-spacing: .14em; }
 

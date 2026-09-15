@@ -81,6 +81,7 @@ function createAuthRoutes(deps) {
         deps.sendJson(response, 200, {
           html: await deps.getLoginNoticeHtml(),
           superAdminSettings: await deps.getPublicSuperAdminSettings(),
+          admissionHomepageUrl: (await deps.getSystemSettings()).admissionHomepageUrl,
         }),
       { auth: false },
     ),

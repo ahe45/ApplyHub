@@ -64,6 +64,18 @@
   }) {
     const logoImageUrl = resolveSuperAdminLogoImageUrl(state.superAdmin || {});
     const schoolName = String(state.superAdmin?.schoolName || '').trim() || '원서접수시스템';
+    let admissionHomepageUrl = '';
+    const configuredHomepage = String((interactive ? state.loginNotice?.admissionHomepageUrl : state.systemSettings?.admissionHomepageUrl) || '').trim();
+    if (configuredHomepage) {
+      try {
+        const url = new URL(configuredHomepage, window.location.origin);
+        if (['http:', 'https:'].includes(url.protocol)) admissionHomepageUrl = url.href;
+      } catch { /* Leave the shortcut disabled when the configured URL is invalid. */ }
+    }
+    const homepageIcon = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m3 10 9-7 9 7M5 9v11h5v-6h4v6h5V9" /></svg>';
+    const homepageLink = interactive && admissionHomepageUrl
+      ? `<a class="ghost-button login-home-link" href="${escapeAttribute(admissionHomepageUrl)}" target="_blank" rel="noopener noreferrer" aria-label="입학처 홈페이지 바로가기 (새 창)" title="입학처 홈페이지 바로가기 (새 창)">${homepageIcon}</a>`
+      : `<button class="ghost-button login-home-link" type="button" disabled aria-label="입학처 홈페이지 바로가기" title="${admissionHomepageUrl ? '입학처 홈페이지 바로가기' : '입학처 홈페이지가 설정되지 않았습니다.'}">${homepageIcon}</button>`;
     const shellClassNames = ["login-shell", "common-login-stage", shellClassName].filter(Boolean).join(" ");
     const panelClassNames = ["login-panel-card", "login-stage-panel", panelClassName].filter(Boolean).join(" ");
     const noticeContentMarkup = useEditorMarkup ? buildLoginNoticeEditorMarkup(noticeHtml) : getLoginNoticeMarkup(noticeHtml);
@@ -129,11 +141,13 @@
 
     return `
       <section class="${shellClassNames}">
-        <header class="public-glass-intro">
+        <header class="public-glass-intro login-stage-header">
+          ${homepageLink}
           <div class="login-stage-brand">
             <img class="login-stage-brand-mark" src="${escapeAttribute(logoImageUrl)}" alt="" width="48" height="48" />
-            <div class="login-stage-brand-copy"><strong title="${escapeAttribute(schoolName)}">${escapeHtml(schoolName)}</strong></div><applyhub-theme-toggle ${interactive ? '' : 'disabled'}></applyhub-theme-toggle>
+            <div class="login-stage-brand-copy"><strong title="${escapeAttribute(schoolName)}">${escapeHtml(schoolName)}</strong></div>
           </div>
+          <applyhub-theme-toggle ${interactive ? '' : 'disabled'}></applyhub-theme-toggle>
         </header>
         ${publicRenderingHelpersModule.renderCompactNotice({ html: noticeContentMarkup, cardClassName: noticeCardClassName, contentClassName: noticeContentClassName, contentId: noticeContentId, contentAttributes: noticeContentAttributes, editing: useEditorMarkup })}
 
