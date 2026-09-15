@@ -141,7 +141,14 @@ function createSystemRoutes(deps) {
       const settings = await deps.getSuperAdminSettings();
       return deps.sendJson(response, 200, { schoolName: settings.schoolName, logoImageUrl: settings.logoImageUrl });
     }, { auth: false }),
-    exactRoute("GET", "/api/bootstrap", async ({ response }) => deps.sendJson(response, 200, await deps.getBootstrapPayload())),
+    exactRoute("GET", "/api/bootstrap", async ({ response, authenticatedAccount }) => {
+      const payload = await deps.getBootstrapPayload();
+      if (authenticatedAccount?.role !== deps.superAdminRole) {
+        payload.accounts = (payload.accounts || []).filter(account => account.role !== deps.superAdminRole);
+        delete payload.systemBackupAutomation;
+      }
+      return deps.sendJson(response, 200, payload);
+    }),
     exactRoute("GET", "/api/system-settings", async ({ response, authenticatedAccount }) => {
       requireSystemManager(authenticatedAccount);
       return deps.sendJson(response, 200, await deps.getSystemSettings());
@@ -163,11 +170,11 @@ function createSystemRoutes(deps) {
       });
     }),
     exactRoute("GET", "/api/system-backup/automation", async ({ response, authenticatedAccount }) => {
-      requireSystemManager(authenticatedAccount);
+      requireSuperAdmin(authenticatedAccount);
       return deps.sendJson(response, 200, await deps.getSystemBackupAutomationSettings());
     }),
     exactRoute("PUT", "/api/system-backup/automation", async ({ request, response, authenticatedAccount }) => {
-      requireSystemManager(authenticatedAccount);
+      requireSuperAdmin(authenticatedAccount);
       const body = await deps.readJsonBody(request);
 
       try {
@@ -203,7 +210,7 @@ function createSystemRoutes(deps) {
       }
     }),
     exactRoute("POST", "/api/system-backup/automation/run", async ({ request, response, authenticatedAccount }) => {
-      requireSystemManager(authenticatedAccount);
+      requireSuperAdmin(authenticatedAccount);
       return deps.sendJson(
         response,
         200,
@@ -216,7 +223,7 @@ function createSystemRoutes(deps) {
     }),
     exactRoute("POST", "/api/system-backup/export", async ({ request, response, authenticatedAccount }) => {
       const body = await deps.readJsonBody(request);
-      requireSystemManager(authenticatedAccount);
+      requireSuperAdmin(authenticatedAccount);
 
       try {
         await deps.verifySystemDataDeletionPassword(authenticatedAccount?.id, body?.currentPassword);
@@ -264,12 +271,12 @@ function createSystemRoutes(deps) {
       }
     }),
     exactRoute("POST", "/api/system-backup/validate", async ({ request, response, authenticatedAccount }) => {
-      requireSystemManager(authenticatedAccount);
+      requireSuperAdmin(authenticatedAccount);
       const backupArchiveBuffer = await deps.readBinaryBody(request);
       return deps.sendJson(response, 200, await deps.validateSystemBackupArchive(backupArchiveBuffer));
     }),
     exactRoute("POST", "/api/system-backup/import", async ({ request, response, authenticatedAccount }) => {
-      requireSystemManager(authenticatedAccount);
+      requireSuperAdmin(authenticatedAccount);
       const backupArchiveBuffer = await deps.readBinaryBody(request);
       const currentPassword = decodeBase64HeaderValue(request.headers["x-system-backup-password-base64"]);
       const uploadFileName = decodeBase64HeaderValue(request.headers["x-system-backup-file-name-base64"]);

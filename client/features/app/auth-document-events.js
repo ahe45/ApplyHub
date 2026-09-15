@@ -205,11 +205,6 @@
 
     async function handleClick(event) {
       const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest('[data-school-logo-reset]')) {
-        if (state.systemSettings.isSaving || state.systemSettings.isUploadingLogo) return true;
-        state.systemSettings.schoolLogoImageUrl = '';
-        syncSystemSettingsDirtyState(); renderView(); return true;
-      }
       const noticeLink = target?.closest(".login-notice-content a[href]") || null;
       const activeSystemSchedulePopoverTarget = String(state.systemSettings.applicantSchedulePopoverTarget || "").trim();
       const systemSchedulePopoverRoot = target?.closest("[data-system-settings-schedule-popover-root]") || null;
@@ -456,20 +451,6 @@
 
     async function handleChange(event) {
       const target = event.target instanceof Element ? event.target : null;
-      if (target?.id === 'systemSettingsSchoolLogo') {
-        const file = target.files?.[0];
-        if (!file || state.systemSettings.isSaving || state.systemSettings.isUploadingLogo) return true;
-        state.systemSettings.isUploadingLogo = true; syncSystemSettingsDirtyState();
-        try {
-          if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) throw new Error('PNG·JPG·WEBP 이미지(2MB 이하)를 선택하세요.');
-          const dataUrl = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('이미지를 읽지 못했습니다.')); reader.readAsDataURL(file); });
-          const image = new Image(); image.src = dataUrl; await image.decode();
-          state.systemSettings.schoolLogoImageUrl = dataUrl;
-          setSystemSettingsStatus('학교 로고를 선택했습니다. 저장 버튼을 눌러 적용하세요.');
-        } catch (error) { setSystemSettingsStatus(error.message || '이미지를 읽지 못했습니다.', 'warning'); }
-        finally { state.systemSettings.isUploadingLogo = false; syncSystemSettingsDirtyState(); renderView(); }
-        return true;
-      }
       const accountField = target?.closest("[data-account-field]") || null;
       const scheduleTarget = String(target?.dataset.systemSettingsScheduleTarget || "").trim();
       const schedulePart = String(target?.dataset.systemSettingsSchedulePart || "").trim();
@@ -639,11 +620,6 @@
           setSystemSettingsStatus("");
         }
         return true;
-      }
-
-      if (target?.id === 'systemSettingsSchoolName') {
-        state.systemSettings.schoolName = target.value;
-        syncSystemSettingsDirtyState(); setSystemSettingsStatus(''); return true;
       }
 
       if (target?.id === "systemSettingsAdmissionHomepageUrl") {

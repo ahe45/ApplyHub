@@ -388,10 +388,7 @@ function createSystemSettingsService({
       (Array.isArray(rows) ? rows : []).map((row) => [String(row.settingKey || ""), String(row.settingValue || "")]),
     );
 
-    const branding = parseSuperAdminSettings(rowsByKey.get('superAdminSettingsJson'));
     return {
-      schoolName: branding.schoolName,
-      schoolLogoImageUrl: branding.logoImageUrl,
       initialPassword: parseSystemInitialPassword(rowsByKey.get("initialPassword")),
       autoLogoutMinutes: parseAutoLogoutMinutes(rowsByKey.get("autoLogoutMinutes")),
       admissionHomepageUrl: parseAdmissionHomepageUrl(rowsByKey.get("admissionHomepageUrl")),
@@ -474,8 +471,7 @@ function createSystemSettingsService({
           'autoLogoutMinutes',
           'admissionHomepageUrl',
           'applicantExamNoDigitCount',
-          'applicantExamNoComponentsJson',
-          'superAdminSettingsJson'
+          'applicantExamNoComponentsJson'
         )
       `,
     );
@@ -510,22 +506,6 @@ function createSystemSettingsService({
 
   async function updateSystemSettings(payload) {
     const nextSettings = normalizeSystemSettingsPayload(payload);
-    const hasBranding = Object.hasOwn(payload, 'schoolName') || Object.hasOwn(payload, 'schoolLogoImageUrl');
-    let branding;
-    if (hasBranding) {
-      const current = await getSuperAdminSettings();
-      branding = validateSuperAdminSettings({ ...current,
-        schoolName: payload.schoolName ?? current.schoolName,
-        logoImageUrl: payload.schoolLogoImageUrl ?? current.logoImageUrl,
-      });
-      if (branding.logoImageUrl !== current.logoImageUrl && branding.logoImageUrl.startsWith('data:')) {
-        const match = branding.logoImageUrl.match(/^data:image\/(png|jpeg|webp);base64,([a-z0-9+/=\s]+)$/i);
-        if (!match || Buffer.from(match[2], 'base64').length > 2 * 1024 * 1024) {
-          throw createHttpError(400, '학교 로고는 PNG·JPG·WEBP 이미지(2MB 이하)여야 합니다.', 'SCHOOL_LOGO_INVALID');
-        }
-      }
-    }
-
     await query(
       `
         INSERT INTO system_set (setting_key, setting_value)
@@ -547,12 +527,6 @@ function createSystemSettingsService({
       ],
     );
 
-    if (branding) {
-      // Patch only school identity: ordinary admins cannot change super-admin options.
-      await query(`INSERT INTO system_set (setting_key, setting_value) VALUES ('superAdminSettingsJson', ?)
-        ON DUPLICATE KEY UPDATE setting_value = JSON_SET(setting_value, '$.schoolName', ?, '$.logoImageUrl', ?)`,
-        [JSON.stringify(branding), branding.schoolName, branding.logoImageUrl]);
-    }
     return getSystemSettings();
   }
 

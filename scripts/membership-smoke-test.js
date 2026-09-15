@@ -67,6 +67,10 @@ async function run() {
       const text = await response.text();
       return { status: response.status, body: (() => { try { return JSON.parse(text); } catch { return text; } })(), cookie: response.headers.get("set-cookie")?.split(";")[0] || "" };
     };
+    if (process.argv.includes('--admin-menus')) {
+      await require('./admin-menu-checks').runAdminMenuChecks({ services, query, base, call });
+      return;
+    }
     const memberPath = "/api/public/members/";
     const password = "MemberTest_12345";
     await members.saveSettings({ birth: "required", phone: "optional", termsEnabled: true, termsTitle: "테스트 약관", termsText: "테스트 약관 내용", extraFields: [{ key: "address", label: "주소", required: true }] });
@@ -525,9 +529,7 @@ async function run() {
     assert((await page.$eval('[data-system-data-delete=applicant-members]', button => button.closest('.system-data-delete-card').textContent)).includes('접수 이력은 보존'));
     await page.screenshot({ path: path.join(artifacts, 'member-data-deletion.png'), fullPage: true });
     await page.goto(base + '/system-backup-restore', { waitUntil: 'networkidle2' });
-    await page.waitForSelector('#systemBackupRestoreFileInput');
-    assert((await page.$eval('#viewRoot', el => el.textContent)).includes('회원 계정·가입 답변·회원 첨부파일·약관 동의'));
-    await page.screenshot({ path: path.join(artifacts, 'member-backup-restore.png'), fullPage: true });
+    assert.equal(await page.$('#systemBackupRestoreFileInput'), null, 'Ordinary administrators cannot open backup and restore');
     await page.goto(base + '/applicant-question-template-management', { waitUntil: 'networkidle2' });
     await page.click(`[data-applicant-field-select="${ruleField.id}"]`);
     assert.equal(await page.$eval('[data-applicant-field-input=fileNamePattern]', el => el.value), '서류_{수험번호}');

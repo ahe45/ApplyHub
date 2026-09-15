@@ -923,8 +923,6 @@
 
     function cloneSystemSettingsSnapshot(snapshot = {}) {
       return {
-        schoolName: normalizeSystemSettingsTextSnapshotValue(snapshot.schoolName),
-        schoolLogoImageUrl: normalizeSystemSettingsTextSnapshotValue(snapshot.schoolLogoImageUrl),
         initialPassword: normalizeSystemSettingsTextSnapshotValue(snapshot.initialPassword),
         autoLogoutMinutes: normalizeSystemSettingsNumericSnapshotValue(snapshot.autoLogoutMinutes, { emptyValue: "0" }),
         admissionHomepageUrl: normalizeSystemSettingsTextSnapshotValue(snapshot.admissionHomepageUrl),
@@ -966,8 +964,6 @@
       const systemSettingsSource = source && typeof source === "object" ? source : {};
 
       return cloneSystemSettingsSnapshot({
-        schoolName: String(systemSettingsSource.schoolName || '').trim(),
-        schoolLogoImageUrl: String(systemSettingsSource.schoolLogoImageUrl || '').trim(),
         initialPassword: String(systemSettingsSource.initialPassword ?? "").trim(),
         autoLogoutMinutes: String(systemSettingsSource.autoLogoutMinutes ?? "").trim(),
         admissionHomepageUrl: String(systemSettingsSource.admissionHomepageUrl ?? "").trim(),
@@ -983,8 +979,6 @@
       const right = cloneSystemSettingsSnapshot(rightSnapshot);
 
       return (
-        left.schoolName === right.schoolName &&
-        left.schoolLogoImageUrl === right.schoolLogoImageUrl &&
         left.initialPassword === right.initialPassword &&
         left.autoLogoutMinutes === right.autoLogoutMinutes &&
         left.admissionHomepageUrl === right.admissionHomepageUrl &&
@@ -1096,8 +1090,6 @@
 
     function formatSystemSettingsSummaryValue(summaryKey, snapshot = {}) {
       const normalizedSnapshot = cloneSystemSettingsSnapshot(snapshot);
-      if (summaryKey === 'schoolName') return normalizedSnapshot.schoolName || '미설정';
-      if (summaryKey === 'schoolLogoImageUrl') return normalizedSnapshot.schoolLogoImageUrl ? '사용자 지정 로고' : '기본 로고';
 
       if (summaryKey === "initialPassword") {
         return normalizedSnapshot.initialPassword || "미설정";
@@ -1130,8 +1122,6 @@
       const savedSnapshot = cloneSystemSettingsSnapshot(state.systemSettings.savedSnapshot || {});
       const draftSnapshot = buildSystemSettingsSnapshot();
       const summaryDefinitions = [
-        { key: 'schoolName', label: '학교명' },
-        { key: 'schoolLogoImageUrl', label: '학교 로고' },
         { key: "initialPassword", label: "초기 비밀번호" },
         { key: "autoLogoutMinutes", label: "자동 로그아웃 시간" },
         { key: "admissionHomepageUrl", label: "입학처 홈페이지 링크" },
@@ -1144,7 +1134,7 @@
           const beforeValue = formatSystemSettingsSummaryValue(definition.key, savedSnapshot);
           const afterValue = formatSystemSettingsSummaryValue(definition.key, draftSnapshot);
 
-          if (beforeValue === afterValue && (definition.key !== 'schoolLogoImageUrl' || savedSnapshot.schoolLogoImageUrl === draftSnapshot.schoolLogoImageUrl)) {
+          if (beforeValue === afterValue) {
             return null;
           }
 
@@ -1167,7 +1157,6 @@
         saveButtonElement.disabled =
           !hasUnsavedChanges ||
           state.systemSettings.isSaving ||
-          state.systemSettings.isUploadingLogo ||
           state.systemDataDeletion.isDeleting ||
           state.systemDataDeletion.isBackingUp ||
           state.systemDataDeletion.isRestoring;
@@ -1360,12 +1349,6 @@
 
     function applySystemSettingsPayload(payload = {}, options = {}) {
       const nextSettings = normalizeSystemSettingsPayload(payload);
-      state.systemSettings.schoolName = nextSettings.schoolName;
-      state.systemSettings.schoolLogoImageUrl = nextSettings.schoolLogoImageUrl;
-      if (state.superAdmin && !state.superAdmin.hasUnsavedChanges) {
-        applySuperAdminPayload({ ...state.superAdmin, schoolName: nextSettings.schoolName, logoImageUrl: nextSettings.schoolLogoImageUrl }, { preserveStatus: true });
-      }
-
       state.systemSettings.initialPassword = nextSettings.initialPassword;
       state.systemSettings.autoLogoutMinutes = nextSettings.autoLogoutMinutes;
       state.systemSettings.admissionHomepageUrl = nextSettings.admissionHomepageUrl;
@@ -1412,9 +1395,6 @@
     }
 
     function getValidatedSystemSettingsPayload() {
-      const schoolName = String(state.systemSettings.schoolName || '').trim();
-      const schoolLogoImageUrl = String(state.systemSettings.schoolLogoImageUrl || '').trim();
-      if (schoolName.length > 100) throw new Error('학교명은 100자 이하여야 합니다.');
       const initialPassword = String(state.systemSettings.initialPassword ?? "").trim();
       const autoLogoutMinutes = Math.round(Number(state.systemSettings.autoLogoutMinutes));
       const admissionHomepageUrl = String(state.systemSettings.admissionHomepageUrl ?? "").trim();
@@ -1467,8 +1447,6 @@
       }
 
       return {
-        schoolName,
-        schoolLogoImageUrl,
         initialPassword,
         autoLogoutMinutes,
         admissionHomepageUrl,
@@ -1657,9 +1635,6 @@
         });
 
         applySuperAdminPayload(savedSettings, { preserveStatus: true });
-        if (!state.systemSettings.hasUnsavedChanges) {
-          applySystemSettingsPayload({ ...state.systemSettings, schoolName: savedSettings.schoolName, schoolLogoImageUrl: savedSettings.logoImageUrl }, { preserveStatus: true });
-        }
         setSuperAdminStatus("슈퍼관리자 설정을 저장했습니다.");
         showToast("슈퍼관리자 설정을 저장했습니다.");
         renderView();
@@ -1682,7 +1657,7 @@
 
     async function saveSystemSettings() {
       let nextSettings;
-      if (state.systemSettings.isSaving || state.systemSettings.isUploadingLogo) return false;
+      if (state.systemSettings.isSaving) return false;
 
       if (isSystemDataOperationActive()) {
         setSystemSettingsStatus("백업, 복원 또는 데이터 삭제 작업이 끝난 뒤 저장하세요.", "warning");

@@ -1725,40 +1725,21 @@
   function renderSystemSettings() {
     const isSaving = state.systemSettings.isSaving;
     const disabled = isSaving ? 'disabled' : '';
-    const saveDisabled = !state.systemSettings.hasUnsavedChanges || isSaving || state.systemSettings.isUploadingLogo || state.systemDataDeletion.isDeleting || state.systemDataDeletion.isBackingUp || state.systemDataDeletion.isRestoring;
-    const logoDisabled = isSaving || state.systemSettings.isUploadingLogo;
+    const saveDisabled = !state.systemSettings.hasUnsavedChanges || isSaving || state.systemDataDeletion.isDeleting || state.systemDataDeletion.isBackingUp || state.systemDataDeletion.isRestoring;
     const components = Array.isArray(state.systemSettings.applicantExamNoComponents) ? state.systemSettings.applicantExamNoComponents : ['admissionCode', 'seriesCode', 'unitCode', 'sequence', ''];
     return `
       <section class="view-stack system-settings-view">
         <article class="form-card system-settings-basic-card">
           <div class="section-header">
-            <div class="menu-section-copy"><h3>시스템 설정</h3><p>학교 정보와 원서접수 운영에 필요한 기본 설정을 관리합니다.</p></div>
+            <div class="menu-section-copy"><h3>시스템 설정</h3><p>원서접수 운영에 필요한 기본 설정을 관리합니다.</p></div>
             <button class="primary-button system-settings-save-button" data-system-settings-action="save" type="button" ${saveDisabled ? 'disabled' : ''}>${isSaving ? '저장 중...' : '기본 설정 저장'}</button>
           </div>
           <div class="system-settings-layout">
             <section class="settings-group settings-group-school" aria-labelledby="settingsSchoolHeading">
-              <h4 id="settingsSchoolHeading">학교 정보</h4>
-              <div class="settings-field-pair">
-                <label class="field" for="systemSettingsSchoolName"><span>학교명</span>
-                  <input class="system-settings-input" id="systemSettingsSchoolName" maxlength="100" value="${escapeAttribute(state.systemSettings.schoolName || '')}" ${disabled} />
-                </label>
-                <label class="field" for="systemSettingsAdmissionHomepageUrl"><span>입학처 홈페이지</span>
-                  <input class="system-settings-input" id="systemSettingsAdmissionHomepageUrl" type="url" maxlength="500" value="${escapeAttribute(state.systemSettings.admissionHomepageUrl || '')}" placeholder="https://admission.example.ac.kr" autocomplete="off" ${disabled} />
-                </label>
-              </div>
-              <div class="settings-logo-field">
-                <span class="settings-field-label">학교 로고</span>
-                <div class="settings-logo-row">
-                  <img class="system-settings-school-logo-preview" src="${escapeAttribute(state.systemSettings.schoolLogoImageUrl || '/client/assets/logo.png')}" alt="학교 로고 미리보기" />
-                  <div class="settings-logo-controls">
-                    <div class="settings-logo-actions">
-                      <input id="systemSettingsSchoolLogo" type="file" aria-label="학교 로고 업로드" accept="image/png,image/jpeg,image/webp" ${logoDisabled ? 'disabled' : ''} />
-                      <button class="ghost-button" type="button" data-school-logo-reset ${logoDisabled || !state.systemSettings.schoolLogoImageUrl ? 'disabled' : ''}>기본 로고 사용</button>
-                    </div>
-                    <small class="muted">PNG·JPG·WEBP, 최대 2MB. 학교명과 로고는 수험생 화면에 표시됩니다.</small>
-                  </div>
-                </div>
-              </div>
+              <h4 id="settingsSchoolHeading">입학처 홈페이지</h4>
+              <label class="field" for="systemSettingsAdmissionHomepageUrl"><span>입학처 홈페이지</span>
+                <input class="system-settings-input" id="systemSettingsAdmissionHomepageUrl" type="url" maxlength="500" value="${escapeAttribute(state.systemSettings.admissionHomepageUrl || '')}" placeholder="https://admission.example.ac.kr" autocomplete="off" ${disabled} />
+              </label>
             </section>
             <section class="settings-group settings-group-security" aria-labelledby="settingsSecurityHeading">
               <h4 id="settingsSecurityHeading">계정·보안</h4>
@@ -1837,7 +1818,7 @@
             <section class="super-admin-setting-card">
               <div class="system-settings-section-head">
                 <span class="system-settings-label">학교명 설정</span>
-                <small class="muted system-settings-help">사용자 페이지 헤더에 표시됩니다. 시스템설정의 학교명과 동일한 값입니다.</small>
+                <small class="muted system-settings-help">사용자 페이지 헤더에 표시되는 학교명을 설정합니다.</small>
               </div>
               <label class="field super-admin-text-field" for="superAdminSchoolName">
                 <span>학교 이름</span>

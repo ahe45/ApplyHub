@@ -93,6 +93,7 @@
     } = systemSettingsController;
 
     const accountCreateController = createAccountCreateController({
+      getCurrentRole: () => state.auth.currentUser?.role,
       accountCreateError,
       accountCreateForm,
       accountCreateId,

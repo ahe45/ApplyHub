@@ -86,7 +86,8 @@
       }
 
       if (gridKey === "accountManagementGrid") {
-        return getAccountGridRows();
+        const superRole = globalThis.AdmitCardAppConfig.superAdminRole;
+        return getAccountGridRows().filter(account => state.auth.currentUser?.role === superRole || account.role !== superRole);
       }
 
       if (gridKey === "applicantHistoryGrid") {

@@ -11,6 +11,7 @@
     "test:ui-smoke": "node scripts/ui-smoke-test.js",
     "test:windows-launchers": "node scripts/windows-launchers-test.js",
     "test:schema-maintenance": "node scripts/schema-maintenance-test.js",
+    "test:admin-menus": "node scripts/membership-smoke-test.js --admin-menus",
     "test:membership": "node scripts/membership-smoke-test.js",
     "test:document-settings": "node scripts/membership-smoke-test.js --document-settings",
     "test:applicant-archive": "node scripts/archive-job-behavior-test.js && node scripts/membership-smoke-test.js --archive",

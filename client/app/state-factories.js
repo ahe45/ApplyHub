@@ -343,8 +343,6 @@
 
   function normalizeSystemSettingsPayload(payload = {}, options = {}) {
     return {
-      schoolName: String(payload.schoolName || '').trim(),
-      schoolLogoImageUrl: String(payload.schoolLogoImageUrl || '').trim(),
       initialPassword: normalizeSystemInitialPassword(payload.initialPassword, options.defaultPassword),
       autoLogoutMinutes: String(
         normalizeSystemAutoLogoutMinutes(payload.autoLogoutMinutes, {
@@ -369,8 +367,6 @@
 
   function cloneSystemSettingsSnapshot(snapshot = {}) {
     return {
-      schoolName: String(snapshot.schoolName || ''),
-      schoolLogoImageUrl: String(snapshot.schoolLogoImageUrl || ''),
       initialPassword: String(snapshot.initialPassword ?? ""),
       autoLogoutMinutes: String(snapshot.autoLogoutMinutes ?? ""),
       admissionHomepageUrl: String(snapshot.admissionHomepageUrl ?? ""),

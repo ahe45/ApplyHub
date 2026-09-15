@@ -14,6 +14,7 @@
     accountCreateName,
     accountCreateRole,
     accountRoleOptions,
+    getCurrentRole = () => "",
     apiRequest,
     appendAccountRecord,
     closeModal,
@@ -25,6 +26,11 @@
     renderView,
     showToast,
   }) {
+    function getAvailableRoles() {
+      const superRole = globalThis.AdmitCardAppConfig.superAdminRole;
+      return accountRoleOptions.filter(role => getCurrentRole() === superRole || role !== superRole);
+    }
+
     function getDefaultAccountRole() {
       return accountRoleOptions.includes("관리자") ? "관리자" : String(accountRoleOptions[0] || "조회용");
     }
@@ -34,7 +40,7 @@
         return;
       }
 
-      const optionElements = accountRoleOptions.map((role) => {
+      const optionElements = getAvailableRoles().map((role) => {
         const option = document.createElement("option");
         option.value = role;
         option.textContent = role;
@@ -111,7 +117,7 @@
         return;
       }
 
-      if (!accountRoleOptions.includes(role)) {
+      if (!getAvailableRoles().includes(role)) {
         setAccountCreateError("계정 권한을 선택하세요.");
         accountCreateRole?.focus();
         return;

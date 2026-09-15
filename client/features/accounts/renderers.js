@@ -8,6 +8,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, () => {
   function renderAccountRoleOptions(selectedRole) {
     return accountRoleOptions
+      .filter(role => state.auth.currentUser?.role === superAdminRole || role !== superAdminRole)
       .map(
         (role) =>
           `<option value="${escapeAttribute(role)}" ${role === selectedRole ? "selected" : ""}>${escapeHtml(role)}</option>`,
