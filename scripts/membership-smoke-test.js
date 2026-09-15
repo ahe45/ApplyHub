@@ -525,9 +525,7 @@ async function run() {
     await page.waitForSelector('#memberDetailPanel');
     assert(new URL(page.url()).searchParams.has('member'), 'Application details link directly back to member information');
     await page.goto(base + '/system-data-deletion', { waitUntil: 'networkidle2' });
-    await page.waitForSelector('[data-system-data-delete=applicant-members]');
-    assert((await page.$eval('[data-system-data-delete=applicant-members]', button => button.closest('.system-data-delete-card').textContent)).includes('접수 이력은 보존'));
-    await page.screenshot({ path: path.join(artifacts, 'member-data-deletion.png'), fullPage: true });
+    assert.equal(await page.$('[data-system-data-delete=applicant-members]'), null, 'Ordinary administrators cannot open data deletion');
     await page.goto(base + '/system-backup-restore', { waitUntil: 'networkidle2' });
     assert.equal(await page.$('#systemBackupRestoreFileInput'), null, 'Ordinary administrators cannot open backup and restore');
     await page.goto(base + '/applicant-question-template-management', { waitUntil: 'networkidle2' });
@@ -1132,9 +1130,15 @@ async function run() {
     assert.equal(zip.getEntry('tables/applicant_member_sessions.json'), null);
     assert.equal(zip.getEntry('tables/applicant_member_verifications.json'), null);
     assert.equal(zip.getEntry('tables/applicant_member_recovery.json'), null);
-    assert.equal((await call('/api/system-data/applicant-members', { currentPassword: 'wrong' }, managerCookie, 'DELETE')).status, 401, 'Member deletion requires the current administrator password');
+    assert.equal((await call('/api/system-data/applicant-members', { currentPassword: 'AdminSmoke1234' }, managerCookie, 'DELETE')).status, 403, 'Ordinary administrators cannot delete system data');
+    await services.authService.createAccount({ id: 'deletion-super-test', name: '삭제 테스트', role: config.superAdminRole });
+    await query('UPDATE accounts SET password_temporary = 0 WHERE login_id = ?', ['deletion-super-test']);
+    const deletionPassword = (await services.systemService.getSystemSettings()).initialPassword;
+    const deletionLogin = await call('/api/auth/login', { id: 'deletion-super-test', password: deletionPassword });
+    assert.equal(deletionLogin.status, 200);
+    assert.equal((await call('/api/system-data/applicant-members', { currentPassword: 'wrong' }, deletionLogin.cookie, 'DELETE')).status, 401, 'Member deletion requires the current super-administrator password');
     assert.equal((await query('SELECT COUNT(*) AS count FROM applicant_members'))[0].count, savedMembers.length);
-    const deleted = await call('/api/system-data/applicant-members', { currentPassword: 'AdminSmoke1234' }, managerCookie, 'DELETE');
+    const deleted = await call('/api/system-data/applicant-members', { currentPassword: deletionPassword }, deletionLogin.cookie, 'DELETE');
     assert.equal(deleted.status, 200, JSON.stringify(deleted));
     assert.equal(deleted.body.deletedMembers, savedMembers.length);
     assert.equal((await query('SELECT COUNT(*) AS count FROM applicant_members'))[0].count, 0);

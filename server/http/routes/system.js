@@ -360,7 +360,7 @@ function createSystemRoutes(deps) {
       "DELETE",
       /^\/api\/system-data\/(?<scope>all|applicant-members|applicant-settings|applicant-history|print-history)$/,
       async ({ request, response, params, authenticatedAccount }) => {
-        requireSystemManager(authenticatedAccount);
+        requireSuperAdmin(authenticatedAccount);
         const body = await deps.readJsonBody(request);
 
         try {

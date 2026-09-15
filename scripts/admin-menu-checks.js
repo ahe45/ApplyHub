@@ -23,15 +23,24 @@ async function runAdminMenuChecks({ services, query, base, call }) {
     assert.equal(bootstrap.body.accounts.some(account => account.id === ids[0]), isSuper);
     assert.equal(Boolean(bootstrap.body.systemBackupAutomation), isSuper);
     assert.equal(config.getAccessibleViewsForRole(role).includes('systemBackupRestore'), isSuper);
+    assert.equal(config.getAccessibleViewsForRole(role).includes('systemDataDeletion'), isSuper);
     // Old saved menu visibility cannot grant access to a super-admin view.
     assert.equal(config.getAccessibleViewsForRole(role, { roleMenuVisibility: { [role]: ['systemBackupRestore'] } }).includes('systemBackupRestore'), isSuper);
+    assert.equal(config.getAccessibleViewsForRole(role, { roleMenuVisibility: { [role]: ['systemDataDeletion'] } }).includes('systemDataDeletion'), isSuper);
     if (!isSuper) {
+      for (const scope of ['all', 'applicant-members', 'applicant-settings', 'applicant-history', 'print-history']) {
+        assert.equal((await call('/api/system-data/' + scope, { currentPassword: password }, cookies[role], 'DELETE')).status, 403, `${role}: delete ${scope}`);
+      }
       for (const [method, endpoint] of [['GET', 'automation'], ['PUT', 'automation'], ['POST', 'automation/run'], ['POST', 'export'], ['POST', 'validate'], ['POST', 'import']]) {
         assert.equal((await call('/api/system-backup/' + endpoint, {}, cookies[role], method)).status, 403, `${role}: ${endpoint}`);
       }
     }
   }
   assert.equal((await call('/api/system-backup/automation', null, superCookie, 'GET')).status, 200);
+  assert.equal((await call('/api/system-data/applicant-members', { currentPassword: 'wrong' }, superCookie, 'DELETE')).status, 401);
+  // These requests operate only on the disposable fixture database.
+  assert.equal((await call('/api/system-data/applicant-members', { currentPassword: password }, superCookie, 'DELETE')).status, 200);
+  assert.equal((await call('/api/system-data/print-history', {}, superCookie, 'DELETE')).status, 200);
   const exportResponse = await fetch(base + '/api/system-backup/export', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: superCookie },
     body: JSON.stringify({ currentPassword: password, includeDatabase: true }),
@@ -90,6 +99,9 @@ async function runAdminMenuChecks({ services, query, base, call }) {
         const nav = await page.$eval('[data-view="systemBackupRestore"]', el => ({ visible: !!el.getClientRects().length && getComputedStyle(el).display !== 'none', section: el.closest('.nav-section').querySelector('.nav-section-title').textContent }));
         assert.equal(nav.visible, isSuper);
         assert.equal(nav.section, '슈퍼관리자');
+        const deletionNav = await page.$eval('[data-view="systemDataDeletion"]', el => ({ visible: !!el.getClientRects().length && getComputedStyle(el).display !== 'none', section: el.closest('.nav-section').querySelector('.nav-section-title').textContent }));
+        assert.equal(deletionNav.visible, isSuper);
+        assert.equal(deletionNav.section, '슈퍼관리자');
         await page.click('[data-account-edit="admin"]');
         assert.equal(await page.$eval('[data-account-field="role"]', (el, superRole) => [...el.options].some(option => option.value === superRole), config.superAdminRole), isSuper);
         await page.click('[data-open-modal="accountCreateModal"]');
@@ -100,6 +112,9 @@ async function runAdminMenuChecks({ services, query, base, call }) {
         assert.equal(await page.$('#systemSettingsSchoolName'), null);
         assert.equal(await page.$('#systemSettingsSchoolLogo'), null);
         assert.equal(await page.$('[data-school-logo-reset]'), null);
+        await page.goto(base + '/system-data-deletion', { waitUntil: 'networkidle0' });
+        assert.equal(Boolean(await page.$('[data-system-data-delete="applicant-members"]')), isSuper);
+        if (isSuper) assert((await page.$eval('[data-system-data-delete="applicant-members"]', el => el.closest('.system-data-delete-card').textContent)).includes('접수 이력은 보존'));
         await page.goto(base + '/system-backup-restore', { waitUntil: 'networkidle0' });
         assert.equal(Boolean(await page.$('#systemBackupRestoreFileInput')), isSuper);
         if (isSuper) {

@@ -58,13 +58,12 @@
         "loginNoticeSettings",
         "accountManagement",
         "systemSettings",
-        "systemDataDeletion",
       ]),
     }),
     Object.freeze({
       key: "super-admin-management",
       title: "슈퍼관리자",
-      views: Object.freeze([superAdminView, "systemBackupRestore"]),
+      views: Object.freeze([superAdminView, "systemBackupRestore", "systemDataDeletion"]),
     }),
   ]);
   const sidebarMenuViewDefinitions = Object.freeze(
@@ -138,7 +137,6 @@
       "accountManagement",
       "loginNoticeSettings",
       "systemSettings",
-      "systemDataDeletion",
     ]),
     운영자: Object.freeze([
       "applicantRecruitmentManagement",
@@ -203,7 +201,7 @@
         return;
       }
 
-      if ([superAdminView, "systemBackupRestore"].includes(normalizedView) && normalizedRole !== superAdminRole) {
+      if ([superAdminView, "systemBackupRestore", "systemDataDeletion"].includes(normalizedView) && normalizedRole !== superAdminRole) {
         return;
       }
 
