@@ -669,7 +669,7 @@ function createApplicantAttachmentStorage({
     );
     const deletedApplicantPhotoCount = await deleteApplicantStoredPhotoFiles(
       normalizedSubmission.id,
-      normalizedSubmission.promotedExamineeNo,
+      normalizedSubmission.examineeNo,
       photoAnswerItem?.value?.fileName || normalizedSubmission.internalPhotoValue?.fileName || "",
     );
     const deletedApplicantFileResults = await Promise.all(

@@ -20,11 +20,10 @@ function createApplicantSchemaBootstrap({
     await query(`
       CREATE TABLE IF NOT EXISTS app_meta (
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-        promoted_examinee_no VARCHAR(30) NULL,
-        promotion_override_json MEDIUMTEXT NULL,
-        promoted_at DATETIME NULL,
+        examinee_no VARCHAR(30) NULL,
+        field_overrides_json MEDIUMTEXT NULL,
         PRIMARY KEY (id),
-        KEY idx_app_meta_promoted (promoted_examinee_no)
+        KEY idx_app_meta_examinee_no (examinee_no)
       )
     `);
   }
@@ -145,13 +144,12 @@ function createApplicantSchemaBootstrap({
         password_hash AS passwordHash,
         status,
         answers_json AS answersJson,
-        promoted_examinee_no AS promotedExamineeNo,
+        promoted_examinee_no AS examineeNo,
         photo_name AS photoName,
         photo_mime AS photoMime,
         TO_BASE64(photo_blob) AS photoBase64,
         created_at AS createdAt,
-        updated_at AS updatedAt,
-        promoted_at AS promotedAt
+        updated_at AS updatedAt
       FROM app_subm
       ORDER BY id ASC
     `);
@@ -171,15 +169,13 @@ function createApplicantSchemaBootstrap({
         `
           INSERT INTO app_meta (
             id,
-            promoted_examinee_no,
-            promoted_at
+            examinee_no
           )
-          VALUES (?, ?, ?)
+          VALUES (?, ?)
         `,
         [
           submissionId,
-          String(legacyRow?.promotedExamineeNo || "").trim() || null,
-          legacyRow?.promotedAt || null,
+          String(legacyRow?.examineeNo || "").trim() || null,
         ],
       );
 
@@ -521,8 +517,8 @@ function createApplicantSchemaBootstrap({
         ? await getTableColumns("app_meta")
         : await query(`SHOW COLUMNS FROM app_meta`);
 
-    if (!(typeof hasColumn === "function" ? hasColumn(applicantMetaColumns, "promotion_override_json") : applicantMetaColumns.some((column) => String(column?.Field || "") === "promotion_override_json"))) {
-      await query(`ALTER TABLE app_meta ADD COLUMN promotion_override_json MEDIUMTEXT NULL AFTER promoted_examinee_no`);
+    if (!(typeof hasColumn === "function" ? hasColumn(applicantMetaColumns, "field_overrides_json") : applicantMetaColumns.some((column) => String(column?.Field || "") === "field_overrides_json"))) {
+      await query(`ALTER TABLE app_meta ADD COLUMN field_overrides_json MEDIUMTEXT NULL AFTER examinee_no`);
     }
   }
 

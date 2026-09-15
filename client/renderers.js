@@ -172,7 +172,7 @@ const applicantHistoryGridColumns = Object.freeze([
   Object.freeze({ key: "series", label: "계열", sortable: true, filterable: true }),
   Object.freeze({ key: "unit", label: "모집단위", sortable: true, filterable: true }),
   Object.freeze({ key: "major", label: "전공", sortable: true, filterable: true }),
-  Object.freeze({ key: "promotedExamineeNo", label: "수험번호", sortable: true, filterable: true }),
+  Object.freeze({ key: "examineeNo", label: "수험번호", sortable: true, filterable: true }),
   Object.freeze({ key: "name", label: "이름", sortable: true, filterable: true }),
   Object.freeze({ key: "birth", label: "생년월일", sortable: true, filterable: true }),
   Object.freeze({ key: "id", label: "접수번호", sortable: true, filterable: true }),

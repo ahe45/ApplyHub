@@ -13,7 +13,7 @@ function fixture() {
   ];
   const submissions = Array.from({length:8}, (_,index) => ({
     id:index+1, name:['김민서','이준호','박서연','정수빈','최지우','한도윤','윤하린','다른전형'][index],
-    email:'test@example.test', status:'submitted', promotedExamineeNo:`26090000${index+1}`,
+    email:'test@example.test', status:'submitted', examineeNo:`26090000${index+1}`,
     track:'9월', admission:index===7 ? '편입학' : '신입학', series:'인문', unit:'인문학부', major:'',
     createdAt:`2026-09-${index<2 ? '15' : String(15-index).padStart(2,'0')} 09:00:00`,
     // Updating documents today must not count as a new application.
@@ -58,7 +58,7 @@ async function verifyDashboard(page, base) {
   const handler = request => {
     if (new URL(request.url()).pathname === '/api/bootstrap') return request.respond({status:200,contentType:'application/json',body:JSON.stringify({
       ...bootstrap, serverDate:'2026-09-15', serverTime:now, applicantManager:{...bootstrap.applicantManager,...manager},
-      examinees:manager.submissions.map(row=>({...row,examineeNo:row.promotedExamineeNo})),
+      examinees:manager.submissions.map(row=>({...row,examineeNo:row.examineeNo})),
     })});
     return request.continue();
   };

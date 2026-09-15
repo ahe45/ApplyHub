@@ -18,14 +18,14 @@ function createMemberAdminService({ query, getSettings, createHttpError }) {
     const rows = await query(`SELECT m.id, m.name, m.email, m.email_verified AS emailVerified, m.created_at AS createdAt,
       COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(m.profile_json, '$.birth')), ''), JSON_UNQUOTE(JSON_EXTRACT(m.profile_json, ?))) AS birth,
       JSON_UNQUOTE(JSON_EXTRACT(m.profile_json, ?)) AS phone,
-      a.id AS submissionId, a.promoted_examinee_no AS examineeNo
+      a.id AS submissionId, a.examinee_no AS examineeNo
       ${join} WHERE ${where.join(' AND ')} ORDER BY m.id DESC LIMIT 20 OFFSET ?`,
     [`$.${JSON.stringify(birthKey)}`, `$.${JSON.stringify(phoneKey)}`, ...params, (currentPage - 1) * 20]);
     return { rows, total: Number(counts.total), page: currentPage, pageSize: 20 };
   }
   async function getRow(id) {
     const [row] = await query(`SELECT m.id, m.name, m.email, m.email_verified AS emailVerified, m.created_at AS createdAt,
-      m.profile_json, m.consent_json, a.id AS submissionId, a.promoted_examinee_no AS examineeNo
+      m.profile_json, m.consent_json, a.id AS submissionId, a.examinee_no AS examineeNo
       FROM applicant_members m LEFT JOIN app_meta a ON a.member_id = m.id WHERE m.id = ?`, [id]);
     if (!row) throw createHttpError(404, '회원을 찾을 수 없습니다.');
     return row;

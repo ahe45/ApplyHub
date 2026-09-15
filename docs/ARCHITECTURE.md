@@ -71,7 +71,7 @@
 - `server/modules/admit-cards/submission-records.js` reads `app_subm` answers and `app_meta` exam numbers directly. Individual PDFs, batch PDFs/ZIPs, the dashboard and print history share these records.
 - There is no roster import/edit screen or assignment workflow. Current schema and backups do not create/include `examinee` or `app_assign`.
 - Existing installations retain inactive legacy tables and old print logs. Startup detaches the old print-log foreign key without deleting log rows; legacy `candidate_id` records are converted to exam numbers first. Historical per-application field overrides and photos remain readable.
-- The `promoted_examinee_no` column name is retained for compatibility; it is the exam number issued when an application is submitted. A promotion state is not required to print. Applicant ownership and lookup schedule checks still apply.
+- `app_meta.examinee_no` stores the exam number issued when an application is submitted. `field_overrides_json` stores corrections used by ticket rendering and document-schedule selection. The old promotion timestamp is removed. Applicant ownership and lookup schedule checks still apply.
 - Run `npm run test:submission-tickets` for fresh-schema and legacy-migration checks plus real PDFs and administrator page checks.
 
 ## Template and cleanup rules

@@ -3,7 +3,7 @@ const TABLE_COMMENTS_BY_TABLE = Object.freeze({
 
   app_email_log: "수험생 이메일 인증 코드 발송 및 검증 이력",
   app_form: "원서접수 및 서류제출 문항 정의",
-  app_meta: "수험생 접수 이관 메타데이터",
+  app_meta: "접수 식별자, 회원 연결 및 수험번호",
   app_schedule: "전형별 접수 및 수험표 조회 일정",
   app_subm: "수험생 접수 응답 데이터",
   app_unit: "모집시기별 전형/계열/모집단위/전공 정의",
@@ -56,9 +56,8 @@ const COLUMN_COMMENTS_BY_TABLE = Object.freeze({
   }),
   app_meta: Object.freeze({
     id: "접수 식별자(app_subm.id와 동일)",
-    promoted_examinee_no: "접수 시 발급한 수험번호",
-    promotion_override_json: "이관 시 적용한 수동 보정 데이터 JSON",
-    promoted_at: "이전 시스템 처리 일시 (보존용)",
+    examinee_no: "접수 시 발급한 수험번호",
+    field_overrides_json: "접수 정보에 적용하는 필드별 보정값 JSON",
   }),
   app_schedule: Object.freeze({
     id: "접수 일정 식별자",

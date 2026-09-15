@@ -28,7 +28,7 @@
           <span class="dashboard-status is-${period.status}">${period.statusLabel}</span>
         </div>`).join("")}</div>` : `<div class="dashboard-empty">선택한 모집 범위에 등록된 일정이 없습니다.</div>`;
       const recent = info.recent.map(row => `<tr ${canViewHistory ? `data-dashboard-submission="${Number(row.id)}"` : ""}>
-        <td>${esc(shortDate(row.createdAt))}</td><td>${canViewHistory ? `<button class="dashboard-detail-link" type="button" data-applicant-submission-toggle="${Number(row.id)}" aria-label="${esc(row.name)} 접수 상세 보기">${esc(row.promotedExamineeNo || "미부여")}</button>` : esc(row.promotedExamineeNo || "미부여")}</td>
+        <td>${esc(shortDate(row.createdAt))}</td><td>${canViewHistory ? `<button class="dashboard-detail-link" type="button" data-applicant-submission-toggle="${Number(row.id)}" aria-label="${esc(row.name)} 접수 상세 보기">${esc(row.examineeNo || "미부여")}</button>` : esc(row.examineeNo || "미부여")}</td>
         <td>${esc(row.name)}</td><td>${esc(row.admission || "—")}</td></tr>`).join("");
       const filters = [["headerTrack", "모집시기"], ["headerAdmission", "전형"], ["headerSeries", "계열"]]
         .map(([id,label]) => `<div class="field"><label for="${id}">${label}</label><select id="${id}" aria-label="${label}"><option value="">전체</option></select></div>`).join("");

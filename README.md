@@ -42,6 +42,22 @@ Node.js가 없거나 22.13보다 오래된 경우 winget으로 설치를 시도�
 
 Windows 실행·설정·업데이트 동작 검증: `npm run test:windows-launchers`
 
+## DB 구조 정리
+
+`npm run db:setup`과 서버 시작 시 기존 DB 구조를 검사하고 필요한 변경을 적용합니다. 업데이트할 때는 기존 서버를 먼저 종료하세요.
+
+- `app_meta.promoted_examinee_no` → `examinee_no`: 접수 시 발급한 수험번호
+- `app_meta.promotion_override_json` → `field_overrides_json`: 수험표와 서류 제출 일정 판단에 적용하는 접수 정보 보정값
+- `app_meta.promoted_at`: 현재 기능에서 사용하지 않는 과거 이관일 컬럼 삭제
+- 미사용 테이블 `examinee`, `app_assign`, `pdf_audit_logs`, `pdf_generation_batches`, `pdf_generation_histories`, `pdf_templates`, `pdf_template_elements`, `pdf_template_pages`, `pdf_template_versions`, `school_settings`, `surveys`, `survey_admins`, `survey_answers`, `survey_questions`, `survey_responses` 삭제
+- 예전 접수 데이터 변환 과정에서 남긴 `app_subm_legacy_<숫자>` 테이블도 구조 확인 후 정리
+
+변경 전 영향받는 테이블의 구조와 데이터를 `.private/schema-backups/`에 SQL 파일로 보관하고 파일 검증을 완료한 뒤 변경합니다. 이 폴더는 Git과 웹 공개 대상에서 제외됩니다. JSON 파일에 테이블별 행 수와 SQL 파일의 SHA-256 검증값을 함께 기록합니다. 복구가 필요하면 SQL 파일을 **별도 DB**에 불러와 이전 데이터를 확인하세요.
+
+삭제 대상에 다른 테이블의 외래키 참조가 있거나 백업에 실패하면 정리를 중단합니다. 대상 목록에 없는 테이블은 유지합니다. 기존 ZIP 백업의 이전 컬럼명은 복원 과정에서 새 컬럼명으로 변환합니다.
+
+응답의 접수 정보도 `examineeNo`, `fieldOverrides`를 사용합니다. 구조 정리 및 이전 백업 복원 검증: `npm run test:schema-maintenance`
+
 ## 이메일 인증 발송
 
 관리자 **시스템 설정 → 이메일 발송 설정**에서 서버 주소, 포트, 보안 방식, 계정, 비밀번호와 발신 정보를 입력합니다. **연결 확인** 후 **메일 설정 저장**을 누르면 다음 인증 메일부터 즉시 적용됩니다. 연결 확인은 SMTP 연결·인증까지만 검사하며 실제 수신 여부를 보장하지는 않습니다.

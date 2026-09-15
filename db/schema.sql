@@ -108,12 +108,11 @@ CREATE TABLE IF NOT EXISTS app_subm (
 CREATE TABLE IF NOT EXISTS app_meta (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   member_id BIGINT UNSIGNED NULL,
-  promoted_examinee_no VARCHAR(30) NULL,
-  promotion_override_json MEDIUMTEXT NULL,
-  promoted_at DATETIME NULL,
+  examinee_no VARCHAR(30) NULL,
+  field_overrides_json MEDIUMTEXT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uniq_app_meta_member (member_id),
-  KEY idx_app_meta_promoted (promoted_examinee_no)
+  KEY idx_app_meta_examinee_no (examinee_no)
 );
 
 CREATE TABLE IF NOT EXISTS applicant_members (
@@ -215,7 +214,7 @@ ALTER TABLE templates
 
 
 ALTER TABLE app_meta
-  ADD COLUMN IF NOT EXISTS promotion_override_json MEDIUMTEXT NULL AFTER promoted_examinee_no;
+  ADD COLUMN IF NOT EXISTS field_overrides_json MEDIUMTEXT NULL AFTER examinee_no;
 
 ALTER TABLE accounts
   ADD COLUMN IF NOT EXISTS display_name VARCHAR(100) NOT NULL DEFAULT '' AFTER login_id,

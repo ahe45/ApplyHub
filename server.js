@@ -140,11 +140,7 @@ const server = http.createServer(async (request, response) => {
 });
 
 async function initializeServer() {
-  try {
-    await initializeApplicationData();
-  } catch (error) {
-    console.error(`Schema check skipped: ${translateDatabaseError(error).message}`);
-  }
+  await initializeApplicationData();
 
   return new Promise((resolve, reject) => {
     const handleError = (error) => {

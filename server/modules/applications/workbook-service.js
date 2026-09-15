@@ -94,7 +94,7 @@ function createApplicantWorkbookService(options = {}) {
       { header: "이름", key: "name", width: 20 },
       { header: "이메일", key: "email", width: 28 },
       { header: "상태", key: "statusLabel", width: 12 },
-      { header: "수험번호", key: "promotedExamineeNo", width: 18 },
+      { header: "수험번호", key: "examineeNo", width: 18 },
       { header: "접수일시", key: "createdAt", width: 22 },
       { header: "최종수정", key: "updatedAt", width: 22 },
     ];
@@ -118,7 +118,7 @@ function createApplicantWorkbookService(options = {}) {
           name: row.name,
           email: row.email,
           statusLabel: row.statusLabel,
-          promotedExamineeNo: row.promotedExamineeNo,
+          examineeNo: row.examineeNo,
           createdAt: row.createdAt,
           updatedAt: row.updatedAt,
         };

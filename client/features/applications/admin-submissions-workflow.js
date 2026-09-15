@@ -132,7 +132,7 @@
         "삭제된 접수 이력은 복구할 수 없습니다.",
       ];
 
-      if (String(targetSubmission?.status || "").trim() === "promoted" || String(targetSubmission?.promotedExamineeNo || "").trim()) {
+      if (String(targetSubmission?.status || "").trim() === "promoted" || String(targetSubmission?.examineeNo || "").trim()) {
         confirmationLines.push("접수 사진·서류와 해당 수험번호의 출력 이력도 함께 삭제됩니다.");
       }
 

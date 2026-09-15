@@ -3,6 +3,10 @@ const path = require("path");
 const mysql = require("mysql2/promise");
 const dotenv = require("dotenv");
 const { getDbConfig } = require("../db");
+const { maintainApplicationSchema } = require('../server/modules/database/schema-maintenance');
+const { createSchemaQueryHelpers } = require('../server/modules/bootstrap/schema/helpers');
+const { createApplicantSchemaBootstrap } = require('../server/modules/bootstrap/schema/applications');
+const { createPrintHistorySchemaBootstrap } = require('../server/modules/bootstrap/schema/print-history');
 
 dotenv.config({ path: path.join(__dirname, "..", ".env"), quiet: true });
 
@@ -19,7 +23,13 @@ async function main() {
       "CREATE DATABASE IF NOT EXISTS ?? CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", [databaseName],
     );
     await connection.query("USE ??", [databaseName]);
-    await connection.query(schemaSql);
+    const query = async (sql, params = []) => (await connection.query(sql, params))[0];
+    const helpers = createSchemaQueryHelpers({ query });
+    await maintainApplicationSchema({ connection, rootDir: path.resolve(__dirname, '..'), initialize: async () => {
+      await createApplicantSchemaBootstrap({ query, ...helpers }).ensureApplicantSchema();
+      await createPrintHistorySchemaBootstrap({ query, ...helpers }).ensurePrintHistorySchema();
+      await connection.query(schemaSql);
+    } });
 
     console.log(`Database '${databaseName}' is ready.`);
   } finally {

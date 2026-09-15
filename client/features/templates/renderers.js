@@ -174,7 +174,7 @@
     }
 
     const summaryFields = [
-      { label: "수험번호", value: normalizedSubmission.promotedExamineeNo || "-" },
+      { label: "수험번호", value: normalizedSubmission.examineeNo || "-" },
       { label: "이름", value: normalizedSubmission.name || "-" },
       { label: "이메일", value: normalizedSubmission.email || "-" },
     ];
@@ -261,7 +261,7 @@
                   ? `<img
                       class="examinee-detail-photo-image"
                       src="${escapeAttribute(normalizedSubmission.photoUrl)}"
-                      alt="${escapeAttribute(`${normalizedSubmission.name || normalizedSubmission.promotedExamineeNo || "수험생"} 사진`)}"
+                      alt="${escapeAttribute(`${normalizedSubmission.name || normalizedSubmission.examineeNo || "수험생"} 사진`)}"
                     />`
                   : `<div class="examinee-detail-photo-placeholder">
                       <strong>사진 미등록</strong>

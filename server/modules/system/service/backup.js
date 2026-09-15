@@ -1,4 +1,5 @@
 const AdmZip = require("adm-zip");
+const { normalizeLegacyBackupRow } = require('../../database/schema-maintenance');
 
 function createSystemBackupService({
   applicantFileStorageDirName = "uploads/file",
@@ -867,7 +868,7 @@ function createSystemBackupService({
       .trim()
       .replace(/[^A-Za-z0-9._-]+/g, "-")
       .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "") || "admitcard";
+      .replace(/^-|-$/g, "") || "applyhub";
 
     return {
       archiveBuffer: zipArchive.toBuffer(),
@@ -1081,7 +1082,7 @@ function createSystemBackupService({
 
           return {
             tableName,
-            rows: tableRows,
+            rows: tableRows.map(row => normalizeLegacyBackupRow(tableName, row)),
           };
         })
       : [];

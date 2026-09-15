@@ -844,7 +844,7 @@
     for (const item of state.currentSubmission?.answerItems || []) {
       if (item.systemFieldKey === "admissionCode") selection.admissionCode = String(item.value || "").trim();
     }
-    const overrides = state.currentSubmission?.promotionOverride || {};
+    const overrides = state.currentSubmission?.fieldOverrides || {};
     for (const key of ["track", "admission", "admissionCode"]) {
       if (Object.prototype.hasOwnProperty.call(overrides, key)) selection[key] = String(overrides[key] || "").trim();
     }
@@ -3120,7 +3120,7 @@
 
   function renderLookupTicketResult() {
     const submission = state.currentSubmission;
-    const examineeNo = String(submission?.promotedExamineeNo || "").trim();
+    const examineeNo = String(submission?.examineeNo || "").trim();
     const pdfUrl =
       submission?.id &&
       state.identity.accessToken

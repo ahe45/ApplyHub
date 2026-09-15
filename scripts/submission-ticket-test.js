@@ -8,7 +8,7 @@ async function verifySubmissionTickets({ services, call, base, query, submission
   assert.deepEqual(await query("SHOW TABLES LIKE 'app_assign'"), [], 'Fresh installs have no assignment table');
   const submission = await services.applicantService.getApplicantSubmissionById(submissionId);
   assert.equal(submission.status, 'submitted');
-  const number = submission.promotedExamineeNo;
+  const number = submission.examineeNo;
   assert(number);
   const adminLogin = await call('/api/auth/login', {id: 'admin', password: '1111'});
   const setup = await call('/api/auth/password/setup', {password: 'TicketTest1234', passwordConfirm: 'TicketTest1234'}, adminLogin.cookie);
@@ -71,7 +71,7 @@ async function verifySubmissionTickets({ services, call, base, query, submission
   await services.initializeApplicationData();
   assert.equal((await query("SELECT * FROM print_log WHERE examinee_no = 'legacy-only'")).length, 1, 'Migration retains old print history');
   assert.equal((await services.systemService.getBootstrapPayload()).examinees.length, 1, 'Legacy-only roster entries never become ticket sources');
-  await query('DROP TABLE examinee'); // Only this test fixture; production migration never deletes the legacy table.
+  assert.deepEqual(await query("SHOW TABLES LIKE 'examinee'"), [], 'Migration removes the backed-up legacy roster');
   const backup = await services.systemService.buildSystemBackupArchive({includeDatabase: true, includedAssetKeys: []});
   assert(backup.archiveBuffer.length > 0);
   const browser = await puppeteer.launch({executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true, args: ['--no-sandbox']});

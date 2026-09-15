@@ -15,7 +15,7 @@ async function run() {
     let route = '', completed = true;
     const member = { id: 1, name: '홍길동', email: 'preview@example.test', profile: {} };
     const selection = { track: '수시', admission: '일반', series: '인문', unit: '문학', major: '' };
-    const submission = { id: 1, name: member.name, email: member.email, status: 'promoted', promotedExamineeNo: '20260001', selectionAnswers: selection,
+    const submission = { id: 1, name: member.name, email: member.email, status: 'promoted', examineeNo: '20260001', selectionAnswers: selection,
       answerMap: { school: '테스트고등학교' }, answerItems: [{ fieldKey: 'school', questionText: '출신학교', inputType: 'text', value: '테스트고등학교' }] };
     page.on('pageerror', error => errors.push(error.message));
     await page.setRequestInterception(true);

@@ -801,7 +801,7 @@ function createApplicantService({
             row?.status ||
             "접수 완료",
         ).trim(),
-        promotedExamineeNo: String(row?.promotedExamineeNo || "").trim(),
+        examineeNo: String(row?.examineeNo || "").trim(),
         createdAt: String(row?.createdAt || "").trim(),
         updatedAt: String(row?.updatedAt || "").trim(),
         answerValues: normalizedAnswerItems.map((answerItem) => {
@@ -830,10 +830,10 @@ function createApplicantService({
     const normalizedRows = (Array.isArray(rows) ? rows : [])
       .map((row) => ({
         submissionId: Number(row?.id || row?.submissionId || 0),
-        promotedExamineeNo: String(row?.promotedExamineeNo || "").trim(),
+        examineeNo: String(row?.examineeNo || "").trim(),
         photoFileName: path.basename(String(row?.photoFileName || "").trim()),
       }))
-      .filter((row) => row.submissionId > 0 || row.promotedExamineeNo || row.photoFileName);
+      .filter((row) => row.submissionId > 0 || row.examineeNo || row.photoFileName);
 
     if (normalizedRows.length === 0) {
       throw createHttpError(400, "다운로드할 수험생 사진 대상이 없습니다.");
@@ -845,7 +845,7 @@ function createApplicantService({
     let addedPhotoCount = 0;
 
     for (const row of normalizedRows) {
-      const dedupeKey = row.submissionId > 0 ? `submission:${row.submissionId}` : row.promotedExamineeNo || row.photoFileName;
+      const dedupeKey = row.submissionId > 0 ? `submission:${row.submissionId}` : row.examineeNo || row.photoFileName;
 
       if (!dedupeKey || handledKeys.has(dedupeKey)) {
         continue;
@@ -853,8 +853,8 @@ function createApplicantService({
 
       handledKeys.add(dedupeKey);
       const storedApplicantPhoto =
-        row.submissionId > 0 ? await readStoredApplicantPhotoFile(row.submissionId, row.promotedExamineeNo, row.photoFileName) : null;
-      const storedPhoto = storedApplicantPhoto || (await readStoredPromotedPhotoFile(row.promotedExamineeNo));
+        row.submissionId > 0 ? await readStoredApplicantPhotoFile(row.submissionId, row.examineeNo, row.photoFileName) : null;
+      const storedPhoto = storedApplicantPhoto || (await readStoredPromotedPhotoFile(row.examineeNo));
 
       if (!storedPhoto?.photoBlob) {
         continue;
@@ -862,7 +862,7 @@ function createApplicantService({
 
       const fallbackExtension = String(storedPhoto.photoMime || "").trim().toLowerCase() === "image/png" ? ".png" : ".jpg";
       const entryExtension = path.extname(String(storedPhoto.photoName || "").trim()).toLowerCase() || fallbackExtension;
-      const entryBaseName = row.promotedExamineeNo || (row.submissionId > 0 ? `submission-${row.submissionId}` : "photo");
+      const entryBaseName = row.examineeNo || (row.submissionId > 0 ? `submission-${row.submissionId}` : "photo");
       let entryName = `${entryBaseName}${entryExtension}`;
       let duplicateIndex = 1;
 
@@ -2726,7 +2726,7 @@ function createApplicantService({
       .map((row) => normalizeApplicantStoredAnswerRow(row, options))
       .filter(Boolean);
     const photoAnswerItem = answerItems.find((answerItem) => answerItem.inputType === "photo") || null;
-    const promotionOverride = normalizeStoredTicketOverrides(firstRow.promotionOverrideJson);
+    const fieldOverrides = normalizeStoredTicketOverrides(firstRow.fieldOverridesJson);
     const systemValues = buildApplicantSystemValueMap(answerItems);
 
     return {
@@ -2736,26 +2736,25 @@ function createApplicantService({
       email: String(firstRow.email || "").trim(),
       hasPassword: Number(firstRow.hasPassword) === 1 || firstRow.hasPassword === true,
       status: String(firstRow.status || "submitted").trim(),
-      promotedExamineeNo: String(firstRow.promotedExamineeNo || "").trim(),
+      examineeNo: String(firstRow.examineeNo || "").trim(),
       hasPhoto: photoAnswerItem?.value?.hasPhoto === true,
       photoFileName: String(photoAnswerItem?.value?.fileName || "").trim(),
       createdAt: String(firstRow.createdAt || "").trim(),
       updatedAt: String(firstRow.updatedAt || "").trim(),
-      promotedAt: String(firstRow.promotedAt || "").trim(),
       birth: systemValues.birth,
       track: systemValues.track,
       admission: systemValues.admission,
       series: systemValues.series,
       unit: systemValues.unit,
       major: systemValues.major,
-      promotionOverride,
+      fieldOverrides,
       answerItems: normalizeStoredAnswerItems(answerItems),
       answerMap: buildApplicantAnswerMap(answerItems),
       ...(options.includeInternal === true
         ? {
             passwordHash: String(firstRow.passwordHash || "").trim(),
             internalPhotoValue: photoAnswerItem?.internalPhotoValue || null,
-            promotionOverrideJson: String(firstRow.promotionOverrideJson || "").trim(),
+            fieldOverridesJson: String(firstRow.fieldOverridesJson || "").trim(),
           }
         : {}),
     };
@@ -2807,12 +2806,11 @@ function createApplicantService({
           COALESCE(ff.question_text, s.field_key) AS questionText,
           COALESCE(ff.input_type, 'text') AS inputType,
           COALESCE(ff.system_field_key, '') AS systemFieldKey,
-          COALESCE(meta.promoted_examinee_no, '') AS promotedExamineeNo,
+          COALESCE(meta.examinee_no, '') AS examineeNo,
           meta.member_id AS memberId,
-          COALESCE(meta.promotion_override_json, '') AS promotionOverrideJson,
+          COALESCE(meta.field_overrides_json, '') AS fieldOverridesJson,
           COALESCE(DATE_FORMAT(summary.created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
           COALESCE(DATE_FORMAT(summary.updated_at, '%Y-%m-%d %H:%i:%s'), '') AS updatedAt,
-          COALESCE(DATE_FORMAT(meta.promoted_at, '%Y-%m-%d %H:%i:%s'), '') AS promotedAt,
           COALESCE(ff.sort_order, 2147483647) AS sortOrder
         FROM app_subm s
         LEFT JOIN (
@@ -2856,12 +2854,11 @@ function createApplicantService({
           COALESCE(ff.question_text, s.field_key) AS questionText,
           COALESCE(ff.input_type, 'text') AS inputType,
           COALESCE(ff.system_field_key, '') AS systemFieldKey,
-          COALESCE(meta.promoted_examinee_no, '') AS promotedExamineeNo,
+          COALESCE(meta.examinee_no, '') AS examineeNo,
           meta.member_id AS memberId,
-          COALESCE(meta.promotion_override_json, '') AS promotionOverrideJson,
+          COALESCE(meta.field_overrides_json, '') AS fieldOverridesJson,
           COALESCE(DATE_FORMAT(summary.created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
           COALESCE(DATE_FORMAT(summary.updated_at, '%Y-%m-%d %H:%i:%s'), '') AS updatedAt,
-          COALESCE(DATE_FORMAT(meta.promoted_at, '%Y-%m-%d %H:%i:%s'), '') AS promotedAt,
           COALESCE(ff.sort_order, 2147483647) AS sortOrder
         FROM app_subm s
         INNER JOIN (
@@ -2921,7 +2918,7 @@ function createApplicantService({
     const normalizedMimeType = String(internalPhotoValue?.mimeType || "").trim();
     const storedApplicantPhoto = await readStoredApplicantPhotoFile(
       submission?.id,
-      submission?.promotedExamineeNo,
+      submission?.examineeNo,
       normalizedPhotoFileName,
       normalizedMimeType,
     );
@@ -2930,7 +2927,7 @@ function createApplicantService({
       return storedApplicantPhoto;
     }
 
-    const storedPromotedPhoto = await readStoredPromotedPhotoFile(submission?.promotedExamineeNo);
+    const storedPromotedPhoto = await readStoredPromotedPhotoFile(submission?.examineeNo);
 
     if (storedPromotedPhoto?.photoBlob) {
       return storedPromotedPhoto;
@@ -2999,12 +2996,11 @@ function createApplicantService({
           COALESCE(ff.question_text, s.field_key) AS questionText,
           COALESCE(ff.input_type, 'text') AS inputType,
           COALESCE(ff.system_field_key, '') AS systemFieldKey,
-          COALESCE(meta.promoted_examinee_no, '') AS promotedExamineeNo,
+          COALESCE(meta.examinee_no, '') AS examineeNo,
           meta.member_id AS memberId,
-          COALESCE(meta.promotion_override_json, '') AS promotionOverrideJson,
+          COALESCE(meta.field_overrides_json, '') AS fieldOverridesJson,
           COALESCE(DATE_FORMAT(summary.created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
           COALESCE(DATE_FORMAT(summary.updated_at, '%Y-%m-%d %H:%i:%s'), '') AS updatedAt,
-          COALESCE(DATE_FORMAT(meta.promoted_at, '%Y-%m-%d %H:%i:%s'), '') AS promotedAt,
           COALESCE(ff.sort_order, 2147483647) AS sortOrder
         FROM app_subm s
         INNER JOIN (
@@ -3047,7 +3043,7 @@ function createApplicantService({
         forUpdate: true,
       });
 
-      const normalizedPromotedExamineeNo = String(submission?.promotedExamineeNo || "").trim();
+      const normalizedPromotedExamineeNo = String(submission?.examineeNo || "").trim();
 
       if (normalizedPromotedExamineeNo) {
         await connection.query(`DELETE FROM print_log WHERE examinee_no = ?`, [normalizedPromotedExamineeNo]);
@@ -3096,12 +3092,11 @@ function createApplicantService({
         email: "",
         hasPassword: false,
         status: "submitted",
-        promotedExamineeNo: "",
+        examineeNo: "",
         hasPhoto: false,
         photoFileName: "",
         createdAt: "",
         updatedAt: "",
-        promotedAt: "",
         answerItems: [],
         answerMap: {},
       };
@@ -3116,7 +3111,7 @@ function createApplicantService({
         s.id,
         s.field_key AS fieldKey,
         s.answer_data AS answerData,
-        COALESCE(meta.promoted_examinee_no, '') AS promotedExamineeNo
+        COALESCE(meta.examinee_no, '') AS examineeNo
       FROM app_subm s
       LEFT JOIN app_meta meta
         ON meta.id = s.id
@@ -3126,7 +3121,7 @@ function createApplicantService({
     let migratedCount = 0;
 
     for (const photoRow of Array.isArray(photoRows) ? photoRows : []) {
-      const normalizedExamineeNo = String(photoRow?.promotedExamineeNo || "").trim();
+      const normalizedExamineeNo = String(photoRow?.examineeNo || "").trim();
       const storedPhotoValue = parseApplicantStoredPhotoAnswerData(photoRow?.answerData, {
         includeBase64: true,
       });
@@ -3503,12 +3498,12 @@ function createApplicantService({
       }
     });
 
-    const promotionOverride = normalizeStoredTicketOverrides(
-      submission?.promotionOverrideJson || submission?.promotionOverride || null,
+    const fieldOverrides = normalizeStoredTicketOverrides(
+      submission?.fieldOverridesJson || submission?.fieldOverrides || null,
     );
 
-    Object.keys(promotionOverride).forEach((key) => {
-      systemValues[key] = String(promotionOverride[key] || "").trim();
+    Object.keys(fieldOverrides).forEach((key) => {
+      systemValues[key] = String(fieldOverrides[key] || "").trim();
     });
 
     return systemValues;
@@ -3539,7 +3534,7 @@ function createApplicantService({
       series: String(applicationRecord.series || "").trim(),
       unit: String(applicationRecord.unit || "").trim(),
       major: String(applicationRecord.major || "").trim(),
-      examineeNo: String(submission?.promotedExamineeNo || "").trim(),
+      examineeNo: String(submission?.examineeNo || "").trim(),
       name: String(applicationRecord.name || submission?.name || "").trim(),
       birth: String(applicationRecord.birth || "").trim(),
       photoBlob: photoRecord?.photoBlob || null,
@@ -3731,7 +3726,7 @@ function createApplicantService({
         : buildApplicantExamNoCandidate(pattern, sourceDate, sequence, matchedRecruitmentUnit);
       const [rows] = await connection.query(
         `
-          SELECT promoted_examinee_no FROM app_meta WHERE promoted_examinee_no = ? LIMIT 1
+          SELECT examinee_no FROM app_meta WHERE examinee_no = ? LIMIT 1
         `,
         [candidateValue],
       );
@@ -3751,7 +3746,7 @@ function createApplicantService({
     });
     const recruitmentUnit = resolveApplicantRecruitmentUnit(recruitmentUnits, applicationRecord);
     const examineeNo =
-      submission.promotedExamineeNo ||
+      submission.examineeNo ||
       (await generateApplicantExamineeNo(connection, settings, applicationRecord, {
         recruitmentUnits,
         matchedRecruitmentUnit: recruitmentUnit,
@@ -4187,11 +4182,11 @@ function createApplicantService({
           `
             INSERT INTO app_meta (
               id,
-              promoted_examinee_no
+              examinee_no
             )
             VALUES (?, ?)
             ON DUPLICATE KEY UPDATE
-              promoted_examinee_no = VALUES(promoted_examinee_no)
+              examinee_no = VALUES(examinee_no)
           `,
           [submissionId, preparedSubmissionRecord.examineeNo],
         );
@@ -4276,11 +4271,11 @@ function createApplicantService({
         `
           INSERT INTO app_meta (
             id,
-            promoted_examinee_no
+            examinee_no
           )
           VALUES (?, ?)
           ON DUPLICATE KEY UPDATE
-            promoted_examinee_no = VALUES(promoted_examinee_no)
+            examinee_no = VALUES(examinee_no)
         `,
         [normalizedSubmissionId, preparedSubmissionRecord.examineeNo],
       );
@@ -4337,7 +4332,7 @@ function createApplicantService({
     const submission = await getApplicantSubmissionForAccessToken(accessToken, submissionId, {requireTicketLookupTarget: true});
     await assertApplicantAdmitCardLookupIsOpen(submission);
     const record = await buildApplicantAdmitCardRecordFromSubmission(submission);
-    return {pdfBuffer: await buildSubmissionAdmitCardPdfBuffer(record, {title: `${record.name || "수험표"} 수험표`}), fileNameBase: String(submission.promotedExamineeNo || submission.id)};
+    return {pdfBuffer: await buildSubmissionAdmitCardPdfBuffer(record, {title: `${record.name || "수험표"} 수험표`}), fileNameBase: String(submission.examineeNo || submission.id)};
   }
 
   async function getMemberApplicationContext(member) {
@@ -4384,7 +4379,7 @@ function createApplicantService({
     const existingAnswers = Object.fromEntries((submission.answerItems || []).map(item => [item.fieldKey, item.value]));
       const artifacts = buildApplicantSubmissionArtifacts(fields, { ...existingAnswers, ...answers }, { name: submission.name, email: submission.email }, submission);
       const records = artifacts.fileUploads.map(upload => buildStoredApplicantFileRecord(
-        submission.promotedExamineeNo || `submission-${submission.id}`, upload.questionText, upload.fieldKey, upload,
+        submission.examineeNo || `submission-${submission.id}`, upload.questionText, upload.fieldKey, upload,
         { ...upload, fileNamePattern: upload.fileNamePattern || '{수험번호}_{질문제목}' },
       ));
     const storedFiles = new Map(records.map(record => [record.fieldKey, JSON.stringify(buildStoredApplicantFileAnswerData(record))]));

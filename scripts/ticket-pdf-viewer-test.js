@@ -51,7 +51,7 @@ async function run() {
     page.on('pageerror', error => errors.push(error.message));
     let failPdf = false, issued = true, pdfDelay = 0, pdfRequests = 0;
     const requestedPaths = new Set();
-    const submission = { id: 1, status: 'promoted', promotedExamineeNo: '00123456', name: '테스트', email: 'test@example.com', track: '수시', admission: '일반', answerItems: [], answerMap: {}, selectionAnswers: { track: '수시', admission: '일반', series: '인문', unit: '문학' } };
+    const submission = { id: 1, status: 'promoted', examineeNo: '00123456', name: '테스트', email: 'test@example.com', track: '수시', admission: '일반', answerItems: [], answerMap: {}, selectionAnswers: { track: '수시', admission: '일반', series: '인문', unit: '문학' } };
     await page.setRequestInterception(true);
     page.on('request', async request => {
       const url = new URL(request.url());
@@ -66,7 +66,7 @@ async function run() {
       }
       if (url.pathname === '/api/public/members/session') return respond({ member: { id: 1, name: submission.name, email: submission.email, profile: {} } });
       if (url.pathname === '/api/public/members/settings') return respond({ questions: [], terms: [] });
-      if (url.pathname === '/api/public/members/application') return respond({ accessToken: 'test-token', submission: { ...submission, ...(issued ? {} : { promotedExamineeNo: '', status: 'submitted' }) }, serverTime: Date.now(), menuWindows: { ticket: { startAt: 0, endAt: 4102444800000 } } });
+      if (url.pathname === '/api/public/members/application') return respond({ accessToken: 'test-token', submission: { ...submission, ...(issued ? {} : { examineeNo: '', status: 'submitted' }) }, serverTime: Date.now(), menuWindows: { ticket: { startAt: 0, endAt: 4102444800000 } } });
       if (url.pathname === '/api/public/applicant-form') return respond({ fields: [], settings: {}, recruitmentUnits: [{ id: 1, trackName: '수시', admissionName: '일반', seriesName: '인문', unitName: '문학' }], schedules: [{ trackName: '수시', admissionName: '일반', admitCardLookupScheduleStartAt: '2020-01-01T00:00', admitCardLookupScheduleEndAt: '2099-12-31T23:59' }] });
       if (request.method() !== 'GET') return request.abort();
       return request.continue();

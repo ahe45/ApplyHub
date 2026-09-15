@@ -43,7 +43,7 @@
   function formatName(pattern, submission = {}, file = {}) {
     const fileName = String(file.fileName || '').split(/[\\/]/).pop();
     const values = {
-      수험번호: submission.promotedExamineeNo || `접수-${String(submission.id || '').padStart(6, '0')}`,
+      수험번호: submission.examineeNo || `접수-${String(submission.id || '').padStart(6, '0')}`,
       접수번호: String(submission.id || ''), 이름: submission.name || '이름없음',
       모집시기: submission.track || '', 전형: submission.admission || '', 모집단위: submission.unit || '',
       서류명: file.label || '서류', 파일명: fileName.replace(/\.[^.]+$/, '') || '파일',

@@ -18,6 +18,7 @@ const { createAuthSessionStore } = require("../modules/auth/session-store");
 const { createPasswordHelpers, DEFAULT_PASSWORD_HASH_PREFIX } = require("../modules/auth/passwords");
 const { createSchemaBootstrapService } = require("../modules/bootstrap/schema");
 const { createDatabaseErrorTranslator } = require("../modules/database/error-translation");
+const { maintainApplicationSchema } = require("../modules/database/schema-maintenance");
 const { createAdmitCardService } = require("../modules/admit-cards/admit-card");
 const { createSubmissionTicketDataService } = require("../modules/admit-cards/submission-records");
 const { createPrintHistoryService } = require("../modules/print-history/service");
@@ -299,8 +300,15 @@ function createApplicationServices({ env = process.env, fs, getPool, path, query
   }
 
   async function initializeApplicationData() {
-    await schemaBootstrapService.ensureApplicantSchema();
-    await schemaBootstrapService.ensurePrintHistorySchema();
+    const schemaConnection = await getPool().getConnection();
+    try {
+      await maintainApplicationSchema({ connection: schemaConnection, rootDir, initialize: async () => {
+        await schemaBootstrapService.ensureApplicantSchema();
+        await schemaBootstrapService.ensurePrintHistorySchema();
+      } });
+    } finally {
+      schemaConnection.release();
+    }
     await templateBootstrapService.ensureTemplateSchema();
     await seedApplicantFormFields();
     await migrateApplicantPhotoStorage();

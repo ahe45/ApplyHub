@@ -17,10 +17,10 @@ function createSubmissionTicketDataService({ createHttpError, query, getApplican
     const records = new Map();
     for (let offset = 0; offset < numbers.length; offset += 200) {
       const chunk = numbers.slice(offset, offset + 200);
-      const matches = await query('SELECT id FROM app_meta WHERE promoted_examinee_no IN (' + chunk.map(() => '?').join(',') + ')', chunk);
+      const matches = await query('SELECT id FROM app_meta WHERE examinee_no IN (' + chunk.map(() => '?').join(',') + ')', chunk);
       const submissions = await service.getApplicantSubmissionsByIds(matches.map(row => row.id));
       for (const submission of submissions) {
-        const number = String(submission.promotedExamineeNo || '');
+        const number = String(submission.examineeNo || '');
         if (records.has(number)) throw createHttpError(409, '접수 이력에 중복된 수험번호가 있습니다.');
         records.set(number, normalizeExamineeRecord(await service.buildApplicantAdmitCardRecordFromSubmission(submission)));
       }
