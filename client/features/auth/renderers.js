@@ -85,7 +85,7 @@
             <h3>${escapeHtml(heading)}</h3>
             ${window.location.search.includes("registered=1") ? '<p class="login-stage-description">회원가입이 완료되었습니다. 이메일로 로그인해 주세요.</p>' : ''}
             <label class="field login-field" for="loginAccountId">
-              <span>이메일 / 관리자 ID</span>
+              <span>이메일</span>
               <input
                 id="loginAccountId"
                 required
@@ -96,7 +96,7 @@
                 value="${escapeAttribute(accountIdValue)}"
                 autocomplete="username"
                 maxlength="255"
-                placeholder="수험생 이메일 또는 관리자 ID"
+                placeholder="이메일을 입력하세요"
                 ${isDisabled ? "disabled" : ""}
               />
             </label>
@@ -126,7 +126,7 @@
           <div class="login-form login-stage-form login-stage-form-preview">
             <h3>${escapeHtml(heading)}</h3>
             <label class="field login-field">
-              <span>이메일 / 관리자 ID</span>
+              <span>이메일</span>
               <input type="text" value="${escapeAttribute(accountIdValue)}" readonly tabindex="-1" />
             </label>
             <label class="field login-field">
