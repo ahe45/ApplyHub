@@ -23,6 +23,18 @@
     }
 
     function bindNavigationEvents() {
+      const scrollContainer = sidebar?.querySelector('.nav-group');
+      if (scrollContainer) {
+        let hideScrollbarTimer;
+        scrollContainer.addEventListener('scroll', () => {
+          scrollContainer.classList.add('is-scrolling');
+          globalScope.clearTimeout(hideScrollbarTimer);
+          hideScrollbarTimer = globalScope.setTimeout(() => {
+            scrollContainer.classList.remove('is-scrolling');
+          }, 800);
+        }, { passive: true });
+      }
+
       (Array.isArray(navItems) ? navItems : []).forEach((item) => {
         item.addEventListener("click", () => {
           const targetView = String(item.dataset.view || "").trim();

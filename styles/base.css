@@ -155,6 +155,7 @@ button {
 }
 
 .nav-group {
+  --sidebar-scrollbar-thumb: transparent;
   display: grid;
   gap: 12px;
   flex: 1 1 auto;
@@ -166,6 +167,12 @@ button {
   align-content: start;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  scrollbar-color: var(--sidebar-scrollbar-thumb) transparent;
+  scrollbar-width: thin;
+}
+
+.nav-group.is-scrolling {
+  --sidebar-scrollbar-thumb: rgba(var(--glass-muted-rgb), 0.28);
 }
 
 .nav-group::-webkit-scrollbar {
@@ -174,7 +181,7 @@ button {
 
 .nav-group::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(var(--glass-muted-rgb), 0.28);
+  background: var(--sidebar-scrollbar-thumb);
 }
 
 .nav-group::-webkit-scrollbar-track {
