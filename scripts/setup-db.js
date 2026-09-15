@@ -7,7 +7,7 @@ const { getDbConfig } = require("../db");
 dotenv.config({ path: path.join(__dirname, "..", ".env"), quiet: true });
 
 async function main() {
-  const databaseName = process.env.DB_NAME || "admit_card";
+  const databaseName = getDbConfig().database;
   const schemaPath = path.join(__dirname, "..", "db", "schema.sql");
   const schemaSql = fs.readFileSync(schemaPath, "utf8");
   const rootConfig = getDbConfig(false);
@@ -16,9 +16,9 @@ async function main() {
 
   try {
     await connection.query(
-      `CREATE DATABASE IF NOT EXISTS \`${databaseName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+      "CREATE DATABASE IF NOT EXISTS ?? CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", [databaseName],
     );
-    await connection.query(`USE \`${databaseName}\``);
+    await connection.query("USE ??", [databaseName]);
     await connection.query(schemaSql);
 
     console.log(`Database '${databaseName}' is ready.`);
