@@ -21,7 +21,7 @@
       this.innerHTML = `<header class="public-school-header" aria-label="사용자 메뉴">
         <a class="ghost-button public-school-home" href="${preview ? '/applicant?preview=1' : signedIn ? '/applicant' : '/login'}" aria-label="처음으로" title="처음으로"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m3 10 9-7 9 7M5 9v11h5v-6h4v6h5V9" /></svg></a>
         <div class="public-school-brand"><img src="${escape(safeLogo(branding.logoImageUrl))}" alt="" /><strong title="${escape(name)}">${escape(name)}</strong></div>
-        ${signedIn && !preview ? '<button class="ghost-button public-school-logout" type="button" title="로그아웃" aria-label="로그아웃"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 4H4v16h5m5-12 4 4-4 4m-6-4h13" /></svg></button>' : '<span class="public-school-action-spacer" aria-hidden="true"></span>'}
+        ${signedIn && !preview ? '<button class="ghost-button public-school-logout" type="button" title="로그아웃" aria-label="로그아웃"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14 7.5V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5a2 2 0 0 0 2-2v-1.5"></path><path d="M10 12h9"></path><path d="m16 8 4 4-4 4"></path></svg></button>' : '<span class="public-school-action-spacer" aria-hidden="true"></span>'}
       </header><p class="public-school-header-error" role="alert" hidden></p>`;
       this.querySelector('img').addEventListener('error', event => {
         const img = event.currentTarget;
