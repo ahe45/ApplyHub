@@ -46,7 +46,7 @@
     closeAllPageSizeMenus,
     closeGridFilterMenu,
     createLookupFilters,
-    downloadExamineeGridWorkbook,
+
     downloadPrintHistoryGridWorkbook,
     filterGridFilterOptionValues,
     getGridFilterOptionValues,
@@ -82,7 +82,7 @@
     toggleGridSelectAll,
     toggleGridSort,
     updateLookupTextFilter,
-    uploadSelectedExamineeFile,
+
   }) {
     const handlePriorityClick = createGridPriorityClickHandler({
       clearHeaderFilters,
@@ -100,7 +100,7 @@
       closeAllPageSizeMenus,
       closeGridFilterMenu,
       createLookupFilters,
-      downloadExamineeGridWorkbook,
+
       downloadPrintHistoryGridWorkbook,
       getGridPage,
       getGridRows,
@@ -116,7 +116,7 @@
       toggleGridFilterMenu,
       toggleGridFilterValue,
       toggleGridSort,
-      uploadSelectedExamineeFile,
+
     });
 
     const gridInputHandlers = createGridInputHandlers({

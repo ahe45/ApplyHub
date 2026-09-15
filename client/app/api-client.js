@@ -69,6 +69,7 @@
       const error = new Error(payload?.error || payload || "요청 처리 중 오류가 발생했습니다.");
       error.status = response.status;
       error.code = payload?.code || "";
+      error.fieldKey = payload?.fieldKey || "";
       throw error;
     }
 

@@ -1,0 +1,58 @@
+/* Shared login and notice previews use the same mobile-sized composition. */
+.app-shell.auth-locked {
+  min-height: 0;
+  height: 100vh;
+  height: 100dvh;
+}
+.app-shell.auth-locked .page-shell {
+  height: 100%;
+  grid-template-rows: minmax(0, 1fr);
+}
+.app-shell.auth-locked .content-area {
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  place-items: start center;
+  min-height: 0;
+  grid-template-rows: max-content;
+  align-content: safe center;
+}
+.login-shell.common-login-stage,
+.login-shell.applicant-notice-editor-stage {
+  width: min(520px, 100%);
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto;
+  align-content: start;
+  gap: 16px;
+  overflow-wrap: anywhere;
+}
+.common-login-stage::before { display: none; }
+.login-shell.common-login-stage > :is(.login-hero-card, .login-panel-card),
+.login-shell.applicant-notice-editor-stage > :is(.login-hero-card, .login-panel-card) {
+  grid-row: auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  padding: 20px;
+  border-radius: 20px;
+  gap: 20px;
+}
+.login-shell.common-login-stage > .login-notice-card,
+.login-shell.applicant-notice-editor-stage > .login-notice-card { gap: 12px; }
+.common-login-stage .login-stage-brand { gap: 12px; }
+.common-login-stage .login-stage-brand-mark { width: 48px; height: 48px; }
+.common-login-stage .login-stage-brand-copy strong { font-size: 20px; }
+.common-login-stage .login-stage-form { width: 100%; }
+.common-login-stage .login-stage-form h3 { font-size: 24px; }
+.common-login-stage .login-stage-description { font-size: 14px; }
+.common-login-stage :is(input, .primary-button, .ghost-button) { min-width: 0; min-height: 48px; font-size: 16px; }
+.common-login-stage .common-login-signup { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+.common-login-recovery { display: flex; justify-content: center; gap: 24px; font-size: 14px; }
+.common-login-recovery a, .common-login-recovery span { display: inline-flex; align-items: center; min-height: 44px; color: var(--glass-muted); }
+.common-login-stage .login-shell-copyright { justify-self: center; margin: 0; text-align: center; }
+.app-shell.auth-locked .common-login-stage .login-shell-copyright { margin-top: 12px; }
+.login-notice-editor-page { justify-content: center; }
+.common-login-stage .login-notice-editor-surface,
+.applicant-notice-editor-stage .login-notice-editor-surface { min-height: 240px; }

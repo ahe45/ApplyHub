@@ -46,15 +46,14 @@
   const findApplicantScheduleRecord = applicantFormConfig.findApplicantScheduleRecord || (() => null);
 
   function createGridFilteringController({
-    applicantAssignmentGridColumns,
+
     applicantHistoryGridColumns,
     applicantRecruitmentGridColumns,
     applicantScheduleGridColumns,
     accountGridColumns,
     admitCardLookupGridColumns,
     closeAllPageSizeMenus,
-    examineePhotoColumn,
-    examineeRegistrationGridColumns,
+
     getApplicantStatusLabel,
     getAccountGridRows,
     getExamineeGridRows,
@@ -63,20 +62,17 @@
     getPrintHistoryRows,
     getTableState,
     printHistoryGridColumns,
-    resultGridColumns,
     state,
   }) {
     const columnHelpers = createGridColumnHelpers({
-      applicantAssignmentGridColumns,
+
       applicantHistoryGridColumns,
       applicantRecruitmentGridColumns,
       applicantScheduleGridColumns,
       accountGridColumns,
       admitCardLookupGridColumns,
-      examineePhotoColumn,
-      examineeRegistrationGridColumns,
+
       printHistoryGridColumns,
-      resultGridColumns,
     });
     const { getGridColumns } = columnHelpers;
 
@@ -97,7 +93,10 @@
         const submissions = Array.isArray(state.applicantManager?.submissions) ? state.applicantManager.submissions : [];
         const schedules = Array.isArray(state.applicantManager?.schedules) ? state.applicantManager.schedules : [];
 
-        return submissions.map((submission) => {
+        const dashboardData = globalThis.AdmitCardDashboardData;
+        const visibleSubmissions = dashboardData.filterHistoryRows(submissions, state.applicantManager?.fields || [],
+          dashboardData.readHistoryFilter(globalThis.location?.search || ""));
+        return visibleSubmissions.map((submission) => {
           const matchedSchedule = findApplicantScheduleRecord(schedules, submission);
 
           return {
@@ -116,10 +115,6 @@
 
       if (gridKey === "applicantScheduleGrid") {
         return Array.isArray(state.applicantManager?.schedules) ? state.applicantManager.schedules : [];
-      }
-
-      if (gridKey === "applicantAssignmentGrid") {
-        return Array.isArray(state.applicantManager?.assignments) ? state.applicantManager.assignments : [];
       }
 
       return getHeaderFilteredRows(getExamineeGridRows());

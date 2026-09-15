@@ -1,308 +1,57 @@
-(function (globalScope, factory) {
-  if (typeof module === "object" && module.exports) {
-    module.exports = factory();
-    return;
-  }
-
-  globalScope.AdmitCardDashboardRenderers = factory();
-})(typeof globalThis !== "undefined" ? globalThis : this, () => {
-  function createDashboardRenderer(deps) {
-    const {
-      escapeHtml,
-      getCurrentUserRole,
-      getExamineeGridRows,
-      getHeaderFilteredRows,
-      getPrintHistoryRows,
-      state,
-    } = deps;
-
-    function formatDashboardCount(value, suffix = "") {
-      const normalizedValue = Number(value || 0);
-      return `${normalizedValue.toLocaleString("ko-KR")}${suffix}`;
-    }
-
-    function buildDashboardGroupedItems(rows, getLabel) {
-      const groupedItems = new Map();
-
-      rows.forEach((row) => {
-        const label = String(getLabel(row) || "미분류").trim() || "미분류";
-        groupedItems.set(label, (groupedItems.get(label) || 0) + 1);
-      });
-
-      return Array.from(groupedItems.entries())
-        .map(([label, count]) => ({
-          label,
-          count,
-        }))
-        .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))
-        .slice(0, 6);
-    }
-
-    function getDashboardData() {
-      const filteredExamineeRows = getHeaderFilteredRows(getExamineeGridRows());
-      const filteredPrintHistoryRows = getHeaderFilteredRows(getPrintHistoryRows());
-      const printedExamineeNos = new Set(filteredPrintHistoryRows.map((row) => row.examineeNo));
-      const filteredExamineeCount = filteredExamineeRows.length;
-      const photoRegisteredCount = filteredExamineeRows.filter((row) => row.hasPhoto).length;
-      const missingPhotoCount = Math.max(0, filteredExamineeCount - photoRegisteredCount);
-      const pendingPrintCount = filteredExamineeRows.filter((row) => !printedExamineeNos.has(row.examineeNo)).length;
-      const photoRegisteredRate =
-        filteredExamineeCount > 0 ? Math.round((photoRegisteredCount / filteredExamineeCount) * 100) : 0;
-      const activeTemplate = state.templateCards.find((card) => card.status === "used") || null;
-      const printedExamineeCount = printedExamineeNos.size;
-
-      return {
-        currentRole: getCurrentUserRole(),
-        hasHeaderFilters: Object.values(state.headerFilters).some(Boolean),
-        filteredExamineeCount,
-        filteredPrintCount: filteredPrintHistoryRows.length,
-        printedExamineeCount,
-        photoRegisteredCount,
-        missingPhotoCount,
-        pendingPrintCount,
-        photoRegisteredRate,
-        activeTemplateName: activeTemplate?.name || "미설정",
-        usedTemplateCount: state.templateCards.filter((card) => card.status === "used").length,
-        totalTemplateCount: state.templateCards.length,
-        todayPrintCount: state.metrics.todayPrints,
-        totalPrintCount: state.metrics.totalPrints,
-        sessionDistribution: buildDashboardGroupedItems(
-          filteredExamineeRows,
-          (row) => [row.date, row.time].filter(Boolean).join(" · "),
-        ),
-        trackDistribution: buildDashboardGroupedItems(
-          filteredExamineeRows,
-          (row) => [row.track, row.admission].filter(Boolean).join(" · "),
-        ),
-      };
-    }
-
-    function renderDashboardHeroTags(dashboardData) {
-      const { currentRole, activeTemplateName, hasHeaderFilters } = dashboardData;
-      const filterSummary = hasHeaderFilters
-        ? [
-            state.headerFilters.track || "모집시기 전체",
-            state.headerFilters.admission || "전형 전체",
-            state.headerFilters.series || "계열 전체",
-            state.headerFilters.date || "시험일자 전체",
-            state.headerFilters.time || "시간 전체",
-          ].join(" / ")
-        : "상단 필터 미적용";
-
-      return [
-        `<span class="hero-tag">${escapeHtml(currentRole || "운영")} 권한</span>`,
-        `<span class="hero-tag">${escapeHtml(filterSummary)}</span>`,
-        `<span class="hero-tag">사용 양식 ${escapeHtml(activeTemplateName)}</span>`,
-      ].join("");
-    }
-
-    function renderDashboardMetricCards(dashboardData) {
-      const {
-        filteredExamineeCount,
-        photoRegisteredRate,
-        photoRegisteredCount,
-        missingPhotoCount,
-        todayPrintCount,
-        totalPrintCount,
-      } = dashboardData;
-
-      return `
-        <article class="metric-card">
-          <p>필터 기준 수험생</p>
-          <strong data-dashboard-metric="filteredExamineeCount">${formatDashboardCount(filteredExamineeCount, "명")}</strong>
-          <span class="metric-meta">
-            전체 <span data-dashboard-metric="registeredExamineeCount">${formatDashboardCount(state.metrics.registeredExaminees, "명")}</span> 중 집계
-          </span>
-        </article>
-        <article class="metric-card">
-          <p>사진 등록률</p>
-          <strong data-dashboard-metric="photoRegisteredRate">${formatDashboardCount(photoRegisteredRate, "%")}</strong>
-          <span class="metric-meta">등록 ${formatDashboardCount(photoRegisteredCount, "명")} · 미등록 ${formatDashboardCount(
-            missingPhotoCount,
-            "명",
-          )}</span>
-        </article>
-        <article class="metric-card">
-          <p>오늘 출력</p>
-          <strong data-dashboard-metric="todayPrintCount">${formatDashboardCount(todayPrintCount, "건")}</strong>
-          <span class="metric-meta">오늘 생성된 출력 이력 기준</span>
-        </article>
-        <article class="metric-card">
-          <p>누적 출력</p>
-          <strong data-dashboard-metric="totalPrintCount">${formatDashboardCount(totalPrintCount, "건")}</strong>
-          <span class="metric-meta">전체 발급 이력 누적 집계</span>
-        </article>
-      `;
-    }
-
-    function renderDashboardBarChart(items, fillClass = "blue", valueSuffix = "명") {
-      if (items.length === 0) {
-        return `
-          <div class="dashboard-chart-empty">
-            <strong>집계할 데이터가 없습니다.</strong>
-            <span>상단 필터를 조정하거나 데이터를 업로드하면 차트가 표시됩니다.</span>
-          </div>
-        `;
-      }
-
-      const maxValue = Math.max(...items.map((item) => item.count), 1);
-
-      return items
-        .map((row) => {
-          const widthPercent = Math.max(12, Math.round((row.count / maxValue) * 100));
-
-          return `
-            <div class="dashboard-bar-item">
-              <div class="dashboard-bar-head">
-                <strong>${escapeHtml(row.label)}</strong>
-                <span>${escapeHtml(formatDashboardCount(row.count, valueSuffix))}</span>
-              </div>
-              <div class="dashboard-bar-track">
-                <span class="dashboard-bar-fill ${fillClass}" style="width: ${widthPercent}%"></span>
-              </div>
-            </div>
-          `;
-        })
-        .join("");
-    }
-
-    function renderDashboardStatusChart(dashboardData) {
-      const {
-        filteredExamineeCount,
-        photoRegisteredCount,
-        printedExamineeCount,
-        pendingPrintCount,
-        totalTemplateCount,
-        usedTemplateCount,
-        activeTemplateName,
-      } = dashboardData;
-
-      if (filteredExamineeCount === 0) {
-        return `
-          <div class="dashboard-chart-empty">
-            <strong>운영 상태를 집계할 데이터가 없습니다.</strong>
-            <span>수험생 데이터가 들어오면 사진 등록, 출력 완료, 출력 대기 비율이 표시됩니다.</span>
-          </div>
-        `;
-      }
-
-      const statusItems = [
-        {
-          label: "사진 등록",
-          count: photoRegisteredCount,
-          percent: Math.round((photoRegisteredCount / filteredExamineeCount) * 100),
-          className: "blue",
-        },
-        {
-          label: "출력 완료",
-          count: printedExamineeCount,
-          percent: Math.round((printedExamineeCount / filteredExamineeCount) * 100),
-          className: "green",
-        },
-        {
-          label: "출력 대기",
-          count: pendingPrintCount,
-          percent: Math.round((pendingPrintCount / filteredExamineeCount) * 100),
-          className: "orange",
-        },
-      ];
-
-      return `
-        <div class="dashboard-bar-list">
-          ${statusItems
-            .map(
-              (item) => `
-                <div class="dashboard-bar-item">
-                  <div class="dashboard-bar-head">
-                    <strong>${escapeHtml(item.label)}</strong>
-                    <span>${escapeHtml(`${formatDashboardCount(item.count, "명")} · ${formatDashboardCount(item.percent, "%")}`)}</span>
-                  </div>
-                  <div class="dashboard-bar-track">
-                    <span class="dashboard-bar-fill ${item.className}" style="width: ${Math.max(item.percent, 12)}%"></span>
-                  </div>
-                </div>`,
-            )
-            .join("")}
-        </div>
-        <p class="muted">사용 중 양식 ${escapeHtml(activeTemplateName)} · 전체 양식 ${formatDashboardCount(
-          totalTemplateCount,
-          "개",
-        )} 중 ${formatDashboardCount(usedTemplateCount, "개")} 활성</p>
-      `;
-    }
-
+(function (scope, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory(require("./data"));
+  else scope.AdmitCardDashboardRenderers = factory(scope.AdmitCardDashboardData);
+})(typeof globalThis !== "undefined" ? globalThis : this, (data) => {
+  function createDashboardRenderer({ escapeHtml: esc, state, isViewAccessible = () => true }) {
+    const count = value => Number(value || 0).toLocaleString("ko-KR");
+    const shortDate = value => value ? `${value.slice(5,7)}.${value.slice(8,10)} ${value.slice(11,16)}` : "—";
     function renderDashboard() {
-      const dashboardData = getDashboardData();
-      const scopeLabel = dashboardData.hasHeaderFilters ? "현재 필터" : "전체 운영";
-      const heroTitle =
-        dashboardData.filteredExamineeCount > 0
-          ? `${scopeLabel} 기준 통계를 한눈에 확인합니다.`
-          : `${scopeLabel} 기준으로 표시할 수험생 데이터가 없습니다.`;
-      const heroDescription =
-        dashboardData.filteredExamineeCount > 0
-          ? `수험생 ${formatDashboardCount(dashboardData.filteredExamineeCount, "명")}을 기준으로 사진 등록, 출력 현황, 분포 차트를 간결하게 요약했습니다.`
-          : "상단 필터를 조정하거나 수험생 데이터를 업로드하면 운영 현황이 이 화면에 집계됩니다.";
-
-      return `
-        <section class="view-stack">
-          <article class="hero-card">
-            <p class="page-kicker">Dashboard</p>
-            <h3>${escapeHtml(heroTitle)}</h3>
-            <p>${escapeHtml(heroDescription)}</p>
-            <div class="hero-tags">
-              ${renderDashboardHeroTags(dashboardData)}
-            </div>
-          </article>
-
-          <section class="metric-grid">
-            ${renderDashboardMetricCards(dashboardData)}
-          </section>
-
-          <section class="dashboard-chart-grid">
-            <article class="panel-card dashboard-chart-card">
-              <div class="section-header">
-                <div>
-                  <h3>시험일자/시간 분포</h3>
-                  <p>현재 필터 기준 수험생이 많이 몰린 시험 일정을 표시합니다.</p>
-                </div>
-              </div>
-              <div class="dashboard-bar-list">
-                ${renderDashboardBarChart(dashboardData.sessionDistribution, "blue", "명")}
-              </div>
-            </article>
-
-            <article class="panel-card dashboard-chart-card">
-              <div class="section-header">
-                <div>
-                  <h3>모집시기/전형 분포</h3>
-                  <p>모집시기와 전형 조합별 수험생 분포 상위 항목을 집계합니다.</p>
-                </div>
-              </div>
-              <div class="dashboard-bar-list">
-                ${renderDashboardBarChart(dashboardData.trackDistribution, "green", "명")}
-              </div>
-            </article>
-
-            <article class="panel-card dashboard-chart-card dashboard-chart-card-wide">
-              <div class="section-header">
-                <div>
-                  <h3>운영 상태 비율</h3>
-                  <p>사진 등록, 출력 완료, 출력 대기 상태를 비율 중심으로 요약합니다.</p>
-                </div>
-              </div>
-              ${renderDashboardStatusChart(dashboardData)}
-            </article>
-          </section>
+      const info = data.buildDashboardData(state.applicantManager, state.headerFilters, Date.now() + (state.bootstrap.serverTimeOffsetMs || 0));
+      const canViewHistory = isViewAccessible("applicantHistory");
+      const url = mode => esc(data.historyUrl(mode, state.headerFilters, info.today));
+      const metric = (mode, label, value, detail) => {
+        const tag = canViewHistory ? "a" : "article";
+        return `<${tag} class="metric-card dashboard-metric" ${canViewHistory ? `href="${url(mode)}"` : ""}>
+          <span class="dashboard-metric-label">${label}</span><strong data-dashboard-metric="${mode}">${count(value)}<small>건</small></strong>
+          <span class="dashboard-metric-caption">${detail}</span></${tag}>`;
+      };
+      const maxCount = Math.max(1, ...info.days.map(day => day.count));
+      const graph = info.days.map(day => `<div class="dashboard-day${day.date === info.today ? " is-today" : ""}" aria-label="${day.date} 접수 ${day.count}건">
+        <span class="dashboard-day-count">${count(day.count)}</span>
+        <div class="dashboard-day-track"><span class="dashboard-day-bar" style="height:${day.count / maxCount * 100}%"></span></div>
+        <span class="dashboard-day-label">${day.date === info.today ? "오늘" : `${Number(day.date.slice(5,7))}/${Number(day.date.slice(8,10))}`}</span>
+      </div>`).join("");
+      const schedule = info.schedule;
+      const scheduleMarkup = schedule ? `<p class="dashboard-schedule-name">${esc([schedule.trackName, schedule.admissionName].filter(Boolean).join(" · "))}</p>
+        <div class="dashboard-schedule-list">${schedule.periods.map(period => `<div class="dashboard-schedule-item">
+          <div><strong>${period.label}</strong><span class="dashboard-schedule-date">${period.status === "unset" ? "일정이 설정되지 않았습니다." : `${esc(shortDate(period.start))} ~ ${esc(shortDate(period.end))}`}</span></div>
+          <span class="dashboard-status is-${period.status}">${period.statusLabel}</span>
+        </div>`).join("")}</div>` : `<div class="dashboard-empty">선택한 모집 범위에 등록된 일정이 없습니다.</div>`;
+      const recent = info.recent.map(row => `<tr ${canViewHistory ? `data-dashboard-submission="${Number(row.id)}"` : ""}>
+        <td>${esc(shortDate(row.createdAt))}</td><td>${canViewHistory ? `<button class="dashboard-detail-link" type="button" data-applicant-submission-toggle="${Number(row.id)}" aria-label="${esc(row.name)} 접수 상세 보기">${esc(row.promotedExamineeNo || "미부여")}</button>` : esc(row.promotedExamineeNo || "미부여")}</td>
+        <td>${esc(row.name)}</td><td>${esc(row.admission || "—")}</td></tr>`).join("");
+      const filters = [["headerTrack", "모집시기"], ["headerAdmission", "전형"], ["headerSeries", "계열"]]
+        .map(([id,label]) => `<div class="field"><label for="${id}">${label}</label><select id="${id}" aria-label="${label}"><option value="">전체</option></select></div>`).join("");
+      return `<section class="view-stack dashboard-view">
+        <div class="section-header"><h3>대시보드</h3><span class="dashboard-date">${esc(info.today.replaceAll("-", "."))} 기준</span></div>
+        <div class="dashboard-filters" aria-label="모집 범위">${filters}</div>
+        <section class="metric-grid dashboard-metrics" aria-label="접수 요약">
+          ${metric("all", "전체 접수", info.total, "선택한 모집 범위의 누적 접수")}
+          ${metric("today", "오늘 접수", info.todayCount, "오늘 새로 접수한 원서")}
+          ${metric("documents", "서류 미제출", info.missingCount, info.hasRequiredDocuments ? "필수 서류가 부족한 접수" : "등록된 필수 서류가 없습니다")}
         </section>
-      `;
+        <section class="dashboard-chart-grid">
+          <article class="panel-card dashboard-chart-card"><div class="section-header"><h3>최근 7일 접수</h3><span class="dashboard-date">총 ${count(info.days.reduce((sum,day) => sum + day.count,0))}건</span></div>
+            <div class="dashboard-week-chart" role="group" aria-label="최근 7일 날짜별 접수 건수">${graph}</div>
+          </article>
+          <article class="panel-card dashboard-chart-card"><div class="section-header"><h3>주요 일정</h3>${isViewAccessible("applicantScheduleManagement") ? `<a class="dashboard-text-link" href="/applicant-schedules">전체 보기${info.scheduleCount > 1 ? ` · ${info.scheduleCount}개 전형` : ""}</a>` : ""}</div>${scheduleMarkup}</article>
+        </section>
+        <article class="panel-card dashboard-recent"><div class="section-header"><h3>최근 접수</h3>${canViewHistory ? `<a class="dashboard-text-link" href="${url("all")}">접수 이력 전체 보기</a>` : ""}</div>
+          ${recent ? `<div class="dashboard-table-scroll"><table class="dashboard-recent-table"><thead><tr><th scope="col">접수 일시</th><th scope="col">수험번호</th><th scope="col">이름</th><th scope="col">전형</th></tr></thead><tbody>${recent}</tbody></table></div>` : '<div class="dashboard-empty">아직 접수된 원서가 없습니다.</div>'}
+        </article>
+      </section>`;
     }
-
-    return Object.freeze({
-      renderDashboard,
-    });
+    return Object.freeze({ renderDashboard });
   }
-
-  return Object.freeze({
-    createDashboardRenderer,
-  });
+  return Object.freeze({ createDashboardRenderer });
 });

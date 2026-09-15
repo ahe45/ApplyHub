@@ -27,19 +27,12 @@
   }) {
     function getTemplatePreviewExaminee() {
       return {
-        date: getTemplatePreviewDate(),
         currentDate: getTemplatePreviewDate(),
-        time: "09:00",
-        session: "09:00",
         track: "모집시기명",
         admission: "전형명",
-        exam: "전형명",
         series: "계열명",
         unit: "모집단위명",
         major: "전공명",
-        building: "고사건물명",
-        room: "고사실명",
-        group: "조",
         examineeNo: "123100001",
         name: "홍길동",
         birth: "2000-03-01",

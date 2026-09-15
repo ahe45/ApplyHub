@@ -1,4 +1,5 @@
 const { exactRoute, regexRoute } = require("../router");
+const { isViewAccessibleForRole } = require("../../../shared/app-config");
 
 function decodeRouteParams(groups = {}) {
   return Object.fromEntries(
@@ -7,7 +8,26 @@ function decodeRouteParams(groups = {}) {
 }
 
 function createApplicantRoutes(deps) {
+  async function requireArchiveAccess(account) {
+    if (!account?.id) throw deps.createHttpError(401, "로그인이 필요합니다.");
+    const roleMenuVisibility = await deps.getRoleMenuVisibilitySettings?.();
+    if (!isViewAccessibleForRole("applicantHistory", account.role, { roleMenuVisibility })) throw deps.createHttpError(403, "접수 이력 다운로드 권한이 없습니다.");
+  }
   return [
+    exactRoute("POST", "/api/applicant-submissions/archive-jobs", async ({ request, response, authenticatedAccount }) => {
+      await requireArchiveAccess(authenticatedAccount);
+      const body = await deps.readJsonBody(request);
+      const job = await deps.applicantService.attachmentArchiveJobs.create(body, authenticatedAccount?.id);
+      return deps.sendJson(response, 202, job, { "Cache-Control": "no-store" });
+    }),
+    regexRoute("GET", /^\/api\/applicant-submissions\/archive-jobs\/(?<jobId>[a-f0-9-]+)$/, async ({ response, params, authenticatedAccount }) => {
+      await requireArchiveAccess(authenticatedAccount);
+      return deps.sendJson(response, 200, deps.applicantService.attachmentArchiveJobs.status(params.jobId, authenticatedAccount?.id), { "Cache-Control": "no-store" });
+    }),
+    regexRoute("GET", /^\/api\/applicant-submissions\/archive-jobs\/(?<jobId>[a-f0-9-]+)\/download$/, async ({ response, params, authenticatedAccount }) => {
+      await requireArchiveAccess(authenticatedAccount);
+      return deps.applicantService.attachmentArchiveJobs.download(params.jobId, authenticatedAccount?.id, response, deps.buildContentDisposition);
+    }),
     exactRoute("GET", "/api/public/applicant-form", async ({ response }) => {
       const [applicantForm, superAdminSettings] = await Promise.all([
         deps.getApplicantPublicForm(),
@@ -63,35 +83,7 @@ function createApplicantRoutes(deps) {
         workbookBuffer,
       );
     }),
-    exactRoute("GET", "/api/applicant-assignments/template.xlsx", async ({ response }) => {
-      const workbookBuffer = await deps.buildApplicantAssignmentTemplateBuffer();
 
-      return deps.sendBinary(
-        response,
-        200,
-        {
-          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "Content-Disposition": deps.buildContentDisposition("attachment", "배정표 양식.xlsx"),
-          "Cache-Control": "no-store",
-        },
-        workbookBuffer,
-      );
-    }),
-    exactRoute("POST", "/api/applicant-assignments/export.xlsx", async ({ request, response }) => {
-      const body = await deps.readJsonBody(request);
-      const workbookBuffer = await deps.buildApplicantAssignmentExportBuffer(Array.isArray(body?.rows) ? body.rows : []);
-
-      return deps.sendBinary(
-        response,
-        200,
-        {
-          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "Content-Disposition": deps.buildContentDisposition("attachment", "배정표 데이터.xlsx"),
-          "Cache-Control": "no-store",
-        },
-        workbookBuffer,
-      );
-    }),
     exactRoute("POST", "/api/applicant-submissions/export.xlsx", async ({ request, response }) => {
       const body = await deps.readJsonBody(request);
       const workbookBuffer = await deps.buildApplicantSubmissionExportBuffer(Array.isArray(body?.rows) ? body.rows : []);
@@ -107,21 +99,7 @@ function createApplicantRoutes(deps) {
         workbookBuffer,
       );
     }),
-    exactRoute("POST", "/api/applicant-submissions/assignment-template.xlsx", async ({ request, response }) => {
-      const body = await deps.readJsonBody(request);
-      const workbookBuffer = await deps.buildApplicantPromotionAssignmentTemplateBuffer(body?.submissionIds);
 
-      return deps.sendBinary(
-        response,
-        200,
-        {
-          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "Content-Disposition": deps.buildContentDisposition("attachment", "고사실 배정표.xlsx"),
-          "Cache-Control": "no-store",
-        },
-        workbookBuffer,
-      );
-    }),
     exactRoute("POST", "/api/applicant-submissions/photos.zip", async ({ request, response }) => {
       const body = await deps.readJsonBody(request);
       const zipBuffer = await deps.buildApplicantSubmissionPhotoArchiveBuffer(Array.isArray(body?.rows) ? body.rows : []);
@@ -137,33 +115,7 @@ function createApplicantRoutes(deps) {
         zipBuffer,
       );
     }),
-    exactRoute("POST", "/api/applicant-submissions/promotions/preview", async ({ request, response }) => {
-      const body = await deps.readJsonBody(request);
-      return deps.sendJson(response, 200, await deps.previewApplicantSubmissionPromotions(body));
-    }),
-    exactRoute("POST", "/api/applicant-submissions/promotions/preview.xlsx", async ({ request, response }) => {
-      const body = await deps.readJsonBody(request);
-      const workbookBuffer = await deps.buildApplicantPromotionPreviewExportBuffer(body?.rows, body?.summary);
 
-      return deps.sendBinary(
-        response,
-        200,
-        {
-          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "Content-Disposition": deps.buildContentDisposition("attachment", "수험생 이관 프리뷰.xlsx"),
-          "Cache-Control": "no-store",
-        },
-        workbookBuffer,
-      );
-    }),
-    exactRoute("POST", "/api/applicant-submissions/promotions/commit", async ({ request, response }) => {
-      const body = await deps.readJsonBody(request);
-      return deps.sendJson(response, 200, await deps.commitApplicantSubmissionPromotions(body));
-    }),
-    exactRoute("POST", "/api/applicant-submissions/promotions/reset", async ({ request, response }) => {
-      const body = await deps.readJsonBody(request);
-      return deps.sendJson(response, 200, await deps.resetApplicantSubmissionPromotions(body));
-    }),
     regexRoute(
       "DELETE",
       /^\/api\/applicant-submissions\/(?<submissionId>\d+)$/,
@@ -222,14 +174,7 @@ function createApplicantRoutes(deps) {
       const body = await deps.readJsonBody(request);
       return deps.sendJson(response, 200, await deps.previewApplicantRecruitmentUnitImport(body));
     }),
-    exactRoute("POST", "/api/applicant-assignments/import", async ({ request, response }) => {
-      const body = await deps.readJsonBody(request);
-      return deps.sendJson(response, 200, await deps.importApplicantAssignments(body));
-    }),
-    exactRoute("POST", "/api/applicant-assignments/import/preview", async ({ request, response }) => {
-      const body = await deps.readJsonBody(request);
-      return deps.sendJson(response, 200, await deps.previewApplicantAssignmentsImport(body));
-    }),
+
     regexRoute(
       "GET",
       /^\/api\/public\/applications\/(?<submissionId>\d+)\/admit-card\.pdf$/,
@@ -245,7 +190,7 @@ function createApplicantRoutes(deps) {
           {
             "Content-Type": "application/pdf",
             "Content-Disposition": deps.buildContentDisposition(
-              "inline",
+              searchParams.get("download") === "1" ? "attachment" : "inline",
               `${admitCardPdf.fileNameBase || params.submissionId}.pdf`,
             ),
             "Cache-Control": "no-store",
@@ -291,25 +236,11 @@ function createApplicantRoutes(deps) {
       const body = await deps.readJsonBody(request);
       return deps.sendJson(response, 200, await deps.saveApplicantSchedule(body));
     }),
-    exactRoute("POST", "/api/applicant-assignments", async ({ request, response }) => {
+    exactRoute("PUT", "/api/applicant-schedules/bulk", async ({ request, response }) => {
       const body = await deps.readJsonBody(request);
-      return deps.sendJson(response, 201, await deps.createApplicantAssignment(body));
+      return deps.sendJson(response, 200, await deps.saveApplicantSchedules(body));
     }),
-    regexRoute(
-      "PUT",
-      /^\/api\/applicant-assignments\/(?<assignmentId>\d+)$/,
-      async ({ request, response, params }) => {
-        const body = await deps.readJsonBody(request);
-        return deps.sendJson(response, 200, await deps.updateApplicantAssignment(params.assignmentId, body));
-      },
-      { getParams: (match) => decodeRouteParams(match.groups) },
-    ),
-    regexRoute(
-      "DELETE",
-      /^\/api\/applicant-assignments\/(?<assignmentId>\d+)$/,
-      async ({ response, params }) => deps.sendJson(response, 200, await deps.deleteApplicantAssignment(params.assignmentId)),
-      { getParams: (match) => decodeRouteParams(match.groups) },
-    ),
+
     regexRoute(
       "PUT",
       /^\/api\/applicant-recruitment-units\/(?<unitId>\d+)$/,

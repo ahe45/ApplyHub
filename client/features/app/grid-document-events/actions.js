@@ -15,7 +15,7 @@
     closeAllPageSizeMenus,
     closeGridFilterMenu,
     createLookupFilters,
-    downloadExamineeGridWorkbook,
+
     downloadPrintHistoryGridWorkbook,
     getGridPage,
     getGridRows,
@@ -31,13 +31,13 @@
     toggleGridFilterMenu,
     toggleGridFilterValue,
     toggleGridSort,
-    uploadSelectedExamineeFile,
+
   }) {
     return async function handleGridActionClick(event) {
       const target = event.target instanceof Element ? event.target : null;
-      const downloadExamineesTrigger = target?.closest("[data-download-examinees]") || null;
+
       const downloadPrintHistoryTrigger = target?.closest("[data-download-print-history]") || null;
-      const uploadExamineesTrigger = target?.closest("[data-upload-examinees]") || null;
+
       const batchPrintTrigger = target?.closest("[data-batch-print]") || null;
       const examineePrintTrigger = target?.closest("[data-print-examinee]") || null;
       const gridRowTrigger = target?.closest("[data-grid-row-clickable]") || null;
@@ -54,20 +54,14 @@
       const lookupResetTrigger = target?.closest("[data-reset-lookup]") || null;
       const refreshTrigger = target?.closest("[data-refresh-grid]") || null;
 
-      if (downloadExamineesTrigger) {
-        await downloadExamineeGridWorkbook();
-        return true;
-      }
+
 
       if (downloadPrintHistoryTrigger) {
         await downloadPrintHistoryGridWorkbook();
         return true;
       }
 
-      if (uploadExamineesTrigger) {
-        await uploadSelectedExamineeFile();
-        return true;
-      }
+
 
       if (batchPrintTrigger) {
         await batchPrintSelectedExaminees();

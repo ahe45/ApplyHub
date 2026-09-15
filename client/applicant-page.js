@@ -1,6 +1,10 @@
 (function () {
   const applicantFormConfig = globalThis.AdmitCardApplicantFormConfig || {};
+  const apiClientModule = globalThis.AdmitCardApiClient || {};
   const loginNoticeLinkUtilsModule = globalThis.AdmitCardLoginNoticeLinkUtils || {};
+  const applicantPublicConstantsModule = globalThis.AdmitCardApplicantPublicConstants || {};
+  const applicantPublicRenderingHelpersModule = globalThis.AdmitCardApplicantPublicRenderingHelpers || {};
+  const applicantPublicUploadHelpersModule = globalThis.AdmitCardApplicantPublicUploadHelpers || {};
   const findApplicantScheduleRecord = applicantFormConfig.findApplicantScheduleRecord || (() => null);
   const getApplicantAggregateScheduleState =
     applicantFormConfig.getApplicantAggregateScheduleState ||
@@ -31,7 +35,44 @@
       isOpen: false,
       reason: "not_configured",
     }));
+
+  if (!apiClientModule?.buildApiUrl || !apiClientModule?.apiRequest) {
+    throw new Error("client/app/api-client.js must be loaded before applicant-page.js.");
+  }
+
+  if (!applicantPublicConstantsModule?.createApplicantPublicRuntimeConstants) {
+    throw new Error("client/features/applicant-public/constants.js must be loaded before applicant-page.js.");
+  }
+
+  if (
+    !applicantPublicRenderingHelpersModule?.escapeHtml ||
+    !applicantPublicRenderingHelpersModule?.escapeAttribute ||
+    !applicantPublicRenderingHelpersModule?.renderApplicantHomeActionButtonLabel
+  ) {
+    throw new Error("client/features/applicant-public/rendering-helpers.js must be loaded before applicant-page.js.");
+  }
+
+  if (!applicantPublicUploadHelpersModule?.createApplicantPublicUploadHelpers) {
+    throw new Error("client/features/applicant-public/upload-helpers.js must be loaded before applicant-page.js.");
+  }
+
+  const { buildApiUrl, apiRequest } = apiClientModule;
+  let membership = null;
   const { buildLoginNoticeMarkup } = loginNoticeLinkUtilsModule;
+  const { escapeAttribute, escapeHtml, renderApplicantHomeActionButtonLabel } = applicantPublicRenderingHelpersModule;
+  const {
+    buildApplicantUploadDraftValue,
+    canPreviewApplicantPdfUploadValue,
+    createApplicantPdfPreviewFile,
+    createApplicantPdfPreviewState,
+    getApplicantUploadFieldValueLabel,
+    isApplicantBlobInstance,
+    isApplicantFileInstance,
+    isApplicantMobilePdfPreviewEnvironment,
+    isApplicantUploadField,
+    readFileAsBase64,
+    revokeApplicantPdfPreviewObjectUrl,
+  } = applicantPublicUploadHelpersModule.createApplicantPublicUploadHelpers();
   const root = document.getElementById("applicantPageRoot");
 
   if (!root) {
@@ -39,48 +80,36 @@
   }
 
   const APPLICANT_IS_PREVIEW_MODE = new URLSearchParams(window.location.search).get("preview") === "1";
-  const APPLICANT_PREVIEW_SEARCH = APPLICANT_IS_PREVIEW_MODE ? "?preview=1" : "";
-  const APPLICANT_PUBLIC_STATE_STORAGE_KEY = `admitcard.applicant-public-state.v1${APPLICANT_IS_PREVIEW_MODE ? ".preview" : ""}`;
-  const APPLICANT_ROUTE_PATHS = Object.freeze({
-    home: "/applicant",
-    verify: "/applicant/verify",
-    apply: "/applicant/apply",
-    form: "/applicant/form",
-    result: "/applicant/result",
-    lookup: "/applicant/lookup",
-    "lookup-summary": "/applicant/lookup/result",
-    "lookup-ticket": "/applicant/ticket",
+  const recruitmentSummaryObserver = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(() => fitRecruitmentSummaryValues()) : null;
+  document.fonts?.ready.then(() => fitRecruitmentSummaryValues());
+  document.fonts?.addEventListener('loadingdone', () => fitRecruitmentSummaryValues());
+  const APPLICANT_FORM_TEST_ENTRY_VISIBLE = false;
+  const {
+    APPLICANT_PREVIEW_SEARCH,
+    APPLICANT_PUBLIC_STATE_STORAGE_KEY,
+  } = applicantPublicConstantsModule.createApplicantPublicRuntimeConstants({
+    isPreviewMode: APPLICANT_IS_PREVIEW_MODE,
   });
-  const APPLICANT_PAGE_TITLES = Object.freeze({
-    home: "수험생 접수",
-    verify: "이메일 인증",
-    apply: "접수 신청",
-    form: "접수 페이지",
-    result: "접수 결과",
-    lookup: "본인 확인",
-    "lookup-summary": "접수결과 조회",
-    "lookup-ticket": "수험표 조회",
-  });
-  const DEFAULT_LOGIN_BRAND_MARK_PATH = "/client/assets/logo.png";
-  const DEFAULT_LOGIN_BACKGROUND_PATH = "/client/assets/bg.png";
+  const {
+    APPLICANT_CUSTOM_SELECT_VALUE,
+    APPLICANT_HISTORY_STATE_MARKER,
+    APPLICANT_LOOKUP_TARGETS,
+    APPLICANT_PAGE_TITLES,
+    APPLICANT_PREVIEW_STATE_STORAGE_KEY,
+    APPLICANT_RECRUITMENT_SELECTION_FIELDS,
+    APPLICANT_ROUTE_PATHS,
+    APPLICANT_SUMMARY_PRIORITY_SYSTEM_FIELDS,
+    DEFAULT_LOGIN_BACKGROUND_PATH,
+    DEFAULT_LOGIN_BRAND_MARK_PATH,
+  } = applicantPublicConstantsModule;
   const INITIAL_SUPER_ADMIN_SETTINGS =
     globalThis.AdmitCardInitialSuperAdminSettings && typeof globalThis.AdmitCardInitialSuperAdminSettings === "object"
       ? globalThis.AdmitCardInitialSuperAdminSettings
       : {};
-  const APPLICANT_LOOKUP_TARGETS = Object.freeze({
-    result: "result",
-    ticket: "ticket",
-  });
-  const APPLICANT_CUSTOM_SELECT_VALUE = "__applicant_custom__";
-  const APPLICANT_RECRUITMENT_SELECTION_FIELDS = Object.freeze([
-    Object.freeze({ key: "track", unitKey: "trackName", label: "모집시기" }),
-    Object.freeze({ key: "admission", unitKey: "admissionName", label: "전형" }),
-    Object.freeze({ key: "series", unitKey: "seriesName", label: "계열" }),
-    Object.freeze({ key: "unit", unitKey: "unitName", label: "모집단위" }),
-    Object.freeze({ key: "major", unitKey: "majorName", label: "전공" }),
-  ]);
-  const APPLICANT_SUMMARY_PRIORITY_SYSTEM_FIELDS = Object.freeze(["track", "admission", "series", "unit", "major"]);
   let verificationCountdownTimerId = 0;
+  const VERIFICATION_CODE_LENGTH = 6;
+  const VERIFICATION_RESEND_DELAY_MS = 10_000;
   let applicantToastTimerId = 0;
   const applicantToastRoot =
     document.getElementById("applicantPublicToastRoot") ||
@@ -100,6 +129,7 @@
     loadError: "",
     formConfig: {
       fields: [],
+      documentFields: [],
       recruitmentUnits: [],
       schedules: [],
       settings: {},
@@ -109,7 +139,6 @@
       },
       systemSettings: {
         admissionHomepageUrl: "",
-        admitCardDataSource: "examinee",
       },
       noticeHtml: "",
     },
@@ -128,6 +157,7 @@
       code: "",
       debugCode: "",
       expiresAt: 0,
+      resendAvailableAt: 0,
       isSending: false,
       isVerifying: false,
     },
@@ -160,6 +190,7 @@
     nationalityPicker: {
       openFieldKey: "",
     },
+    pdfPreview: createApplicantPdfPreviewState(),
     fieldUi: {
       dateParts: {},
       customSelectModes: {},
@@ -168,6 +199,13 @@
     draftAnswers: {},
     isSaving: false,
   };
+
+  function createApplicantHistoryState(overrides = {}) {
+    return {
+      [APPLICANT_HISTORY_STATE_MARKER]: true,
+      mode: getGuardedApplicantMode(overrides.mode ?? state.mode),
+    };
+  }
 
   function normalizeApplicantLookupTarget(value = "") {
     return String(value || "").trim() === APPLICANT_LOOKUP_TARGETS.ticket
@@ -204,19 +242,6 @@
       heading: "접수결과 조회",
       description: "이름, 이메일, 비밀번호를 입력하면 일치하는 최신 접수 내역의 접수 결과를 조회합니다.",
     };
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
-  }
-
-  function escapeAttribute(value) {
-    return escapeHtml(value);
   }
 
   function normalizeApplicantBrandSettings(settings = {}) {
@@ -275,43 +300,6 @@
     }
   }
 
-  function getApplicantHomeActionIconMarkup(iconKey = "") {
-    if (iconKey === "apply") {
-      return `
-        <svg class="button-icon applicant-public-home-action-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="5" y="4" width="14" height="16" rx="2"></rect>
-          <path d="M9 4h6"></path>
-          <path d="M9 9h6"></path>
-          <path d="M12 12v5"></path>
-          <path d="M9.5 14.5h5"></path>
-        </svg>
-      `;
-    }
-
-    if (iconKey === "summary") {
-      return `
-        <svg class="button-icon applicant-public-home-action-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <rect x="5" y="4" width="14" height="16" rx="2"></rect>
-          <path d="M9 9h6"></path>
-          <path d="M9 13h3"></path>
-          <path d="m10 16 1.8 1.8 3.2-3.3"></path>
-        </svg>
-      `;
-    }
-
-    return `
-      <svg class="button-icon applicant-public-home-action-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M5 9a2 2 0 0 0 0 4v2.5A1.5 1.5 0 0 0 6.5 17h11a1.5 1.5 0 0 0 1.5-1.5V13a2 2 0 0 0 0-4V8.5A1.5 1.5 0 0 0 17.5 7h-11A1.5 1.5 0 0 0 5 8.5z"></path>
-        <path d="M12 7v10"></path>
-        <path d="M9 10h6"></path>
-      </svg>
-    `;
-  }
-
-  function renderApplicantHomeActionButtonLabel(label = "", iconKey = "") {
-    return `${getApplicantHomeActionIconMarkup(iconKey)}<span>${escapeHtml(label)}</span>`;
-  }
-
   function stopVerificationCountdown() {
     if (verificationCountdownTimerId) {
       window.clearInterval(verificationCountdownTimerId);
@@ -363,7 +351,7 @@
     return {
       shouldShow: true,
       isExpired: true,
-      text: "인증 코드가 만료되었습니다. 새 코드를 다시 발송하세요.",
+      text: "인증 코드가 만료되었습니다. 새 코드를 다시 생성하세요.",
     };
   }
 
@@ -378,6 +366,7 @@
   }
 
   function syncVerificationCountdownUi() {
+    syncVerificationButtons();
     const verificationCodeInput = document.getElementById("verificationCode");
     const verificationField = verificationCodeInput?.closest(".applicant-public-field") || null;
     const existingTimerElement = verificationField?.querySelector("[data-applicant-verification-timer='true']") || null;
@@ -415,7 +404,7 @@
   }
 
   function syncVerificationCountdown() {
-    const shouldRun = state.mode === "verify" && Number(state.verification.expiresAt || 0) > 0 && !isVerificationCodeExpired();
+    const shouldRun = state.mode === "verify" && (getVerificationResendSeconds() > 0 || !isVerificationCodeExpired());
 
     if (!shouldRun) {
       stopVerificationCountdown();
@@ -437,10 +426,34 @@
 
       syncVerificationCountdownUi();
 
-      if (isVerificationCodeExpired()) {
+      if (isVerificationCodeExpired() && getVerificationResendSeconds() === 0) {
         stopVerificationCountdown();
       }
     }, 1000);
+  }
+
+  function getVerificationResendSeconds() {
+    let availableAt = Number(state.verification.resendAvailableAt || 0);
+    try { availableAt = Math.max(availableAt, Number(sessionStorage.getItem('applyhub.applicant-verification-resend-at')) || 0); } catch { /* Use in-memory cooldown when storage is blocked. */ }
+    return Math.max(0, Math.ceil((availableAt - Date.now()) / 1000));
+  }
+
+  function canVerifyCode() {
+    return new RegExp(`^[0-9]{${VERIFICATION_CODE_LENGTH}}$`).test(state.verification.code)
+      && !isVerificationCodeExpired() && !state.verification.isSending && !state.verification.isVerifying
+      && getApplicantFormEditAvailabilityState().isEditable;
+  }
+
+  function syncVerificationButtons() {
+    if (state.mode !== 'verify') return;
+    const sendButton = root.querySelector('[data-applicant-action="send-code"]');
+    const seconds = getVerificationResendSeconds();
+    if (sendButton) {
+      sendButton.disabled = state.verification.isSending || state.verification.isVerifying || seconds > 0 || !getApplicantFormEditAvailabilityState().isEditable;
+      sendButton.textContent = state.verification.isSending ? '발송 중...' : seconds > 0 ? `재발송까지 ${seconds}초` : Number(state.verification.expiresAt || 0) > 0 ? '인증코드 재발송' : '인증코드 발송';
+    }
+    const verifyButton = root.querySelector('[data-applicant-form="verify-code"] button[type="submit"]');
+    if (verifyButton) verifyButton.disabled = !canVerifyCode();
   }
 
   function normalizeApplicantRoutePath(pathname = "") {
@@ -463,60 +476,20 @@
 
   function updateApplicantDocumentTitle() {
     const pageTitle = APPLICANT_PAGE_TITLES[state.mode] || APPLICANT_PAGE_TITLES.home;
-    document.title = `${pageTitle} | Admit Card System`;
-  }
-
-  function buildApiUrl(resource) {
-    return new URL(resource, `${window.location.origin}/`).toString();
-  }
-
-  async function apiRequest(resource, options = {}) {
-    const response = await fetch(buildApiUrl(resource), {
-      credentials: "same-origin",
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-      },
-    });
-    const contentType = response.headers.get("content-type") || "";
-    const payload = contentType.includes("application/json") ? await response.json() : await response.text();
-
-    if (!response.ok) {
-      const error = new Error(payload?.error || payload || "요청 처리 중 오류가 발생했습니다.");
-      error.status = response.status;
-      error.code = payload?.code || "";
-      throw error;
-    }
-
-    return payload;
+    document.title = `${pageTitle} | 원서접수시스템`;
   }
 
   function getApplicantFormFieldByKey(fieldKey = "") {
     const normalizedFieldKey = String(fieldKey || "").trim();
-    return (Array.isArray(state.formConfig.fields) ? state.formConfig.fields : []).find((field) => String(field?.fieldKey || "").trim() === normalizedFieldKey) || null;
+    return getAllApplicantFields().find((field) => String(field?.fieldKey || "").trim() === normalizedFieldKey) || null;
   }
 
-  function isApplicantUploadField(field = {}) {
-    const inputType = String(field?.inputType || "").trim();
-    return inputType === "photo" || inputType === "file";
+  function getAllApplicantFields() {
+    return [...(state.formConfig.fields || []), ...(state.formConfig.documentFields || [])];
   }
 
-  function buildApplicantUploadDraftValue(inputType = "", value = {}) {
-    const normalizedInputType = String(inputType || "").trim();
-    const normalizedValue = value && typeof value === "object" ? value : {};
-
-    if (normalizedInputType === "photo") {
-      return {
-        hasPhoto: normalizedValue?.hasPhoto === true || normalizedValue?.file instanceof File,
-        fileName: String(normalizedValue?.fileName || normalizedValue?.file?.name || ""),
-      };
-    }
-
-    return {
-      hasFile: normalizedValue?.hasFile === true || normalizedValue?.file instanceof File,
-      fileName: String(normalizedValue?.fileName || normalizedValue?.file?.name || ""),
-    };
+  function getActiveApplicantFields() {
+    return state.mode === 'documents' ? (state.formConfig.documentFields || []) : (state.formConfig.fields || []);
   }
 
   function createSerializableDraftAnswers() {
@@ -575,6 +548,7 @@
             code: state.verification.code,
             debugCode: state.verification.debugCode,
             expiresAt: Number(state.verification.expiresAt || 0),
+            resendAvailableAt: Number(state.verification.resendAvailableAt || 0),
           },
           lookup: {
             target: normalizeApplicantLookupTarget(state.lookup.target),
@@ -623,6 +597,7 @@
           code: String(snapshot.verification.code || ""),
           debugCode: String(snapshot.verification.debugCode || ""),
           expiresAt: Number(snapshot.verification.expiresAt || 0),
+          resendAvailableAt: Number(snapshot.verification.resendAvailableAt || 0),
           isSending: false,
           isVerifying: false,
         };
@@ -730,27 +705,6 @@
     return `${yearValue}-${monthValue}-${dayValue}T${hourValue}:${minuteValue}`;
   }
 
-  function getApplicantScheduleDate(value, { inclusiveEndMinute = false } = {}) {
-    const normalizedValue = normalizeApplicantScheduleDateTime(value);
-
-    if (!normalizedValue) {
-      return null;
-    }
-
-    const [, yearValue, monthValue, dayValue, hourValue, minuteValue] = normalizedValue.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/) || [];
-    const parsedDate = new Date(
-      Number(yearValue),
-      Number(monthValue) - 1,
-      Number(dayValue),
-      Number(hourValue),
-      Number(minuteValue),
-      inclusiveEndMinute ? 59 : 0,
-      inclusiveEndMinute ? 999 : 0,
-    );
-
-    return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
-  }
-
   function formatApplicantScheduleDateTime(value) {
     const normalizedValue = normalizeApplicantScheduleDateTime(value);
 
@@ -805,26 +759,6 @@
     return `${formatApplicantScheduleDateTime(scheduleState.applicantScheduleStartAt)} ~ ${formatApplicantScheduleDateTime(scheduleState.applicantScheduleEndAt)}`;
   }
 
-  function getApplicantSubmissionScheduleStatusMessage(scheduleState = getApplicantSubmissionScheduleState()) {
-    if (scheduleState.reason === "not_configured") {
-      return "접수 기간이 아직 설정되지 않았습니다.";
-    }
-
-    if (!scheduleState.isConfigured) {
-      return "접수 기간 설정을 확인하세요.";
-    }
-
-    if (scheduleState.reason === "before_start") {
-      return "아직 접수 시작 전입니다.";
-    }
-
-    if (scheduleState.reason === "after_end") {
-      return "접수 기간이 종료되었습니다.";
-    }
-
-    return "현재 접수 가능합니다.";
-  }
-
   function getApplicantLookupScheduleState(referenceDate = new Date(), target = null) {
     if (target) {
       return getApplicantLookupScheduleStateForSchedule(findApplicantScheduleRecord(getApplicantSchedules(), target), referenceDate);
@@ -839,26 +773,6 @@
     }
 
     return `${formatApplicantScheduleDateTime(scheduleState.admitCardLookupScheduleStartAt)} ~ ${formatApplicantScheduleDateTime(scheduleState.admitCardLookupScheduleEndAt)}`;
-  }
-
-  function getApplicantLookupScheduleStatusMessage(scheduleState = getApplicantLookupScheduleState()) {
-    if (scheduleState.reason === "not_configured") {
-      return "수험표 조회 기간이 아직 설정되지 않았습니다.";
-    }
-
-    if (!scheduleState.isConfigured) {
-      return "수험표 조회 기간 설정을 확인하세요.";
-    }
-
-    if (scheduleState.reason === "before_start") {
-      return "아직 수험표 조회 시작 전입니다.";
-    }
-
-    if (scheduleState.reason === "after_end") {
-      return "수험표 조회 기간이 종료되었습니다.";
-    }
-
-    return "현재 수험표 조회 가능합니다.";
   }
 
   function getApplicantApplyAvailabilityState({ target = getApplicantEditableScheduleTarget() } = {}) {
@@ -924,7 +838,35 @@
     return "현재는 접수를 진행할 수 없습니다.";
   }
 
+  function getMemberDocumentEditAvailabilityState() {
+    if (APPLICANT_IS_PREVIEW_MODE) return { isEditable: true, disabledMessage: '', periodLabel: '' };
+    const selection = getApplicantRecruitmentSelectionFromSubmission(state.currentSubmission);
+    for (const item of state.currentSubmission?.answerItems || []) {
+      if (item.systemFieldKey === "admissionCode") selection.admissionCode = String(item.value || "").trim();
+    }
+    const overrides = state.currentSubmission?.promotionOverride || {};
+    for (const key of ["track", "admission", "admissionCode"]) {
+      if (Object.prototype.hasOwnProperty.call(overrides, key)) selection[key] = String(overrides[key] || "").trim();
+    }
+    const schedule = findApplicantScheduleRecord(getApplicantSchedules(), selection);
+    const scheduleState = applicantFormConfig.getApplicantDocumentSubmissionScheduleState(schedule);
+    const periodLabel = scheduleState.isConfigured
+      ? `${scheduleState.documentSubmissionScheduleStartAt.replace("T", " ")} ~ ${scheduleState.documentSubmissionScheduleEndAt.replace("T", " ")}` : "";
+    const disabledMessage = state.isLoadingForm ? "서류 제출 페이지를 준비하는 중입니다."
+      : state.loadError ? state.loadError
+      : !state.currentSubmission?.id ? "접수를 완료한 후 서류를 제출하세요."
+      : scheduleState.reason === "not_configured" ? "서류 제출 기간이 아직 설정되지 않았습니다."
+      : scheduleState.reason === "before_start" ? "아직 서류 제출 기간이 아닙니다."
+      : scheduleState.reason === "after_end" ? "서류 제출 기간이 종료되었습니다."
+      : !scheduleState.isOpen ? "현재는 서류를 제출할 수 없습니다." : "";
+    return { isEditable: !disabledMessage, disabledMessage, periodLabel };
+  }
+
   function getApplicantFormEditAvailabilityState() {
+    if (state.mode === "documents") return getMemberDocumentEditAvailabilityState();
+    if (!APPLICANT_IS_PREVIEW_MODE && membership?.member && state.currentSubmission?.id) {
+      return { isEditable: false, disabledMessage: '접수가 완료되었습니다. 접수는 계정당 한 번만 가능합니다.' };
+    }
     const applyAvailabilityState = getApplicantApplyAvailabilityState({ target: getApplicantEditableScheduleTarget() });
 
     return {
@@ -1227,6 +1169,9 @@
 
   function getGuardedApplicantMode(requestedMode = "") {
     const normalizedMode = String(requestedMode || "").trim();
+    if (!APPLICANT_IS_PREVIEW_MODE && !membership?.member && !["home", "signup"].includes(normalizedMode)) return "home";
+    if (normalizedMode === "signup") return membership?.member ? "home" : "signup";
+    if (normalizedMode === "documents") return APPLICANT_IS_PREVIEW_MODE || state.currentSubmission?.id ? "documents" : "home";
 
     if (normalizedMode === "verify") {
       return canEnterApplicantVerification() ? "verify" : "home";
@@ -1286,7 +1231,23 @@
 
     if (currentLocation !== targetLocation) {
       const historyMethod = replace ? "replaceState" : "pushState";
-      window.history[historyMethod](null, "", targetLocation);
+      window.history[historyMethod](
+        createApplicantHistoryState({
+          mode: state.mode,
+
+        }),
+        "",
+        targetLocation,
+      );
+    } else if (replace === true) {
+      window.history.replaceState(
+        createApplicantHistoryState({
+          mode: state.mode,
+
+        }),
+        "",
+        targetLocation,
+      );
     }
 
     persistApplicantPublicState();
@@ -1429,7 +1390,6 @@
           aria-describedby="applicantPublicDialogMessage"
         >
           <div class="applicant-public-dialog-copy">
-            <span class="applicant-public-form-section-kicker">Notice</span>
             <h2 id="applicantPublicDialogTitle">${escapeHtml(state.dialog.title || "안내")}</h2>
             <p id="applicantPublicDialogMessage">${escapeHtml(state.dialog.message || "")}</p>
           </div>
@@ -1458,7 +1418,96 @@
     }
   }
 
+  function renderApplicantPdfPreview() {
+    if (state.pdfPreview?.isOpen !== true) {
+      return "";
+    }
+
+    const canUseInlineViewer = state.pdfPreview?.useInlineViewer !== false && !!state.pdfPreview.viewerUrl;
+    const showExternalOpenButton = !canUseInlineViewer;
+    const bodyMarkup = canUseInlineViewer
+      ? `
+          <div class="applicant-public-pdf-frame applicant-public-pdf-viewer-frame">
+            <iframe title="${escapeAttribute(state.pdfPreview.fileName || "PDF 미리보기")}" src="${escapeAttribute(state.pdfPreview.viewerUrl)}"></iframe>
+          </div>
+        `
+      : `
+            <div class="applicant-public-empty-state applicant-public-pdf-mobile-empty">
+              <strong>PDF 미리보기</strong>
+              <span>미리볼 수 있는 PDF 페이지가 없습니다.</span>
+            </div>
+          `;
+
+    return `
+      <div class="applicant-public-pdf-viewer-layer" data-applicant-pdf-viewer="true">
+        <button
+          class="applicant-public-pdf-viewer-backdrop"
+          data-applicant-action="close-pdf-preview"
+          type="button"
+          aria-label="PDF 미리보기 닫기"
+        ></button>
+        <section
+          class="applicant-public-pdf-viewer"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="applicantPdfPreviewTitle"
+        >
+          <div class="applicant-public-pdf-viewer-head">
+            <div class="applicant-public-pdf-viewer-copy">
+              <h2 id="applicantPdfPreviewTitle">${escapeHtml(state.pdfPreview.title || "PDF 미리보기")}</h2>
+              <p>${escapeHtml(state.pdfPreview.fileName || "")}</p>
+            </div>
+            <div class="applicant-public-actions applicant-public-pdf-viewer-actions">
+              ${
+                showExternalOpenButton
+                  ? `
+                    <button
+                      class="primary-button applicant-public-pdf-download-button"
+                      data-applicant-action="open-pdf-preview-external"
+                      data-applicant-pdf-preview-open="true"
+                      type="button"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path
+                          d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.41l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.41L11 12.59V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"
+                          fill="currentColor"
+                        ></path>
+                      </svg>
+                      <span>원본 PDF파일 다운로드</span>
+                    </button>
+                  `
+                  : ""
+              }
+              <button
+                class="ghost-button"
+                data-applicant-action="close-pdf-preview"
+                data-applicant-pdf-preview-close="true"
+                type="button"
+              >닫기</button>
+            </div>
+          </div>
+          ${bodyMarkup}
+        </section>
+      </div>
+    `;
+  }
+
+  function syncApplicantPdfPreviewUi() {
+    if (state.pdfPreview?.isOpen !== true) {
+      return;
+    }
+
+    const preferredButton =
+      root.querySelector("[data-applicant-pdf-preview-open='true']") ||
+      root.querySelector("[data-applicant-pdf-preview-close='true']");
+
+    if (preferredButton instanceof HTMLButtonElement) {
+      preferredButton.focus();
+    }
+  }
+
   function resetIdentity() {
+    closeApplicantPdfPreview({ render: false });
     state.identity = {
       name: "",
       email: "",
@@ -1494,6 +1543,7 @@
       code: "",
       debugCode: "",
       expiresAt: 0,
+      resendAvailableAt: state.verification.resendAvailableAt || 0,
       isSending: false,
       isVerifying: false,
     };
@@ -1523,11 +1573,6 @@
 
   function getSubmissionAnswerMap(submission = null) {
     return submission?.answerMap && typeof submission.answerMap === "object" ? submission.answerMap : {};
-  }
-
-  function getApplicantFormFieldByKey(fieldKey = "") {
-    const normalizedFieldKey = String(fieldKey || "").trim();
-    return (Array.isArray(state.formConfig.fields) ? state.formConfig.fields : []).find((field) => field.fieldKey === normalizedFieldKey) || null;
   }
 
   function parseApplicantDateParts(value = "") {
@@ -1577,59 +1622,13 @@
   }
 
   function getApplicantDateDayCount(year, month) {
-    const normalizedYear = Number(year || 0);
-    const normalizedMonth = Number(month || 0);
-
-    if (!Number.isInteger(normalizedYear) || normalizedYear < 1 || !Number.isInteger(normalizedMonth) || normalizedMonth < 1 || normalizedMonth > 12) {
-      return 31;
-    }
-
-    return new Date(normalizedYear, normalizedMonth, 0).getDate();
-  }
-
-  function getApplicantDateYearOptions(inputType = "", selectedYear = "") {
-    const currentYear = new Date().getFullYear();
-    let startYear = inputType === "birthdate" ? currentYear - 120 : currentYear - 10;
-    let endYear = inputType === "birthdate" ? currentYear : currentYear + 20;
-    const normalizedSelectedYear = Number(selectedYear || 0);
-
-    if (Number.isInteger(normalizedSelectedYear) && normalizedSelectedYear > 0) {
-      startYear = Math.min(startYear, normalizedSelectedYear);
-      endYear = Math.max(endYear, normalizedSelectedYear);
-    }
-
-    const years = [];
-
-    if (inputType === "birthdate") {
-      for (let year = endYear; year >= startYear; year -= 1) {
-        years.push(String(year));
-      }
-      return years;
-    }
-
-    for (let year = startYear; year <= endYear; year += 1) {
-      years.push(String(year));
-    }
-
-    return years;
-  }
-
-  function renderApplicantDateOptions(values = [], selectedValue = "", placeholder = "") {
-    const normalizedSelectedValue = String(selectedValue || "").trim();
-
-    return [
-      `<option value="">${escapeHtml(placeholder)}</option>`,
-      ...(Array.isArray(values) ? values : []).map((value) => {
-        const normalizedValue = String(value || "").trim();
-        return `<option value="${escapeAttribute(normalizedValue)}" ${normalizedSelectedValue === normalizedValue ? "selected" : ""}>${escapeHtml(normalizedValue)}</option>`;
-      }),
-    ].join("");
+    return applicantPublicRenderingHelpersModule.getDateDayCount(year, month);
   }
 
   function syncApplicantFieldUiState({ preserveExisting = true } = {}) {
     const nextDateParts = {};
     const nextCustomSelectModes = {};
-    const fields = Array.isArray(state.formConfig.fields) ? state.formConfig.fields : [];
+    const fields = getAllApplicantFields();
 
     fields.forEach((field) => {
       const fieldKey = String(field?.fieldKey || "").trim();
@@ -1668,7 +1667,7 @@
   function buildDraftAnswers(submission = null) {
     const answerMap = getSubmissionAnswerMap(submission);
 
-    return (Array.isArray(state.formConfig.fields) ? state.formConfig.fields : []).reduce((draft, field) => {
+    return getAllApplicantFields().reduce((draft, field) => {
       if (field.systemFieldKey === "name") {
         draft[field.fieldKey] = state.identity.name || state.verification.name || state.lookup.name || "";
         return draft;
@@ -1679,11 +1678,175 @@
     }, {});
   }
 
+  function buildApplicantTestRecruitmentSelection() {
+    const firstRecruitmentUnit = (Array.isArray(state.formConfig.recruitmentUnits) ? state.formConfig.recruitmentUnits : [])[0] || {};
+
+    return {
+      track: String(firstRecruitmentUnit.trackName || ""),
+      admission: String(firstRecruitmentUnit.admissionName || ""),
+      series: String(firstRecruitmentUnit.seriesName || ""),
+      unit: String(firstRecruitmentUnit.unitName || ""),
+      major: String(firstRecruitmentUnit.majorName || ""),
+    };
+  }
+
+  function buildApplicantTestDraftValue(field = {}, index = 0, options = {}) {
+    const recruitmentSelection = options?.recruitmentSelection || {};
+    const identity = options?.identity || {};
+    const normalizedQuestionText = String(field?.questionText || "").trim();
+    const normalizedSystemFieldKey = String(field?.systemFieldKey || "").trim();
+    const normalizedInputType = String(field?.inputType || "text").trim();
+
+    if (normalizedSystemFieldKey === "name") {
+      return identity.name || "테스트 수험생";
+    }
+
+    if (normalizedSystemFieldKey === "email") {
+      return identity.email || "applicant.test@example.com";
+    }
+
+    if (normalizedSystemFieldKey === "track") {
+      return recruitmentSelection.track || "";
+    }
+
+    if (normalizedSystemFieldKey === "admission") {
+      return recruitmentSelection.admission || "";
+    }
+
+    if (normalizedSystemFieldKey === "series") {
+      return recruitmentSelection.series || "";
+    }
+
+    if (normalizedSystemFieldKey === "unit") {
+      return recruitmentSelection.unit || "";
+    }
+
+    if (normalizedSystemFieldKey === "major") {
+      return recruitmentSelection.major || "";
+    }
+
+    if (normalizedInputType === "select") {
+      const fieldOptions = Array.isArray(field.options) ? field.options : [];
+
+      if (fieldOptions.length > 0) {
+        return String(fieldOptions[0] || "");
+      }
+
+      return field.allowCustomOption === true ? `${normalizedQuestionText || "선택 항목"} 테스트` : "";
+    }
+
+    if (normalizedInputType === "textarea") {
+      return `${normalizedQuestionText || "입력 항목"} 테스트 입력값입니다.`;
+    }
+
+    if (normalizedInputType === "phone") {
+      return "01012345678";
+    }
+
+    if (normalizedInputType === "nationality") {
+      return "대한민국";
+    }
+
+    if (normalizedInputType === "date") {
+      return "2026-09-01";
+    }
+
+    if (normalizedInputType === "birthdate") {
+      return "2005-03-15";
+    }
+
+    if (normalizedInputType === "time") {
+      return "09:00";
+    }
+
+    if (isApplicantUploadField(field)) {
+      return buildApplicantUploadDraftValue(normalizedInputType);
+    }
+
+    return `${normalizedQuestionText || "입력 항목"} 테스트 ${index + 1}`;
+  }
+
+  function buildApplicantFormTestPreviewSnapshot() {
+    const identity = {
+      name: "테스트 수험생",
+      email: "applicant.test@example.com",
+      accessToken: "",
+      submissionId: 0,
+      source: "preview",
+    };
+    const recruitmentSelection = buildApplicantTestRecruitmentSelection();
+    const draftAnswers = (Array.isArray(state.formConfig.fields) ? state.formConfig.fields : []).reduce((draft, field, index) => {
+      const fieldKey = String(field?.fieldKey || "").trim();
+
+      if (!fieldKey) {
+        return draft;
+      }
+
+      draft[fieldKey] = buildApplicantTestDraftValue(field, index, {
+        recruitmentSelection,
+        identity,
+      });
+      return draft;
+    }, {});
+
+    return {
+      verification: {
+        name: identity.name,
+        email: identity.email,
+        code: "",
+        debugCode: "",
+        expiresAt: 0,
+      },
+      lookup: {
+        target: APPLICANT_LOOKUP_TARGETS.result,
+        name: "",
+        email: "",
+      },
+      identity,
+      recruitment: recruitmentSelection,
+      currentSubmission: null,
+      draftAnswers,
+      fieldUi: {
+        dateParts: {},
+        customSelectModes: {},
+      },
+    };
+  }
+
+  function openApplicantFormTestEntry() {
+    if (state.isLoadingForm) {
+      setMessage("error", "접수 양식을 불러오는 중입니다.");
+      render();
+      return;
+    }
+
+    if (state.loadError) {
+      setMessage("error", state.loadError || "접수 페이지를 준비하지 못했습니다.");
+      render();
+      return;
+    }
+
+    if (!hasApplicantFormConfigured()) {
+      setMessage("error", "접수 양식이 아직 설정되지 않았습니다.");
+      render();
+      return;
+    }
+
+    try {
+      window.sessionStorage.setItem(APPLICANT_PREVIEW_STATE_STORAGE_KEY, JSON.stringify(buildApplicantFormTestPreviewSnapshot()));
+      window.location.assign(`${APPLICANT_ROUTE_PATHS.form}?preview=1`);
+    } catch (error) {
+      setMessage("error", "테스트 진입 상태를 준비하지 못했습니다.");
+      render();
+    }
+  }
+
   function getApplicantFlowEntryMode() {
     return hasApplicantRecruitmentSelectionStep() ? "apply" : "form";
   }
 
   function getApplicantFormBackMode() {
+    if (membership?.member && !hasApplicantRecruitmentSelectionStep()) return "home";
     if (APPLICANT_IS_PREVIEW_MODE) {
       return "home";
     }
@@ -1783,31 +1946,7 @@
   function renderNationalityPickerContent(fieldKey = "") {
     const filteredNationalityOptions = getFilteredNationalityOptions(fieldKey);
     const fieldValue = String(state.draftAnswers[fieldKey] || "").trim();
-
-    if (filteredNationalityOptions.length === 0) {
-      return `<div class="applicant-public-nationality-empty">검색 결과가 없습니다.</div>`;
-    }
-
-    return `
-      <div class="applicant-public-nationality-options" role="listbox">
-        ${filteredNationalityOptions
-          .map((option) => {
-            const isSelected = fieldValue === String(option.label || "").trim();
-            return `
-              <button
-                class="applicant-public-nationality-option ${isSelected ? "is-selected" : ""}"
-                data-applicant-nationality-field-key="${escapeAttribute(fieldKey)}"
-                data-applicant-nationality-value="${escapeAttribute(option.label)}"
-                type="button"
-              >
-                <strong>${escapeHtml(option.label)}</strong>
-                <span>${escapeHtml([option.englishLabel, option.code].filter(Boolean).join(" · "))}</span>
-              </button>
-            `;
-          })
-          .join("")}
-      </div>
-    `;
+    return applicantPublicRenderingHelpersModule.renderNationalityOptions(filteredNationalityOptions, fieldKey, fieldValue);
   }
 
   function syncNationalityFieldUI(fieldKey = "") {
@@ -1871,25 +2010,70 @@
     }
   }
 
-  async function readFileAsBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
+  function closeApplicantPdfPreview(options = {}) {
+    revokeApplicantPdfPreviewObjectUrl(state.pdfPreview?.objectUrl);
+    state.pdfPreview = createApplicantPdfPreviewState();
 
-      reader.addEventListener("load", () => {
-        const result = String(reader.result || "");
-        const [, base64 = ""] = result.split(",");
-        resolve(base64);
-      });
-      reader.addEventListener("error", () => {
-        reject(new Error("파일을 읽지 못했습니다."));
-      });
-      reader.readAsDataURL(file);
+    if (options.render !== false) {
+      render();
+    }
+  }
+
+  async function openApplicantPdfPreview(fieldKey = "") {
+    const normalizedFieldKey = String(fieldKey || "").trim();
+    const field = getApplicantFormFieldByKey(normalizedFieldKey);
+    const fieldValue = normalizedFieldKey ? state.draftAnswers?.[normalizedFieldKey] : null;
+    let previewFile = null;
+
+    try {
+      previewFile = await createApplicantPdfPreviewFile(fieldValue);
+    } catch (error) {
+      console.error("Failed to create applicant PDF preview file.", error);
+    }
+
+    if (!isApplicantBlobInstance(previewFile)) {
+      setMessage("error", "미리볼 수 있는 PDF 파일이 없습니다.");
+      render();
+      return;
+    }
+
+    closeApplicantPdfPreview({ render: false });
+    const objectUrl = URL.createObjectURL(previewFile);
+    state.pdfPreview = createApplicantPdfPreviewState({
+      isOpen: true,
+      fieldKey: normalizedFieldKey,
+      title: String(field?.questionText || "").trim() || "PDF 미리보기",
+      fileName: String(previewFile.name || fieldValue?.fileName || "").trim() || "document.pdf",
+      file: previewFile,
+      objectUrl,
+      viewerUrl: `${objectUrl}#page=1&view=FitH&navpanes=0&pagemode=none`,
+      useInlineViewer: !isApplicantMobilePdfPreviewEnvironment(),
     });
+    render();
+  }
+
+  function openApplicantPdfPreviewExternally() {
+    const previewFile = state.pdfPreview?.file;
+
+    if (!isApplicantBlobInstance(previewFile)) {
+      setMessage("error", "열 수 있는 PDF 파일이 없습니다.");
+      render();
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(previewFile);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = String(state.pdfPreview?.fileName || previewFile.name || "document.pdf").trim() || "document.pdf";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => revokeApplicantPdfPreviewObjectUrl(objectUrl), 300000);
   }
 
   async function buildSubmissionPayloadAnswers() {
     const answerPayload = {};
-    const fields = Array.isArray(state.formConfig.fields) ? state.formConfig.fields : [];
+    const fields = getActiveApplicantFields();
 
     syncApplicantRecruitmentSelectionIntoDraftAnswers();
 
@@ -1901,7 +2085,12 @@
         continue;
       }
 
-      if (currentValue?.file instanceof File) {
+      if (isApplicantFileInstance(currentValue?.file)) {
+        if (field.inputType === 'file' && !applicantFormConfig.isAllowedUploadExtension(currentValue.file.name, field.allowedExtensions)) {
+          const error = new Error(`${field.questionText}: ${field.allowedExtensions.join(', ')} 파일만 업로드할 수 있습니다.`);
+          error.fieldKey = field.fieldKey;
+          throw error;
+        }
         answerPayload[field.fieldKey] = {
           fileName: currentValue.file.name,
           mimeType: currentValue.file.type || "application/octet-stream",
@@ -1937,7 +2126,7 @@
           isApplicantScheduleOpen: isScheduleOpen,
         })
       : String(status || "").trim() === "promoted"
-        ? "배정 완료"
+        ? "접수 완료"
         : isScheduleOpen
           ? "접수 중"
           : "접수 완료";
@@ -2031,6 +2220,14 @@
     const ticketLookupButtonTitle = !ticketLookupAvailabilityState.isAvailable
       ? getApplicantLookupDisabledMessage(ticketLookupAvailabilityState)
       : "수험표 조회";
+    const formTestButtonTitle = state.isLoadingForm
+      ? "접수 양식을 불러오는 중입니다."
+      : state.loadError
+        ? state.loadError || "접수 페이지를 준비하지 못했습니다."
+        : !hasApplicantFormConfigured()
+          ? "접수 양식이 아직 설정되지 않았습니다."
+          : "임의의 데이터로 접수 페이지를 바로 테스트합니다.";
+    const isFormTestDisabled = state.isLoadingForm || Boolean(state.loadError) || !hasApplicantFormConfigured();
 
     return `
       <button
@@ -2045,26 +2242,9 @@
 
       <section class="applicant-public-home-stage">
         <section class="applicant-public-home">
-          <article class="applicant-public-hero login-hero-card login-notice-card">
-            <div class="login-notice-head">
-              <p class="page-kicker">Applicant Notice</p>
-              <h2>공지사항</h2>
-            </div>
-            <div class="login-notice-content applicant-public-notice-surface">
-              ${getApplicantNoticeMarkup(state.formConfig.noticeHtml, "접수 전 공지사항을 확인하세요.")}
-            </div>
-          </article>
+          ${applicantPublicRenderingHelpersModule.renderCompactNotice({ html: getApplicantNoticeMarkup(state.formConfig.noticeHtml, "접수 전 공지사항을 확인하세요."), cardClassName: 'applicant-public-hero', contentClassName: 'applicant-public-notice-surface' })}
 
           <article class="applicant-public-panel applicant-public-action-grid login-panel-card login-stage-panel">
-            <div class="applicant-public-action-header">
-              <div class="applicant-public-brand login-stage-brand">
-                <img class="applicant-public-brand-mark" src="${escapeAttribute(getApplicantBrandLogoUrl())}" alt="" />
-                <div class="applicant-public-brand-copy login-stage-brand-copy">
-                  <span>Admit Card System</span>
-                  <strong>수험생 접수</strong>
-                </div>
-              </div>
-            </div>
             ${renderMessage()}
             ${
               state.isLoadingForm
@@ -2081,7 +2261,7 @@
                 ? `<div class="applicant-public-empty-state"><strong>접수 양식이 아직 설정되지 않았습니다.</strong><span>관리자에게 접수 양식 설정 여부를 확인하세요.</span></div>`
                 : ""
             }
-            <div class="applicant-public-action-stack applicant-public-home-actions">
+            ${!APPLICANT_IS_PREVIEW_MODE ? membership.home() : `<div class="applicant-public-action-stack applicant-public-home-actions">
               <button
                 class="primary-button"
                 data-applicant-action="go-verify"
@@ -2102,11 +2282,24 @@
                 ${ticketLookupAvailabilityState.isAvailable ? "" : "disabled"}
                 title="${escapeAttribute(ticketLookupButtonTitle)}"
               >${renderApplicantHomeActionButtonLabel("수험표 조회", "ticket")}</button>
-            </div>
+              ${
+                APPLICANT_FORM_TEST_ENTRY_VISIBLE
+                  ? `
+                    <button
+                      class="ghost-button applicant-public-home-test-button"
+                      data-applicant-action="open-form-test-entry"
+                      type="button"
+                      ${isFormTestDisabled ? "disabled" : ""}
+                      title="${escapeAttribute(formTestButtonTitle)}"
+                    >${renderApplicantHomeActionButtonLabel("Form 테스트 진입", "apply")}</button>
+                  `
+                  : ""
+              }
+            </div>`}
           </article>
         </section>
 
-        <p class="login-shell-copyright applicant-public-copyright">COPYRIGHT(c) 2026 BY U-PLUS SYSTEM. ALL RIGHTS RESERVED.</p>
+        <p class="login-shell-copyright applicant-public-copyright">ApplyHub · 원서접수시스템<br>© 2026 U-PLUS SYSTEM</p>
       </section>
     `;
   }
@@ -2117,9 +2310,8 @@
 
     return `
       <section class="applicant-public-step">
-        <article class="applicant-public-slab">
-          <h2>이메일 인증</h2>
-          <p>이름과 이메일을 입력한 뒤 인증 코드를 확인하면 다음 단계로 이동합니다.</p>
+        <article class="applicant-public-slab applicant-public-verification-panel">
+          ${renderApplicantStepHeader('이메일 인증')}
           ${renderMessage()}
           ${
             !APPLICANT_IS_PREVIEW_MODE && isVerificationDisabled
@@ -2129,65 +2321,80 @@
 
           <div class="applicant-public-form applicant-public-verify-form">
             <div class="applicant-public-field">
-              <label for="verificationName">이름 <span class="applicant-public-required">*</span></label>
+              <label for="verificationName">이름 ${globalThis.AdmitCardPublicFormFeedback.badge(true)}</label>
               <input
                 id="verificationName"
+                required
                 data-applicant-model="verification.name"
                 type="text"
                 value="${escapeAttribute(state.verification.name)}"
-                ${isVerificationDisabled ? "disabled" : ""}
+                ${isVerificationDisabled || state.verification.isSending || state.verification.isVerifying ? "disabled" : ""}
               />
             </div>
             <div class="applicant-public-field">
-              <label for="verificationEmail">이메일 <span class="applicant-public-required">*</span></label>
+              <label for="verificationEmail">이메일 ${globalThis.AdmitCardPublicFormFeedback.badge(true)}</label>
               <input
                 id="verificationEmail"
+                required
                 data-applicant-model="verification.email"
                 type="email"
                 value="${escapeAttribute(state.verification.email)}"
-                ${isVerificationDisabled ? "disabled" : ""}
+                ${isVerificationDisabled || state.verification.isSending || state.verification.isVerifying ? "disabled" : ""}
               />
             </div>
           </div>
 
           <div class="applicant-public-actions">
-            <button class="ghost-button" data-applicant-action="back-home" type="button">뒤로</button>
             <button
               class="primary-button"
               data-applicant-action="send-code"
               type="button"
-              ${state.verification.isSending || isVerificationDisabled ? "disabled" : ""}
-              title="${isVerificationDisabled ? escapeAttribute(formEditAvailabilityState.disabledMessage) : "인증 코드 발송"}"
+              ${state.verification.isSending || isVerificationDisabled || getVerificationResendSeconds() > 0 ? "disabled" : ""}
+              title="${isVerificationDisabled ? escapeAttribute(formEditAvailabilityState.disabledMessage) : "인증코드 발송"}"
             >
-              ${state.verification.isSending ? "발송 중..." : "인증 코드 발송"}
+              ${state.verification.isSending ? "발송 중..." : "인증코드 발송"}
             </button>
           </div>
 
           <form class="applicant-public-form" data-applicant-form="verify-code">
             <div class="applicant-public-field">
-              <label for="verificationCode">인증 코드 <span class="applicant-public-required">*</span></label>
+              <label for="verificationCode">인증 코드 ${globalThis.AdmitCardPublicFormFeedback.badge(true)}</label>
               <input
                 id="verificationCode"
+                required
                 data-applicant-model="verification.code"
                 type="text"
-                maxlength="12"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                pattern="[0-9]{${VERIFICATION_CODE_LENGTH}}"
+                minlength="${VERIFICATION_CODE_LENGTH}"
+                maxlength="${VERIFICATION_CODE_LENGTH}"
                 value="${escapeAttribute(state.verification.code)}"
-                ${isVerificationDisabled ? "disabled" : ""}
+                ${isVerificationDisabled || state.verification.isSending || state.verification.isVerifying ? "disabled" : ""}
               />
               ${renderVerificationCountdownMarkup()}
               ${
                 state.verification.debugCode
-                  ? `<span class="applicant-public-file-note">개발용 확인 코드: <strong>${escapeHtml(state.verification.debugCode)}</strong></span>`
+                  ? `
+                    <span
+                      class="applicant-public-file-note applicant-public-verification-code-preview"
+                      data-applicant-verification-code-preview="true"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <span>이메일은 발송되지 않습니다.</span>
+                      <strong>인증 코드 ${escapeHtml(state.verification.debugCode)}</strong>
+                    </span>
+                  `
                   : ""
               }
             </div>
 
             <div class="applicant-public-actions">
-              <button class="ghost-button" data-applicant-action="back-home" type="button">뒤로</button>
               <button
                 class="primary-button"
                 type="submit"
-                ${state.verification.isVerifying || isVerificationDisabled ? "disabled" : ""}
+                ${!canVerifyCode() ? "disabled" : ""}
                 title="${isVerificationDisabled ? escapeAttribute(formEditAvailabilityState.disabledMessage) : "인증 확인"}"
               >
                 ${state.verification.isVerifying ? "확인 중..." : "인증 확인"}
@@ -2210,14 +2417,15 @@
   }
 
   function renderApplicantPasswordFields(isReadOnly = false) {
-    const hasExistingPassword = state.currentSubmission?.hasPassword === true;
+    if (membership?.member) return "";
+    const hasExistingPassword = Boolean(membership?.member) || state.currentSubmission?.hasPassword === true;
     const passwordConfirmError = getApplicantPasswordConfirmError();
 
     return `
       <div class="applicant-public-field applicant-public-password-field">
         <label for="applicationPassword">
           비밀번호
-          ${hasExistingPassword ? "" : ` <span class="applicant-public-required">*</span>`}
+          ${globalThis.AdmitCardPublicFormFeedback.badge(!hasExistingPassword)}
         </label>
         <span class="applicant-public-file-note applicant-public-field-note">
           ${
@@ -2239,7 +2447,7 @@
       <div class="applicant-public-field applicant-public-password-field ${passwordConfirmError ? "is-invalid" : ""}" data-applicant-password-confirm-field="true">
         <label for="applicationPasswordConfirm">
           비밀번호 확인
-          ${hasExistingPassword ? "" : ` <span class="applicant-public-required">*</span>`}
+          ${globalThis.AdmitCardPublicFormFeedback.badge(!hasExistingPassword)}
         </label>
         <span class="applicant-public-file-note applicant-public-field-note">비밀번호를 한 번 더 입력해 주세요.</span>
         <input
@@ -2259,43 +2467,12 @@
 
   function renderApplicantDateField(field, fieldValue, requiredBadge, fieldDescriptionMarkup, isReadOnly) {
     const dateParts = getApplicantDatePartState(field.fieldKey);
-    const yearOptions = getApplicantDateYearOptions(field.inputType, dateParts.year);
-    const monthOptions = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0"));
-    const dayOptions = Array.from(
-      { length: getApplicantDateDayCount(dateParts.year, dateParts.month) },
-      (_, index) => String(index + 1).padStart(2, "0"),
-    );
 
     return `
       <div class="applicant-public-field">
         <label>${escapeHtml(field.questionText)} ${requiredBadge}</label>
         ${fieldDescriptionMarkup}
-        <div class="applicant-public-date-select-grid">
-          <select
-            id="field-${escapeAttribute(field.fieldKey)}-year"
-            data-applicant-date-field-key="${escapeAttribute(field.fieldKey)}"
-            data-applicant-date-part="year"
-            ${isReadOnly ? "disabled" : ""}
-          >
-            ${renderApplicantDateOptions(yearOptions, dateParts.year, "연")}
-          </select>
-          <select
-            id="field-${escapeAttribute(field.fieldKey)}-month"
-            data-applicant-date-field-key="${escapeAttribute(field.fieldKey)}"
-            data-applicant-date-part="month"
-            ${isReadOnly ? "disabled" : ""}
-          >
-            ${renderApplicantDateOptions(monthOptions, dateParts.month, "월")}
-          </select>
-          <select
-            id="field-${escapeAttribute(field.fieldKey)}-day"
-            data-applicant-date-field-key="${escapeAttribute(field.fieldKey)}"
-            data-applicant-date-part="day"
-            ${isReadOnly ? "disabled" : ""}
-          >
-            ${renderApplicantDateOptions(dayOptions, dateParts.day, "일")}
-          </select>
-        </div>
+        ${applicantPublicRenderingHelpersModule.renderDateSelectControls({ fieldKey: field.fieldKey, inputType: field.inputType, parts: dateParts, label: field.questionText, disabled: isReadOnly })}
         <input type="hidden" data-applicant-field-key="${escapeAttribute(field.fieldKey)}" value="${escapeAttribute(fieldValue || "")}" />
       </div>
     `;
@@ -2304,7 +2481,7 @@
   function renderApplicantField(field, options = {}) {
     const fieldValue = state.draftAnswers[field.fieldKey];
     const isReadOnly = options.isReadOnly === true || field.systemFieldKey === "name";
-    const requiredBadge = field.required ? `<span class="applicant-public-required">*</span>` : "";
+    const requiredBadge = globalThis.AdmitCardPublicFormFeedback.badge(field.required);
     const fieldDescription = String(field.questionDescription || "").trim();
     const fieldDescriptionMarkup = fieldDescription
       ? `<span class="applicant-public-file-note applicant-public-field-note">${escapeHtml(fieldDescription)}</span>`
@@ -2396,35 +2573,57 @@
 
     if (isApplicantUploadField(field)) {
       const isPhotoField = field.inputType === "photo";
-      const uploadLabel =
-        fieldValue?.file instanceof File
-          ? fieldValue.file.name
-          : isPhotoField
-            ? fieldValue?.hasPhoto
-              ? fieldValue.fileName || "기존 사진이 등록되어 있습니다."
-              : "선택된 파일이 없습니다."
-            : fieldValue?.hasFile
-            ? fieldValue.fileName || "기존 파일이 등록되어 있습니다."
-            : "선택된 파일이 없습니다.";
+      const uploadLabel = getApplicantUploadFieldValueLabel(field, fieldValue);
+      const isPdfPreviewAvailable = !isPhotoField && canPreviewApplicantPdfUploadValue(fieldValue);
 
       return `
         <div class="applicant-public-field applicant-public-file-field">
           <label for="field-${escapeAttribute(field.fieldKey)}">${escapeHtml(field.questionText)} ${requiredBadge}</label>
           ${fieldDescriptionMarkup}
           <div class="applicant-public-file-shell">
+            ${!isPhotoField && field.allowedExtensions?.length ? `<small class="muted">허용 확장자: ${escapeHtml(field.allowedExtensions.join(', '))}</small>` : ''}
             <input
               id="field-${escapeAttribute(field.fieldKey)}"
               class="applicant-public-file-input"
               data-applicant-field-key="${escapeAttribute(field.fieldKey)}"
               ${fieldTypeAttribute}
               type="file"
-              ${isPhotoField ? 'accept="image/*"' : ""}
+              ${isPhotoField ? 'accept="image/*"' : field.allowedExtensions?.length ? `accept="${escapeAttribute(field.allowedExtensions.map(ext => '.' + ext).join(','))}"` : ""}
               ${isReadOnly ? "disabled" : ""}
             />
-            <label class="applicant-public-file-display" for="field-${escapeAttribute(field.fieldKey)}">
-              <span class="applicant-public-file-button">파일 선택</span>
-              <span class="applicant-public-file-name">${escapeHtml(uploadLabel)}</span>
-            </label>
+            ${
+              isPhotoField
+                ? `
+                  <label class="applicant-public-file-display" for="field-${escapeAttribute(field.fieldKey)}">
+                    <span class="applicant-public-file-button">파일 선택</span>
+                    <span class="applicant-public-file-name">${escapeHtml(uploadLabel)}</span>
+                  </label>
+                `
+                : `
+                  <div class="applicant-public-file-display">
+                    <button
+                      class="applicant-public-file-button applicant-public-file-register-button"
+                      data-applicant-action="choose-upload-file"
+                      data-applicant-upload-field-key="${escapeAttribute(field.fieldKey)}"
+                      type="button"
+                      ${isReadOnly ? "disabled" : ""}
+                    >파일 등록</button>
+                    ${
+                      isPdfPreviewAvailable
+                        ? `
+                          <button
+                            class="applicant-public-file-name applicant-public-file-name-button"
+                            data-applicant-action="open-uploaded-pdf-preview"
+                            data-applicant-upload-field-key="${escapeAttribute(field.fieldKey)}"
+                            type="button"
+                            title="${escapeAttribute(uploadLabel)}"
+                          >${escapeHtml(uploadLabel)}</button>
+                        `
+                        : `<span class="applicant-public-file-name">${escapeHtml(uploadLabel)}</span>`
+                    }
+                  </div>
+                `
+            }
           </div>
         </div>
       `;
@@ -2501,6 +2700,19 @@
     return fields.filter((field) => !["track", "admission", "series", "unit", "major"].includes(String(field?.systemFieldKey || "").trim()));
   }
 
+  function fitRecruitmentSummaryValues() {
+    root.querySelectorAll('.applicant-public-selection-summary-value').forEach(element => {
+      if (!element.clientWidth) return;
+      // Preserve a readable floor; CSS ellipsis handles values that still do not fit.
+      let size = 16;
+      element.style.fontSize = `${size}px`;
+      while (size > 14 && element.scrollWidth > element.clientWidth) {
+        size -= 0.5;
+        element.style.fontSize = `${size}px`;
+      }
+    });
+  }
+
   function renderApplicantRecruitmentSelectionSummary() {
     const summaryItems = APPLICANT_RECRUITMENT_SELECTION_FIELDS
       .map((definition) => ({
@@ -2520,7 +2732,7 @@
             (item) => `
               <div class="applicant-public-selection-summary-item">
                 <strong>${escapeHtml(item.label)}</strong>
-                <span>${escapeHtml(item.value)}</span>
+                <span class="applicant-public-selection-summary-value" title="${escapeHtml(item.value)}">${escapeHtml(item.value)}</span>
               </div>
             `,
           )
@@ -2550,7 +2762,7 @@
 
       return `
         <div class="applicant-public-field">
-          <label for="applicationSelection-${escapeAttribute(definition.key)}">${escapeHtml(definition.label)} <span class="applicant-public-required">*</span></label>
+          <label for="applicationSelection-${escapeAttribute(definition.key)}">${escapeHtml(definition.label)} ${globalThis.AdmitCardPublicFormFeedback.badge(true)}</label>
           <select
             id="applicationSelection-${escapeAttribute(definition.key)}"
             data-applicant-model="recruitment.${escapeAttribute(definition.key)}"
@@ -2570,11 +2782,10 @@
     }).join("");
   }
 
-  function renderApplicantApplicationHeaderActions(statusMarkup = "") {
+  function renderApplicantStepHeader(title, statusMarkup = "") {
     return `
-      <div class="applicant-public-application-header-actions">
-        ${statusMarkup}
-        <button class="ghost-button applicant-public-application-home-button" data-applicant-action="back-home" type="button">처음으로</button>
+      <div class="applicant-public-application-header">
+        <div class="applicant-public-application-header-copy"><h2>${escapeHtml(title)}</h2>${statusMarkup}</div>
       </div>
     `;
   }
@@ -2587,13 +2798,7 @@
     return `
       <section class="applicant-public-step applicant-public-application-step">
         <article class="applicant-public-slab applicant-public-application-panel">
-          <div class="applicant-public-application-header">
-            <div class="applicant-public-application-header-copy">
-              <p class="page-kicker applicant-public-form-kicker">Application Setup</p>
-              <h2>접수 신청</h2>
-            </div>
-            ${renderApplicantApplicationHeaderActions()}
-          </div>
+          ${renderApplicantStepHeader('원서접수')}
           ${renderMessage()}
           ${
             !APPLICANT_IS_PREVIEW_MODE && isReadOnly
@@ -2602,18 +2807,13 @@
           }
           <div class="applicant-public-form applicant-public-application-form">
             <div class="applicant-public-form-section">
-              <div class="applicant-public-form-section-head">
-                <span class="applicant-public-form-section-kicker">Selection</span>
-                <h3>지원 정보를 선택하세요</h3>
-                <p>전형 관리 기준으로 모집시기, 전형, 계열, 모집단위, 전공을 순서대로 선택합니다.</p>
-              </div>
               <div class="applicant-public-form-stack">
                 ${renderApplicantRecruitmentSelectionFields(isReadOnly)}
               </div>
             </div>
 
-            <div class="applicant-public-actions applicant-public-application-actions">
-              <button class="ghost-button" data-applicant-action="back-verify" type="button">이전</button>
+            <div class="applicant-public-actions applicant-public-application-actions applicant-public-step-navigation">
+              <button class="ghost-button" data-applicant-action="back-home" type="button">이전</button>
               <button
                 class="primary-button"
                 data-applicant-action="continue-application"
@@ -2631,9 +2831,15 @@
   function renderApplicationConfiguredFields(isReadOnly = false) {
     const fields = getVisibleApplicantFormFields();
     const renderedFields = [];
+    const birthField = renderApplicantStaticField({
+      fieldId: 'applicationBirth', label: '생년월일',
+      value: applicantPublicRenderingHelpersModule.formatApplicantBirthDate(membership?.birthDate),
+      helperText: membership?.birthDate ? '회원가입 시 등록한 생년월일입니다.' : '회원가입 시 등록한 생년월일이 없습니다.',
+    });
     let insertedEmailAndPassword = false;
 
     fields.forEach((field) => {
+      if (membership?.birthDate && (field.systemFieldKey === 'birth' || field.inputType === 'birthdate')) return;
       renderedFields.push(renderApplicantField(field, { isReadOnly }));
 
       if (!insertedEmailAndPassword && field.systemFieldKey === "name") {
@@ -2642,22 +2848,23 @@
             fieldId: "applicationEmail",
             label: "이메일",
             value: state.identity.email || "-",
-            helperText: "이메일 인증이 완료된 주소입니다.",
+            helperText: "회원가입 시 등록한 이메일입니다.",
           }),
         );
-        renderedFields.push(renderApplicantPasswordFields(isReadOnly));
+        renderedFields.push(birthField, renderApplicantPasswordFields(isReadOnly));
         insertedEmailAndPassword = true;
       }
     });
 
     if (!insertedEmailAndPassword) {
       renderedFields.unshift(renderApplicantPasswordFields(isReadOnly));
+      renderedFields.unshift(birthField);
       renderedFields.unshift(
         renderApplicantStaticField({
           fieldId: "applicationEmail",
           label: "이메일",
           value: state.identity.email || "-",
-          helperText: "이메일 인증이 완료된 주소입니다.",
+          helperText: "회원가입 시 등록한 이메일입니다.",
         }),
       );
       renderedFields.unshift(
@@ -2665,7 +2872,7 @@
           fieldId: "applicationName",
           label: "이름",
           value: state.identity.name || "-",
-          helperText: "본인 확인이 완료된 이름입니다.",
+          helperText: "회원가입 시 등록한 이름입니다.",
         }),
       );
     }
@@ -2689,13 +2896,7 @@
     return `
       <section class="applicant-public-step applicant-public-application-step">
         <article class="applicant-public-slab applicant-public-application-panel">
-          <div class="applicant-public-application-header">
-            <div class="applicant-public-application-header-copy">
-              <p class="page-kicker applicant-public-form-kicker">Application Setup</p>
-              <h2>접수 페이지</h2>
-            </div>
-            ${renderApplicantApplicationHeaderActions(statusMarkup)}
-          </div>
+          ${renderApplicantStepHeader('원서접수', statusMarkup)}
           ${renderMessage()}
           ${
             isPreviewMode
@@ -2706,10 +2907,6 @@
           }
           <form class="applicant-public-form applicant-public-application-form" data-applicant-form="application">
             <div class="applicant-public-form-section">
-              <div class="applicant-public-form-section-head">
-                <span class="applicant-public-form-section-kicker">Account</span>
-                <h3>기본 정보 및 접수 항목</h3>
-              </div>
               ${renderApplicantRecruitmentSelectionSummary()}
               <div class="applicant-public-form-stack">
                 ${renderApplicationConfiguredFields(isReadOnly)}
@@ -2743,6 +2940,7 @@
   }
 
   function renderSummaryItems(answerItems = []) {
+    const documentKeys = new Set((state.formConfig.documentFields || []).map(field => field.fieldKey));
     const fieldOrderMap = (Array.isArray(state.formConfig?.fields) ? state.formConfig.fields : []).reduce((orderMap, field, fieldIndex) => {
       const fieldKey = String(field?.fieldKey || "").trim();
 
@@ -2754,6 +2952,7 @@
     }, new Map());
     const normalizedItems = Array.isArray(answerItems)
       ? answerItems
+          .filter(item => !documentKeys.has(item?.fieldKey))
           .map((answerItem, index) => ({
             answerItem: answerItem && typeof answerItem === "object" ? answerItem : {},
             index,
@@ -2845,9 +3044,10 @@
 
           <form class="applicant-public-form applicant-public-lookup-form" data-applicant-form="lookup">
             <div class="applicant-public-field">
-              <label for="lookupName">이름 <span class="applicant-public-required">*</span></label>
+              <label for="lookupName">이름 ${globalThis.AdmitCardPublicFormFeedback.badge(true)}</label>
               <input
                 id="lookupName"
+                required
                 data-applicant-model="lookup.name"
                 type="text"
                 value="${escapeAttribute(state.lookup.name)}"
@@ -2855,9 +3055,10 @@
               />
             </div>
             <div class="applicant-public-field">
-              <label for="lookupEmail">이메일 <span class="applicant-public-required">*</span></label>
+              <label for="lookupEmail">이메일 ${globalThis.AdmitCardPublicFormFeedback.badge(true)}</label>
               <input
                 id="lookupEmail"
+                required
                 data-applicant-model="lookup.email"
                 type="email"
                 value="${escapeAttribute(state.lookup.email)}"
@@ -2865,9 +3066,10 @@
               />
             </div>
             <div class="applicant-public-field applicant-public-password-field">
-              <label for="lookupPassword">비밀번호 <span class="applicant-public-required">*</span></label>
+              <label for="lookupPassword">비밀번호 ${globalThis.AdmitCardPublicFormFeedback.badge(true)}</label>
               <input
                 id="lookupPassword"
+                required
                 data-applicant-model="lookup.password"
                 type="password"
                 value="${escapeAttribute(state.lookup.password)}"
@@ -2918,27 +3120,20 @@
 
   function renderLookupTicketResult() {
     const submission = state.currentSubmission;
-    const formEditAvailabilityState = getApplicantFormEditAvailabilityState();
-    const isEditDisabled = !formEditAvailabilityState.isEditable;
-    const admitCardDataSource = String(state.formConfig.systemSettings?.admitCardDataSource || "").trim() || "examinee";
-    const isSubmissionAdmitCardSource = admitCardDataSource === "submission";
+    const examineeNo = String(submission?.promotedExamineeNo || "").trim();
     const pdfUrl =
       submission?.id &&
-      state.identity.accessToken &&
-      (isSubmissionAdmitCardSource || (submission?.status === "promoted" && submission?.promotedExamineeNo))
+      state.identity.accessToken
         ? buildApiUrl(`/api/public/applications/${submission.id}/admit-card.pdf?token=${encodeURIComponent(state.identity.accessToken)}`)
         : "";
-    const pdfViewerUrl = pdfUrl ? `${pdfUrl}#page=1&view=FitH&navpanes=0&pagemode=none` : "";
-    const previewMarkup = pdfViewerUrl
+    const previewMarkup = pdfUrl
       ? `
-        <div class="applicant-public-pdf-frame">
-          <iframe title="수험표 미리보기" src="${escapeAttribute(pdfViewerUrl)}"></iframe>
-        </div>
+        <ticket-pdf-viewer src="${escapeAttribute(pdfUrl)}" aria-label="수험표 미리보기"></ticket-pdf-viewer>
       `
       : `
         <div class="applicant-public-empty-state">
           <strong>수험표가 아직 발급되지 않았습니다.</strong>
-          <span>관리자가 수험생 데이터 메뉴에서 반영을 완료하면 이 화면에서 PDF가 표시됩니다.</span>
+          <span>원서접수를 완료한 후 수험표 조회 기간에 확인할 수 있습니다.</span>
         </div>
       `;
 
@@ -2948,17 +3143,10 @@
           <div class="applicant-public-ticket-viewer-head">
             <div class="applicant-public-ticket-viewer-copy">
               <h2>수험표 조회</h2>
-              <p>수험표 PDF를 열람하고 인쇄합니다.</p>
-            </div>
-            <div class="applicant-public-actions">
-              <button
-                class="ghost-button"
-                data-applicant-action="edit-application"
-                type="button"
-                ${isEditDisabled ? "disabled" : ""}
-                title="${isEditDisabled ? escapeAttribute(formEditAvailabilityState.disabledMessage) : "접수 내용 수정"}"
-              >수정</button>
-              <button class="primary-button" data-applicant-action="back-home" type="button">홈</button>
+              <div class="applicant-ticket-number-row">
+                <p>수험번호: ${escapeHtml(examineeNo || "미부여")}</p>
+                ${pdfUrl ? `<a class="primary-button applicant-ticket-download" href="${escapeAttribute(`${pdfUrl}&download=1`)}" download="${escapeAttribute(`수험표_${examineeNo || submission.id}.pdf`)}">다운로드</a>` : ''}
+              </div>
             </div>
           </div>
           ${renderMessage()}
@@ -2968,9 +3156,48 @@
     `;
   }
 
+  function renderMemberDocuments() {
+    const fields = state.formConfig.documentFields || [];
+    const availability = getApplicantFormEditAvailabilityState();
+    return `<section class="applicant-public-step"><article class="applicant-public-slab"><h2>서류 제출</h2>
+      ${availability.periodLabel ? `<p class="applicant-public-preview-note">서류 제출 기간: ${escapeHtml(availability.periodLabel)}</p>` : ""}
+      ${renderMessage()}${!availability.isEditable ? `<p class="applicant-public-preview-note">${escapeHtml(availability.disabledMessage)}</p>` : ""}
+      <form class="applicant-public-form" data-applicant-form="member-documents"><div class="applicant-public-form-stack">${fields.length ? fields.map((field) => renderApplicantField(field, { isReadOnly: !availability.isEditable })).join("") : "<p>제출할 서류 항목이 없습니다.</p>"}</div>
+      <div class="applicant-public-actions"><button class="ghost-button" type="button" data-applicant-action="member-home">첫 화면</button><button class="primary-button" type="submit" ${!fields.length || !availability.isEditable || state.isSaving ? "disabled" : ""}>${state.isSaving ? "제출 중…" : "서류 제출"}</button></div></form></article></section>`;
+  }
+
+  async function saveMemberDocuments() {
+    if (state.isSaving) return;
+    const availability = getMemberDocumentEditAvailabilityState();
+    if (!availability.isEditable) {
+      setMessage("error", availability.disabledMessage);
+      render();
+      return;
+    }
+    if (!validatePublicApplicationFields()) return;
+    if (APPLICANT_IS_PREVIEW_MODE) { setMessage('success', '미리보기에서는 서류를 저장하지 않습니다.'); render(); return; }
+    let fieldError = null;
+    state.isSaving = true;
+    resetMessage();
+    render();
+    try {
+      const submission = await apiRequest("/api/public/members/documents", { method: "POST", body: JSON.stringify({ answers: await buildSubmissionPayloadAnswers() }) });
+      applySubmissionContext({ accessToken: state.identity.accessToken, submission, source: "lookup" });
+      setMessage("success", "서류를 제출했습니다.");
+    } catch (error) {
+      if (error.fieldKey) fieldError = error;
+      else setMessage("error", error.message);
+    }
+    finally { state.isSaving = false; render(); if (fieldError) showPublicApplicationFieldError(fieldError); }
+  }
+
   function render() {
     const markup =
-      state.mode === "verify"
+      state.mode === "signup"
+        ? membership.signupScreen()
+        : state.mode === "documents"
+        ? renderMemberDocuments()
+        : state.mode === "verify"
         ? renderVerify()
         : state.mode === "apply"
           ? renderApply()
@@ -2986,7 +3213,10 @@
                 ? renderLookupTicketResult()
                 : renderHome();
 
-    root.innerHTML = `${markup}${renderApplicantDialog()}`;
+    root.innerHTML = `<public-school-header></public-school-header>${markup}${renderApplicantDialog()}${renderApplicantPdfPreview()}`;
+    recruitmentSummaryObserver?.disconnect();
+    root.querySelectorAll('.applicant-public-selection-summary').forEach(element => recruitmentSummaryObserver?.observe(element));
+    fitRecruitmentSummaryValues();
     syncApplicantBranding();
     updateApplicantDocumentTitle();
     persistApplicantPublicState();
@@ -2994,6 +3224,7 @@
     syncVerificationCountdownUi();
     syncApplicantPasswordConfirmValidationUI();
     syncApplicantDialogUi();
+    syncApplicantPdfPreviewUi();
   }
 
   async function loadFormConfig() {
@@ -3009,13 +3240,13 @@
       applyApplicantPreviewIdentity();
       state.formConfig = {
         fields: Array.isArray(payload?.fields) ? payload.fields : [],
+        documentFields: Array.isArray(payload?.documentFields) ? payload.documentFields : [],
         recruitmentUnits: Array.isArray(payload?.recruitmentUnits) ? payload.recruitmentUnits : [],
         schedules: Array.isArray(payload?.schedules) ? payload.schedules : [],
         settings: payload?.settings || {},
         superAdminSettings: normalizeApplicantBrandSettings(payload?.superAdminSettings),
         systemSettings: {
           admissionHomepageUrl: "",
-          admitCardDataSource: "examinee",
           ...(payload?.systemSettings && typeof payload.systemSettings === "object" ? payload.systemSettings : {}),
         },
         noticeHtml: String(payload?.noticeHtml || ""),
@@ -3037,6 +3268,7 @@
   }
 
   async function sendVerificationCode() {
+    if (state.verification.isSending || state.verification.isVerifying || getVerificationResendSeconds() > 0) return;
     resetMessage();
     const entryAvailabilityState = getApplicantApplyEntryAvailabilityState();
 
@@ -3045,6 +3277,9 @@
       return;
     }
 
+    const verificationForm = root.querySelector('.applicant-public-verify-form');
+    if (verificationForm && !globalThis.AdmitCardPublicFormFeedback.validate(verificationForm)) return;
+    let fieldStatus = null;
     state.verification.code = "";
     state.verification.debugCode = "";
     state.verification.isSending = true;
@@ -3060,16 +3295,20 @@
       });
       state.verification.debugCode = String(payload?.debugCode || "");
       state.verification.expiresAt = Date.now() + Math.max(0, Number(payload?.expiresInSeconds || 0)) * 1000;
-      setMessage("success", "인증 코드를 발송했습니다. 5분 이내에 인증 코드를 입력하세요.");
+      state.verification.resendAvailableAt = Date.now() + VERIFICATION_RESEND_DELAY_MS;
+      try { sessionStorage.setItem('applyhub.applicant-verification-resend-at', String(state.verification.resendAvailableAt)); } catch { /* In-memory cooldown still applies. */ }
+      fieldStatus = { text: state.verification.debugCode ? '아래 표시된 인증코드를 입력해 주세요.' : '이메일로 발송한 인증코드를 입력해 주세요.', error: false };
     } catch (error) {
-      setMessage("error", error?.message || "인증 코드를 발송하지 못했습니다.");
+      fieldStatus = { text: error?.message || '인증 코드를 생성하지 못했습니다.', error: true };
     } finally {
       state.verification.isSending = false;
       render();
+      if (fieldStatus) globalThis.AdmitCardPublicFormFeedback.status(document.getElementById('verificationEmail'), fieldStatus.text, fieldStatus.error);
     }
   }
 
   async function verifyCode() {
+    if (state.verification.isVerifying || state.verification.isSending) return;
     resetMessage();
     const entryAvailabilityState = getApplicantApplyEntryAvailabilityState();
 
@@ -3079,11 +3318,16 @@
     }
 
     if (Number(state.verification.expiresAt || 0) > 0 && isVerificationCodeExpired()) {
-      setMessage("error", "인증 코드가 만료되었습니다. 새 코드를 다시 발송하세요.");
       render();
+      globalThis.AdmitCardPublicFormFeedback.status(document.getElementById('verificationCode'), '인증 코드가 만료되었습니다. 새 코드를 다시 생성하세요.', true);
       return;
     }
 
+    if (!canVerifyCode()) {
+      syncVerificationButtons();
+      return;
+    }
+    let fieldError = '';
     state.verification.isVerifying = true;
     render();
 
@@ -3109,13 +3353,48 @@
       navigateToApplicantMode(getApplicantFlowEntryMode());
       return;
     } catch (error) {
-      setMessage("error", error?.message || "이메일 인증에 실패했습니다.");
+      fieldError = error?.message || '이메일 인증에 실패했습니다.';
     } finally {
       state.verification.isVerifying = false;
       if (state.mode === "verify") {
         render();
+        if (fieldError) globalThis.AdmitCardPublicFormFeedback.status(document.getElementById('verificationCode'), fieldError, true);
       }
     }
+  }
+
+  function getPublicApplicationControl(fieldKey) {
+    return [...root.querySelectorAll('[data-applicant-field-key]')].find(input => input.dataset.applicantFieldKey === fieldKey);
+  }
+
+  function showPublicApplicationFieldError(error) {
+    const control = getPublicApplicationControl(error.fieldKey);
+    if (!globalThis.AdmitCardPublicFormFeedback.status(control, error.message, true)) {
+      setMessage('error', error.message);
+      return;
+    }
+    const field = control.closest('.applicant-public-field');
+    (field.querySelector('select, input:not([type=hidden]):not([type=file]), textarea, button, label[for]') || control).focus();
+    field.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  function validatePublicApplicationFields() {
+    let firstError = null;
+    for (const field of getActiveApplicantFields()) {
+      const control = getPublicApplicationControl(field.fieldKey);
+      if (!control || control.disabled || control.readOnly) continue;
+      const value = state.draftAnswers[field.fieldKey];
+      const missing = isApplicantUploadField(field) ? !(value?.file || value?.hasFile || value?.hasPhoto) : !String(value || '').trim();
+      const parts = state.fieldUi?.dateParts?.[field.fieldKey];
+      const partialDate = ['date', 'birthdate'].includes(field.inputType) && parts && Object.values(parts).some(Boolean) && !value;
+      if ((field.required && missing) || partialDate) {
+        const error = { fieldKey: field.fieldKey, message: isApplicantUploadField(field) ? '파일을 업로드해 주세요.' : partialDate ? '날짜를 모두 선택해 주세요.' : '필수 항목을 입력하거나 선택해 주세요.' };
+        globalThis.AdmitCardPublicFormFeedback.status(control, error.message, true);
+        firstError ||= error;
+      }
+    }
+    if (firstError) showPublicApplicationFieldError(firstError);
+    return !firstError;
   }
 
   async function saveApplication() {
@@ -3133,7 +3412,14 @@
       return;
     }
 
-    const hasExistingPassword = state.currentSubmission?.hasPassword === true;
+    if (!validatePublicApplicationFields()) return;
+    const passwordError = (id, text) => {
+      const control = document.getElementById(id);
+      globalThis.AdmitCardPublicFormFeedback.status(control, text, true);
+      control?.focus();
+    };
+
+    const hasExistingPassword = Boolean(membership?.member) || state.currentSubmission?.hasPassword === true;
     const passwordValue = String(state.application.password || "");
     const passwordConfirmValue = String(state.application.passwordConfirm || "");
     state.application.passwordConfirmTouched = true;
@@ -3141,44 +3427,39 @@
 
     if (!passwordValue.trim()) {
       if (!hasExistingPassword) {
-        setMessage("error", "비밀번호를 입력하세요.");
-        render();
+        passwordError('applicationPassword', '비밀번호를 입력하세요.');
         return;
       }
 
       if (passwordConfirmValue.trim()) {
-        setMessage("error", "변경할 비밀번호를 입력하세요.");
-        render();
+        passwordError('applicationPassword', '변경할 비밀번호를 입력하세요.');
         return;
       }
     }
 
     if (passwordValue.trim()) {
       if (passwordValue.length < 4) {
-        setMessage("error", "비밀번호는 4자 이상이어야 합니다.");
-        render();
+        passwordError('applicationPassword', '비밀번호는 4자 이상이어야 합니다.');
         return;
       }
 
       if (passwordValue.length > 100) {
-        setMessage("error", "비밀번호는 100자 이하여야 합니다.");
-        render();
+        passwordError('applicationPassword', '비밀번호는 100자 이하여야 합니다.');
         return;
       }
 
       if (!passwordConfirmValue.trim()) {
-        setMessage("error", "비밀번호 확인을 입력하세요.");
-        render();
+        document.getElementById('applicationPasswordConfirm')?.focus();
         return;
       }
 
       if (passwordValue !== passwordConfirmValue) {
-        setMessage("error", "비밀번호 확인이 일치하지 않습니다.");
-        render();
+        document.getElementById('applicationPasswordConfirm')?.focus();
         return;
       }
     }
 
+    let fieldError = null;
     state.isSaving = true;
     render();
 
@@ -3198,17 +3479,27 @@
         submission: payload,
         source: state.identity.source || "apply",
       });
+      membership?.markSubmitted(payload);
+      await membership?.refreshApplication().catch(() => {});
       state.application.passwordConfirm = "";
       state.application.passwordConfirmTouched = false;
-      setMessage("success", "접수가 정상적으로 저장되었습니다.");
+      setMessage("success", "접수가 완료되었습니다.");
       navigateToApplicantMode("result");
       return;
     } catch (error) {
-      setMessage("error", error?.message || "접수 저장에 실패했습니다.");
+      if (error.code === 'APPLICANT_ALREADY_SUBMITTED') {
+        await membership?.refreshApplication().catch(() => {});
+        setMessage('error', error.message);
+        navigateToApplicantMode('home');
+        return;
+      }
+      if (error.fieldKey) fieldError = error;
+      else setMessage("error", error?.message || "접수 저장에 실패했습니다.");
     } finally {
       state.isSaving = false;
       if (state.mode === "form") {
         render();
+        if (fieldError) showPublicApplicationFieldError(fieldError);
       }
     }
   }
@@ -3224,6 +3515,7 @@
       return;
     }
 
+    let fieldError = '';
     state.lookup.isLoading = true;
     render();
 
@@ -3246,11 +3538,13 @@
       navigateToApplicantMode(getApplicantLookupResultMode(lookupTarget));
       return;
     } catch (error) {
-      setMessage("error", error?.message || "접수 이력을 찾지 못했습니다.");
+      if (error.status >= 400 && error.status < 500) fieldError = error.message || '입력한 접수 조회 정보를 확인해 주세요.';
+      else setMessage('error', error?.message || '접수 이력을 찾지 못했습니다.');
     } finally {
       state.lookup.isLoading = false;
       if (state.mode === "lookup") {
         render();
+        if (fieldError) globalThis.AdmitCardPublicFormFeedback.status(document.getElementById('lookupPassword'), fieldError, true);
       }
     }
   }
@@ -3280,13 +3574,13 @@
       }
 
       const inputElement = findApplicantFieldElement(fieldKey);
+      // Restore focus before closing: focusin opens this field's search results.
+      if (inputElement instanceof HTMLInputElement) {
+        inputElement.focus({ preventScroll: true });
+      }
       closeNationalityPicker();
       syncNationalityFieldUI(fieldKey);
       persistApplicantPublicState();
-
-      if (inputElement instanceof HTMLInputElement) {
-        inputElement.focus();
-      }
 
       return;
     }
@@ -3305,6 +3599,38 @@
     }
 
     const action = String(target.dataset.applicantAction || "").trim();
+    if (await membership.handleAction(action)) return;
+
+    if (action === "choose-upload-file") {
+      const fieldKey = String(target.dataset.applicantUploadFieldKey || "").trim();
+
+      if (!fieldKey) {
+        return;
+      }
+
+      const fileInput = findApplicantFieldElement(fieldKey);
+
+      if (fileInput instanceof HTMLInputElement && fileInput.type === "file") {
+        fileInput.click();
+      }
+
+      return;
+    }
+
+    if (action === "open-uploaded-pdf-preview") {
+      await openApplicantPdfPreview(target.dataset.applicantUploadFieldKey);
+      return;
+    }
+
+    if (action === "close-pdf-preview") {
+      closeApplicantPdfPreview();
+      return;
+    }
+
+    if (action === "open-pdf-preview-external") {
+      openApplicantPdfPreviewExternally();
+      return;
+    }
 
     if (action === "go-verify") {
       const entryAvailabilityState = getApplicantApplyEntryAvailabilityState();
@@ -3341,6 +3667,11 @@
       return;
     }
 
+    if (action === "open-form-test-entry") {
+      openApplicantFormTestEntry();
+      return;
+    }
+
     if (action === "go-admission-home") {
       const admissionHomepageUrl = resolveAdmissionHomepageUrl();
 
@@ -3356,12 +3687,6 @@
 
     if (action === "back-home" || action === "confirm-result") {
       resetToHome();
-      return;
-    }
-
-    if (action === "back-verify") {
-      resetMessage();
-      navigateToApplicantMode("verify");
       return;
     }
 
@@ -3387,7 +3712,9 @@
             return !selectedValue || !options.includes(selectedValue);
           }) || null;
 
-        setMessage("error", `${nextRequiredField?.label || "접수 신청 정보"}을(를) 선택하세요.`);
+        const control = document.getElementById(`applicationSelection-${nextRequiredField?.key}`);
+        if (globalThis.AdmitCardPublicFormFeedback.status(control, `${nextRequiredField?.label || '접수 신청 정보'}을(를) 선택하세요.`, true)) control.focus();
+        else setMessage('error', '접수 신청 정보를 선택하세요.');
         return;
       }
 
@@ -3456,6 +3783,16 @@
     if (!form) {
       return;
     }
+    if (["member-login", "member-register", "member-terms"].includes(form.dataset.applicantForm)) {
+      event.preventDefault();
+      await membership.handleSubmit(form);
+      return;
+    }
+    if (form.dataset.applicantForm === "member-documents") {
+      event.preventDefault();
+      await saveMemberDocuments();
+      return;
+    }
 
     if (form.matches("[data-applicant-form='verify-code']")) {
       event.preventDefault();
@@ -3503,7 +3840,9 @@
     }
 
     if (target.dataset.applicantModel === "verification.code") {
+      target.value = target.value.replace(/\D/g, '').slice(0, VERIFICATION_CODE_LENGTH);
       state.verification.code = target.value;
+      syncVerificationButtons();
       persistApplicantPublicState();
       return;
     }
@@ -3604,7 +3943,7 @@
     persistApplicantPublicState();
   });
 
-  root.addEventListener("change", (event) => {
+  root.addEventListener("change", async (event) => {
     const element =
       event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement
         ? event.target
@@ -3651,6 +3990,16 @@
         return;
       }
 
+      if (state.pdfPreview?.fieldKey === fieldKey) {
+        closeApplicantPdfPreview({ render: false });
+      }
+
+      const field = getApplicantFormFieldByKey(fieldKey);
+      if (file && fieldType === 'file' && !applicantFormConfig.isAllowedUploadExtension(file.name, field?.allowedExtensions)) {
+        element.value = '';
+        globalThis.AdmitCardPublicFormFeedback.status(element, `${field.allowedExtensions.join(', ')} 파일만 업로드할 수 있습니다.`, true);
+        return;
+      }
       state.draftAnswers[fieldKey] = file
         ? fieldType === "photo"
           ? {
@@ -3772,28 +4121,96 @@
     syncNationalityFieldUI(fieldKey);
   });
 
-  window.addEventListener("popstate", () => {
+  window.addEventListener("popstate", (event) => {
+    closeApplicantPdfPreview({ render: false });
     applyApplicantRouteFromLocation();
   });
 
+  window.addEventListener("resize", () => {
+    fitRecruitmentSummaryValues();
+  });
+
   window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && state.pdfPreview?.isOpen === true) {
+      event.preventDefault();
+      closeApplicantPdfPreview();
+      return;
+    }
+
     if (event.key === "Escape" && state.dialog?.isOpen === true) {
       event.preventDefault();
       closeApplicantDialog();
+      return;
     }
+
   });
 
+  membership = globalThis.createApplicantMembershipController({
+    apiRequest, escapeHtml, render, navigate: navigateToApplicantMode, setMessage,
+    getApplyAvailability: () => {
+      const availability = getApplicantApplyEntryAvailabilityState();
+      return { ...availability, disabledMessage: getApplicantApplyEntryDisabledMessage(availability) };
+    },
+    clearApplication: () => {
+      window.sessionStorage.removeItem(APPLICANT_PUBLIC_STATE_STORAGE_KEY);
+      state.identity = { name: "", email: "", accessToken: "", submissionId: 0, source: "" };
+      state.currentSubmission = null;
+      state.draftAnswers = {};
+      state.recruitment = {};
+      state.verification.name = "";
+      state.verification.email = "";
+      state.lookup.name = "";
+      state.lookup.email = "";
+    },
+    openApplication: async (action, context, member) => {
+      if (action !== "apply" && !context.submission?.id) throw new Error("접수 내역이 없습니다. 먼저 접수하기를 진행하세요.");
+      state.identity.name = member.name;
+      state.identity.email = member.email;
+      state.verification.name = member.name;
+      state.verification.email = member.email;
+      state.lookup.name = member.name;
+      state.lookup.email = member.email;
+      applySubmissionContext({ ...context, source: "lookup" });
+      for (const field of state.formConfig.fields) {
+        if (!state.draftAnswers[field.fieldKey]) {
+          if ((field.systemFieldKey === 'birth' || field.inputType === 'birthdate') && membership.birthDate) state.draftAnswers[field.fieldKey] = membership.birthDate;
+          if (field.inputType === "phone" && typeof member.profile?.phone === 'string') state.draftAnswers[field.fieldKey] = member.profile.phone;
+        }
+      }
+      syncApplicantFieldUiState({ preserveExisting: false });
+      resetMessage();
+      if (action === "apply") {
+        const availability = getApplicantApplyEntryAvailabilityState();
+        if (!availability.isAvailable) { notifyApplicantApplyEntryUnavailable(availability); return; }
+        navigateToApplicantMode(getApplicantFlowEntryMode());
+      } else if (action === "documents") {
+        navigateToApplicantMode("documents");
+      } else {
+        state.lookup.target = action === "ticket" ? APPLICANT_LOOKUP_TARGETS.ticket : APPLICANT_LOOKUP_TARGETS.result;
+        if (action === "ticket" && !getApplicantLookupAvailabilityState().isAvailable) throw new Error(getApplicantLookupDisabledMessage());
+        navigateToApplicantMode(action === "ticket" ? "lookup-ticket" : "lookup-summary");
+      }
+    },
+  });
   const initialMode = getApplicantModeFromPathname(window.location.pathname);
-
-  if (["verify", "apply", "form"].includes(initialMode) && !(APPLICANT_IS_PREVIEW_MODE && initialMode === "form")) {
+  if (APPLICANT_IS_PREVIEW_MODE) {
+    restoreApplicantPublicState();
+    state.mode = initialMode;
+    render();
+    loadFormConfig();
+    if (initialMode === 'signup') {
+      membership.initialize().then(render).catch(error => { state.loadError = error.message; render(); });
+    }
+  } else {
     window.sessionStorage.removeItem(APPLICANT_PUBLIC_STATE_STORAGE_KEY);
-    window.location.replace(APPLICANT_ROUTE_PATHS.home);
-    return;
+    state.mode = initialMode === "signup" ? "signup" : "home";
+    render();
+    membership.initialize().then(async () => {
+      await loadFormConfig();
+      if (membership.member && ["form", "apply", "lookup-summary", "lookup-ticket", "documents", "result"].includes(initialMode)) {
+        const action = ["form", "apply"].includes(initialMode) ? "apply" : initialMode === "lookup-ticket" ? "ticket" : initialMode === "documents" ? "documents" : "summary";
+        await membership.handleAction(`member-${action}`);
+      }
+    }).catch((error) => { state.loadError = error.message; state.isLoadingForm = false; render(); });
   }
-
-  restoreApplicantPublicState();
-  state.mode = getApplicantModeFromPathname(window.location.pathname);
-  syncApplicantRoute({ replace: true });
-  render();
-  loadFormConfig();
 })();

@@ -28,26 +28,24 @@
 
   function createGridStateController(deps) {
     const {
-      applicantAssignmentGridColumns,
+
       applicantHistoryGridColumns,
       applicantRecruitmentGridColumns,
       applicantScheduleGridColumns,
       accountGridColumns,
       admitCardLookupGridColumns,
       createTableState,
-      examineePhotoColumn,
-      examineeRegistrationGridColumns,
+
       getApplicantStatusLabel,
       getAccountGridRows,
       getExamineeGridRows,
       getFilteredLookupRows,
       getHeaderFilteredRows,
       normalizeGridSortRules,
-      openExamineeDetail,
+
       getPrintHistoryRows,
       printHistoryGridColumns,
-      resultGridColumns,
-      startApplicantAssignmentEdit,
+
       startApplicantRecruitmentUnitEdit,
       startApplicantScheduleEdit,
       state,
@@ -68,15 +66,14 @@
     } = gridTableSettingsController;
 
     const gridFilteringController = createGridFilteringController({
-      applicantAssignmentGridColumns,
+
       applicantHistoryGridColumns,
       applicantRecruitmentGridColumns,
       applicantScheduleGridColumns,
       accountGridColumns,
       admitCardLookupGridColumns,
       closeAllPageSizeMenus,
-      examineePhotoColumn,
-      examineeRegistrationGridColumns,
+
       getApplicantStatusLabel,
       getAccountGridRows,
       getExamineeGridRows,
@@ -85,7 +82,6 @@
       getPrintHistoryRows,
       getTableState,
       printHistoryGridColumns,
-      resultGridColumns,
       state,
     });
     const {
@@ -121,8 +117,7 @@
     const gridSelectionController = createGridSelectionController({
       getGridRows,
       getTableState,
-      openExamineeDetail,
-      startApplicantAssignmentEdit,
+
       startApplicantRecruitmentUnitEdit,
       startApplicantScheduleEdit,
       state,

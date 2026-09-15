@@ -12,8 +12,8 @@ function createSystemDataCleanupService({
   const applicantFileStorageDirectoryPath = path.join(rootDir, applicantFileStorageDirName);
   const applicantPhotoStorageDirectoryPath = path.join(rootDir, applicantPhotoStorageDirName);
   const legacyApplicantPhotoStorageDirectoryPath = path.join(rootDir, "uploads", "applicant-photos");
-  const examineePhotoStorageDirectoryPath = path.join(rootDir, examineePhotoStorageDirName);
-  const autoIncrementTableNames = new Set(["app_meta", "app_unit", "app_schedule", "app_assign", "app_email_log", "examinee", "print_log", "app_form"]);
+
+  const autoIncrementTableNames = new Set(["app_meta", "app_unit", "app_schedule", "app_email_log", "print_log", "app_form"]);
 
   function toSqlIdentifier(value = "") {
     return `\`${String(value || "").replaceAll("`", "``")}\``;
@@ -34,7 +34,7 @@ function createSystemDataCleanupService({
   function normalizeSystemDataDeleteScope(scope) {
     const normalizedScope = String(scope || "").trim().toLowerCase();
 
-    if (!["all", "applicant-settings", "applicant-assignments", "applicant-history", "examinees", "photos", "print-history"].includes(normalizedScope)) {
+    if (!["all", "applicant-members", "applicant-settings", "applicant-history", "print-history"].includes(normalizedScope)) {
       throw createHttpError(400, "지원하지 않는 데이터 삭제 범위입니다.", "SYSTEM_DATA_SCOPE_INVALID");
     }
 
@@ -78,22 +78,14 @@ function createSystemDataCleanupService({
     await clearStoredFiles(applicantFileStorageDirectoryPath);
   }
 
-  async function clearExamineeStoredPhotoFiles() {
-    await clearStoredFiles(examineePhotoStorageDirectoryPath);
-  }
-
   async function deleteAllSystemData() {
     const connection = await getPool().getConnection();
 
     try {
       await connection.beginTransaction();
 
-      const [examineeSummaryRows] = await connection.query(`
-        SELECT
-          COUNT(*) AS examineeCount,
-          SUM(CASE WHEN photo_name IS NOT NULL OR photo_mime IS NOT NULL THEN 1 ELSE 0 END) AS photoCount
-        FROM examinee
-      `);
+      const [memberSummaryRows] = await connection.query('SELECT COUNT(*) AS memberCount FROM applicant_members');
+
       const [printHistorySummaryRows] = await connection.query(`
         SELECT COUNT(*) AS printHistoryCount
         FROM print_log
@@ -102,10 +94,7 @@ function createSystemDataCleanupService({
         SELECT COUNT(*) AS applicantSettingsCount
         FROM app_unit
       `);
-      const [applicantAssignmentSummaryRows] = await connection.query(`
-        SELECT COUNT(*) AS applicantAssignmentCount
-        FROM app_assign
-      `);
+
       const [applicantSubmissionSummaryRows] = await connection.query(`
         SELECT COUNT(DISTINCT id) AS applicantSubmissionCount
         FROM app_subm
@@ -113,98 +102,30 @@ function createSystemDataCleanupService({
 
       await connection.query(`DELETE FROM app_unit`);
       await connection.query(`DELETE FROM app_schedule`);
-      await connection.query(`DELETE FROM app_assign`);
       await connection.query(`DELETE FROM print_log`);
       await connection.query(`DELETE FROM app_subm`);
       await connection.query(`DELETE FROM app_meta`);
       await connection.query(`DELETE FROM app_email_log`);
-      await connection.query(`DELETE FROM examinee`);
+      await connection.query(`DELETE FROM applicant_member_sessions`);
+      await connection.query(`DELETE FROM applicant_member_verifications`);
+      await connection.query(`DELETE FROM applicant_member_recovery`);
+      await connection.query(`DELETE FROM applicant_members`);
       await connection.commit();
       await resetAutoIncrementCounters(connection.query.bind(connection), [
         "app_unit",
         "app_schedule",
-        "app_assign",
         "print_log",
         "app_meta",
         "app_email_log",
-        "examinee",
-      ]);
-      await Promise.all([clearApplicantStoredPhotoFiles(), clearApplicantStoredFileUploads(), clearExamineeStoredPhotoFiles()]);
+        ]);
+      await Promise.all([clearApplicantStoredPhotoFiles(), clearApplicantStoredFileUploads()]);
 
       return {
         scope: "all",
-        deletedExaminees: Number(examineeSummaryRows?.[0]?.examineeCount || 0),
-        deletedPhotos: Number(examineeSummaryRows?.[0]?.photoCount || 0),
+        deletedMembers: Number(memberSummaryRows?.[0]?.memberCount || 0),
         deletedApplicantSettings: Number(applicantSettingsSummaryRows?.[0]?.applicantSettingsCount || 0),
-        deletedApplicantAssignments: Number(applicantAssignmentSummaryRows?.[0]?.applicantAssignmentCount || 0),
         deletedPrintHistory: Number(printHistorySummaryRows?.[0]?.printHistoryCount || 0),
         deletedApplicantSubmissions: Number(applicantSubmissionSummaryRows?.[0]?.applicantSubmissionCount || 0),
-      };
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  }
-
-  async function deleteCandidatePhotoData() {
-    const [summary] = await query(`
-      SELECT COUNT(*) AS photoCount
-      FROM examinee
-      WHERE photo_name IS NOT NULL OR photo_mime IS NOT NULL
-    `);
-
-    await query(`
-      UPDATE examinee
-      SET
-        photo_name = NULL,
-        photo_mime = NULL
-      WHERE photo_name IS NOT NULL OR photo_mime IS NOT NULL
-    `);
-    await clearExamineeStoredPhotoFiles();
-
-    return {
-      scope: "photos",
-      deletedExaminees: 0,
-      deletedPhotos: Number(summary?.photoCount || 0),
-      deletedApplicantSettings: 0,
-      deletedApplicantAssignments: 0,
-      deletedPrintHistory: 0,
-      deletedApplicantSubmissions: 0,
-    };
-  }
-
-  async function deleteExamineeData() {
-    const connection = await getPool().getConnection();
-
-    try {
-      await connection.beginTransaction();
-
-      const [examineeSummaryRows] = await connection.query(`
-        SELECT
-          COUNT(*) AS examineeCount,
-          SUM(CASE WHEN photo_name IS NOT NULL OR photo_mime IS NOT NULL THEN 1 ELSE 0 END) AS photoCount
-        FROM examinee
-      `);
-      const [printHistorySummaryRows] = await connection.query(`
-        SELECT COUNT(*) AS printHistoryCount
-        FROM print_log
-      `);
-
-      await connection.query(`DELETE FROM examinee`);
-      await connection.commit();
-      await resetAutoIncrementCounters(connection.query.bind(connection), ["examinee", "print_log"]);
-      await clearExamineeStoredPhotoFiles();
-
-      return {
-        scope: "examinees",
-        deletedExaminees: Number(examineeSummaryRows?.[0]?.examineeCount || 0),
-        deletedPhotos: Number(examineeSummaryRows?.[0]?.photoCount || 0),
-        deletedApplicantSettings: 0,
-        deletedApplicantAssignments: 0,
-        deletedPrintHistory: Number(printHistorySummaryRows?.[0]?.printHistoryCount || 0),
-        deletedApplicantSubmissions: 0,
       };
     } catch (error) {
       await connection.rollback();
@@ -226,30 +147,7 @@ function createSystemDataCleanupService({
 
     return {
       scope: "applicant-settings",
-      deletedExaminees: 0,
-      deletedPhotos: 0,
       deletedApplicantSettings: Number(summary?.applicantSettingsCount || 0),
-      deletedApplicantAssignments: 0,
-      deletedPrintHistory: 0,
-      deletedApplicantSubmissions: 0,
-    };
-  }
-
-  async function deleteApplicantAssignmentData() {
-    const [summary] = await query(`
-      SELECT COUNT(*) AS applicantAssignmentCount
-      FROM app_assign
-    `);
-
-    await query(`DELETE FROM app_assign`);
-    await resetAutoIncrementCounters(query, ["app_assign"]);
-
-    return {
-      scope: "applicant-assignments",
-      deletedExaminees: 0,
-      deletedPhotos: 0,
-      deletedApplicantSettings: 0,
-      deletedApplicantAssignments: Number(summary?.applicantAssignmentCount || 0),
       deletedPrintHistory: 0,
       deletedApplicantSubmissions: 0,
     };
@@ -266,10 +164,7 @@ function createSystemDataCleanupService({
 
     return {
       scope: "print-history",
-      deletedExaminees: 0,
-      deletedPhotos: 0,
       deletedApplicantSettings: 0,
-      deletedApplicantAssignments: 0,
       deletedPrintHistory: Number(summary?.printHistoryCount || 0),
       deletedApplicantSubmissions: 0,
     };
@@ -289,36 +184,39 @@ function createSystemDataCleanupService({
 
     return {
       scope: "applicant-history",
-      deletedExaminees: 0,
-      deletedPhotos: 0,
       deletedApplicantSettings: 0,
-      deletedApplicantAssignments: 0,
       deletedPrintHistory: 0,
       deletedApplicantSubmissions: Number(summary?.applicantSubmissionCount || 0),
     };
   }
 
+  async function deleteMemberData() {
+    const connection = await getPool().getConnection();
+    try {
+      await connection.beginTransaction();
+      // Lock accounts until their sessions and application links are removed.
+      const [members] = await connection.query('SELECT id FROM applicant_members FOR UPDATE');
+      await connection.query('DELETE FROM applicant_member_sessions');
+      await connection.query('DELETE FROM applicant_member_verifications');
+      await connection.query('DELETE FROM applicant_member_recovery');
+      await connection.query('UPDATE app_meta SET member_id = NULL WHERE member_id IS NOT NULL');
+      await connection.query('DELETE FROM applicant_members');
+      await connection.commit();
+      return { scope: 'applicant-members', deletedMembers: members.length, deletedApplicantSubmissions: 0 };
+    } catch (error) { await connection.rollback(); throw error; }
+    finally { connection.release(); }
+  }
+
   async function deleteSystemData(scope) {
     const normalizedScope = normalizeSystemDataDeleteScope(scope);
+    if (normalizedScope === 'applicant-members') return deleteMemberData();
 
     if (normalizedScope === "all") {
       return deleteAllSystemData();
     }
 
-    if (normalizedScope === "photos") {
-      return deleteCandidatePhotoData();
-    }
-
-    if (normalizedScope === "examinees") {
-      return deleteExamineeData();
-    }
-
     if (normalizedScope === "applicant-settings") {
       return deleteApplicantSettingsData();
-    }
-
-    if (normalizedScope === "applicant-assignments") {
-      return deleteApplicantAssignmentData();
     }
 
     if (normalizedScope === "applicant-history") {

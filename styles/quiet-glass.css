@@ -1,0 +1,172 @@
+/* Application-wide Quiet Glass material layer. Layout stays in feature styles.
+   Public reference geometry is loaded next in public-glass.css. */
+body { color: var(--glass-ink); background: var(--glass-backdrop); background-attachment: fixed; }
+.sidebar, .topbar {
+  background: rgba(var(--glass-surface-rgb), .82);
+  border-color: var(--glass-white);
+  box-shadow: inset 0 1px 0 var(--glass-white);
+  backdrop-filter: blur(20px);
+}
+.sidebar { border-right: 1px solid var(--glass-white); }
+.topbar { border-bottom: 1px solid var(--glass-white); }
+.brand-badge { filter: none; }
+.brand h1 { color: var(--glass-ink); font-weight: 700; }
+.topbar h2 { font-size: 22px; letter-spacing: -.04em; font-weight: 700; }
+.nav-section-title { font-size: 12px; font-weight: 500; letter-spacing: .03em; }
+.nav-section + .nav-section, .sidebar-footer { border-color: var(--glass-line); }
+.nav-item { color: var(--glass-muted); font-size: 13px; font-weight: 500; }
+.nav-item:hover, .nav-item.active {
+  color: var(--glass-tint-ink); background: var(--glass-tint);
+  border-color: var(--glass-line); box-shadow: var(--glass-shadow); transform: none;
+}
+.nav-item.active { font-weight: 700; }
+.nav-icon-wrap { color: var(--glass-tint-ink); background: var(--glass-bg); }
+.nav-item:hover .nav-icon-wrap, .nav-item.active .nav-icon-wrap {
+  color: #fff; background: var(--glass-button); box-shadow: none; transform: none;
+}
+.hero-card, .panel-card, .metric-card, .table-card, .form-card,
+.split-card, .timeline-card, .template-card, .account-card,
+.system-settings-field, .template-tag-panel, .template-page-properties-panel,
+.editor-toolbar, .applicant-answer-item {
+  background: var(--glass-surface); border-color: var(--glass-line);
+  border-radius: 24px; box-shadow: var(--glass-shadow);
+}
+.hero-card { background: var(--glass-backdrop); border-color: var(--glass-frame-line); }
+.hero-card::after { background: none; }
+.hero-card h3 { font-weight: 700; line-height: 1.4; letter-spacing: -.04em; }
+.topbar-session-timer, .header-chip-combo-trigger, .table-filter-menu,
+.header-chip-combo-menu { background: var(--glass-surface); border-color: var(--glass-line); box-shadow: var(--glass-shadow); }
+.primary-button {
+  color: #fff; background: var(--glass-button); border: 1px solid transparent;
+  border-radius: 12px; box-shadow: var(--glass-button-shadow); font-weight: 700;
+}
+.primary-button:hover:not(:disabled) { background: var(--glass-primary-hover); transform: none; }
+.ghost-button, .secondary-button, .outline-button, .icon-button {
+  background: var(--glass-tint); color: var(--glass-tint-ink);
+  border: 1px solid var(--glass-line); border-radius: 12px; box-shadow: none;
+}
+.ghost-button:hover:not(:disabled), .secondary-button:hover:not(:disabled),
+.outline-button:hover:not(:disabled), .icon-button:hover:not(:disabled) {
+  background: var(--glass-bg); box-shadow: var(--glass-shadow); transform: none;
+}
+.danger-button, .ghost-button.danger-button, .table-inline-button.danger {
+  background: var(--glass-error-bg); border-color: var(--glass-error-line); color: var(--glass-error);
+}
+.danger-button:hover:not(:disabled) { background: var(--glass-error-bg); }
+button:focus-visible, a:focus-visible, summary:focus-visible {
+  outline: 3px solid rgba(var(--glass-primary-rgb), .38); outline-offset: 3px;
+}
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=hidden]):not([type=file]),
+select, textarea {
+  color: var(--glass-ink); background-color: var(--glass-bg);
+  border-color: var(--glass-line); border-radius: 12px;
+}
+input::placeholder, textarea::placeholder { color: var(--glass-muted); }
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--glass-primary); outline-offset: 2px;
+  border-color: var(--glass-primary); box-shadow: var(--glass-focus);
+}
+input[type=checkbox], input[type=radio] { accent-color: var(--glass-primary); }
+[aria-invalid=true]:not([type=checkbox]) { border-color: var(--glass-error); }
+.template-management-tabs { gap: 8px; }
+.template-management-tab { border-radius: 12px; color: var(--glass-muted); background: var(--glass-surface); border-color: var(--glass-line); }
+.template-management-tab.active { background: var(--glass-button); color: #fff; border-color: transparent; box-shadow: var(--glass-button-shadow); }
+.filter-chip.active, .table-page-button.active { background: var(--glass-tint); color: var(--glass-tint-ink); border-color: var(--glass-line); }
+.result-grid-card thead th { color: var(--glass-muted); background: var(--glass-bg); }
+.result-grid-card tbody tr.is-selected { background: var(--glass-tint); }
+.table-inline-button.primary { background: var(--glass-button); color: #fff; border-color: transparent; }
+.modal-backdrop, .busy-overlay-backdrop, .applicant-public-dialog-backdrop {
+  background: rgba(var(--glass-shadow-rgb), .3); backdrop-filter: blur(8px);
+}
+.modal-sheet, .busy-overlay-panel, .applicant-public-dialog, .applicant-member-term-dialog {
+  background: var(--glass-surface); color: var(--glass-ink);
+  border: 1px solid var(--glass-frame-line); border-radius: 24px; box-shadow: var(--glass-dialog-shadow);
+}
+.modal-header, .modal-toolbar { border-color: var(--glass-line); background: var(--glass-bg); }
+.busy-overlay-panel p, .busy-overlay-progress-meta { color: var(--glass-muted); }
+.busy-overlay-progress-value { color: var(--glass-ink); }
+.busy-overlay-cancel-button { border-radius: 12px; color: var(--glass-tint-ink); background: var(--glass-tint); border-color: var(--glass-line); }
+.busy-spinner { border-color: var(--glass-line); border-top-color: var(--glass-primary); border-right-color: var(--glass-tint); }
+.toast-message { background: var(--glass-surface); color: var(--glass-ink); border-color: var(--glass-line); box-shadow: var(--glass-dialog-shadow); }
+.template-tag-button { color: var(--glass-tint-ink); background: var(--glass-tint); border-color: var(--glass-line); box-shadow: var(--glass-shadow); }
+.template-preview-stage, .template-editor-page { background: var(--glass-bg); }
+.applicant-field-meta-chip,
+:is(.applicant-public-body, .common-login-stage) .applicant-public-badge {
+  min-height: 24px; padding: 4px 8px; border: 1px solid transparent;
+  border-radius: 8px; font-size: 11px; line-height: 1.4; font-weight: 500;
+}
+.applicant-field-meta-required,
+:is(.applicant-public-body, .common-login-stage) .applicant-public-badge.is-required {
+  color: var(--glass-tint-ink); background: var(--glass-tint);
+}
+.applicant-field-meta-optional,
+:is(.applicant-public-body, .common-login-stage) .applicant-public-badge.is-optional {
+  color: var(--glass-muted); background: var(--glass-surface); border-color: var(--glass-line);
+}
+.applicant-field-meta-system { color: var(--glass-tint-ink); background: var(--glass-tint); }
+.applicant-field-meta-type { color: var(--glass-muted); background: var(--glass-bg); }
+.applicant-member-term-dialog::backdrop { background: rgba(var(--glass-shadow-rgb), .3); backdrop-filter: blur(8px); }
+.menu-toggle { background: var(--glass-tint); border-color: var(--glass-line); }
+@media (max-width: 720px) {
+  .applicant-settings-fields-panel > .section-header { flex-wrap: wrap; }
+  .applicant-settings-fields-panel > .section-header .inline-actions { width: 100%; display: flex; flex-direction: row; }
+  .applicant-settings-fields-panel > .section-header .inline-actions button { width: auto; flex: 1; white-space: nowrap; }
+  .applicant-field-card-main { flex-direction: column; gap: 12px; }
+  .applicant-field-card-actions.inline-actions { display: flex; flex-direction: row; width: 100%; gap: 8px; }
+  .applicant-field-card-actions.inline-actions button { flex: 1; width: auto; }
+}
+/* These are document/preview surfaces, not application cards. Preserve output. */
+.paper, .template-editor-surface, .template-render-sheet, .template-preview-stage {
+  color-scheme: light;
+  --text: #152033; --text-dim: #5e6a80; --accent-strong: #143fcf;
+  --accent: #2d63f5; --line: #dfe5f0;
+  font-family: "Manrope", "Noto Sans KR", sans-serif;
+}
+/* Notice editing is application UI, not the printable document canvas. */
+:is(.paper, .template-render-sheet, .template-preview-stage, .template-editor-surface:not(.login-notice-editor-surface)) {
+  --glass-bg: #edf4fa; --glass-surface: #fafdff; --glass-ink: #203f55;
+  --glass-muted: #5b7385; --glass-line: #cfdee9; --glass-tint: #e2eff7;
+  --glass-tint-ink: #2f5871; --glass-link: #25546f;
+  --glass-primary: #25546f; --glass-primary-hover: #346d8f;
+  --glass-primary-rgb: 37, 84, 111; --glass-tint-rgb: 226, 239, 247;
+  --glass-button: linear-gradient(125deg, #346d8f, #25546f);
+  --glass-surface-rgb: 250, 253, 255; --glass-bg-rgb: 237, 244, 250;
+  --glass-line-rgb: 207, 222, 233; --glass-ink-rgb: 32, 63, 85;
+  --glass-muted-rgb: 91, 115, 133;
+  --grid-head: #edf4fa; --grid-head-text: #5b7385;
+  --grid-line: #cfdee9; --grid-row-line: #cfdee9; --grid-hover: #e2eff7;
+}
+.template-editor-surface.login-notice-editor-surface {
+  color-scheme: var(--glass-color-scheme); --text: var(--glass-ink); --text-dim: var(--glass-muted);
+  --accent-strong: var(--glass-link); --line: var(--glass-line);
+}
+button:focus-visible, a:focus-visible, summary:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline-color: var(--glass-link);
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-item, .nav-icon-wrap, .primary-button, .secondary-button, .ghost-button,
+  .outline-button, .icon-button, .toast-message { transition: none; animation: none; }
+}
+
+/* Shared mode switch: normal document flow, never covering form controls. */
+applyhub-theme-toggle { display: inline-flex; flex: 0 0 auto; margin-left: auto; }
+applyhub-theme-toggle .theme-toggle {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0;
+  border: 1px solid var(--glass-line); border-radius: 12px;
+  background: var(--glass-tint); color: var(--glass-tint-ink);
+  font-size: 12px; line-height: 1; font-weight: 500; white-space: nowrap;
+}
+applyhub-theme-toggle .theme-toggle:hover:not(:disabled) { background: var(--glass-bg); }
+applyhub-theme-toggle .theme-toggle:focus-visible { outline: 2px solid var(--glass-link); outline-offset: 3px; }
+applyhub-theme-toggle svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+:root[data-theme="dark"] .theme-toggle-sun,
+:root:not([data-theme="dark"]) .theme-toggle-moon { display: none; }
+.public-glass-page-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; width: 100%; justify-self: stretch; }
+@media (max-width: 720px) {
+  .topbar-right { gap: 8px; padding-left: 0; border-left: 0; }
+  .topbar-right applyhub-theme-toggle { margin-left: 0; }
+  .topbar-right .user-meta { min-width: 0; overflow-wrap: anywhere; }
+}
+@media print { applyhub-theme-toggle { display: none !important; } }

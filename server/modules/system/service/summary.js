@@ -1,7 +1,6 @@
 function createSystemSummaryService({
   formatDateAsYmd,
   getAccounts,
-  getApplicantAssignments,
   getApplicantFormFields,
   getApplicantRecruitmentUnits,
   getApplicantNoticeHtml,
@@ -18,7 +17,7 @@ function createSystemSummaryService({
   query,
 }) {
   async function getSummary() {
-    const [examineeSummary] = await query(`SELECT COUNT(*) AS registeredExaminees FROM examinee`);
+    const [examineeSummary] = await query(`SELECT COUNT(DISTINCT id) AS registeredExaminees FROM app_subm`);
     const [printSummary] = await query(`SELECT COUNT(*) AS totalPrints FROM print_log`);
     const [todayPrintSummary] = await query(`
       SELECT COUNT(*) AS todayPrints
@@ -34,7 +33,7 @@ function createSystemSummaryService({
   }
 
   async function getBootstrapPayload() {
-    const [examinees, printHistory, templates, accounts, summary, systemSettings, systemBackupAutomation, superAdminSettings, loginNoticeHtml, applicantNoticeHtml, applicantFormFields, applicantRecruitmentUnits, applicantSchedules, applicantAssignments, applicantSubmissions, applicantSettings] = await Promise.all([
+    const [examinees, printHistory, templates, accounts, summary, systemSettings, systemBackupAutomation, superAdminSettings, loginNoticeHtml, applicantNoticeHtml, applicantFormFields, applicantRecruitmentUnits, applicantSchedules, applicantSubmissions, applicantSettings] = await Promise.all([
       getExaminees(),
       getPrintHistory(),
       getTemplates(),
@@ -48,7 +47,6 @@ function createSystemSummaryService({
       getApplicantFormFields(),
       getApplicantRecruitmentUnits(),
       getApplicantSchedules(),
-      getApplicantAssignments(),
       getApplicantSubmissions(),
       getApplicantSettings(),
     ]);
@@ -58,7 +56,6 @@ function createSystemSummaryService({
         fields: applicantFormFields,
         recruitmentUnits: applicantRecruitmentUnits,
         schedules: applicantSchedules,
-        assignments: applicantAssignments,
         settings: applicantSettings,
         submissions: applicantSubmissions,
       },
@@ -73,6 +70,7 @@ function createSystemSummaryService({
       loginNoticeHtml,
       applicantNoticeHtml,
       serverDate: formatDateAsYmd(new Date()),
+      serverTime: Date.now(),
     };
   }
 

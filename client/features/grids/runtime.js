@@ -27,7 +27,7 @@
   const { createGridTableUiController } = gridTableUiModule;
 
   function createGridRuntimeController({
-    applicantAssignmentGridColumns,
+
     applicantHistoryGridColumns,
     applicantRecruitmentGridColumns,
     applicantScheduleGridColumns,
@@ -36,8 +36,7 @@
     createTableState,
     escapeAttribute,
     escapeHtml,
-    examineePhotoColumn,
-    examineeRegistrationGridColumns,
+
     getApplicantStatusLabel,
     getAccountGridRows,
     getExamineeGridRows,
@@ -46,12 +45,11 @@
     headerFilterFields,
     lookupSelectKeys,
     normalizeGridSortRules,
-    openExamineeDetail,
+
     printHistoryGridColumns,
     renderAccountRoleOptions,
     renderView,
-    resultGridColumns,
-    startApplicantAssignmentEdit,
+
     startApplicantRecruitmentUnitEdit,
     startApplicantScheduleEdit,
     state,
@@ -70,15 +68,14 @@
       state,
     });
     const gridStateMethods = createGridStateController({
-      applicantAssignmentGridColumns,
+
       applicantHistoryGridColumns,
       applicantRecruitmentGridColumns,
       applicantScheduleGridColumns,
       accountGridColumns,
       admitCardLookupGridColumns,
       createTableState,
-      examineePhotoColumn,
-      examineeRegistrationGridColumns,
+
       getApplicantStatusLabel,
       getAccountGridRows,
       getExamineeGridRows,
@@ -86,10 +83,9 @@
       getHeaderFilteredRows: (...args) => gridRenderingController.getHeaderFilteredRows(...args),
       getPrintHistoryRows,
       normalizeGridSortRules,
-      openExamineeDetail,
+
       printHistoryGridColumns,
-      resultGridColumns,
-      startApplicantAssignmentEdit,
+
       startApplicantRecruitmentUnitEdit,
       startApplicantScheduleEdit,
       state,

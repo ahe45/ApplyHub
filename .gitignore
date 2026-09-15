@@ -3,3 +3,10 @@ node_modules/
 .idea/
 .tmp-*/
 uploads/
+
+.tmp-*.log
+
+.private/
+
+backups/
+보안접속.txt

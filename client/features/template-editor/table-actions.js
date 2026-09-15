@@ -133,7 +133,7 @@
       const style = normalizeTemplateEditorBorderStyle(options.style || getTemplateEditorBorderStyleInput?.()?.value || "solid");
       const rawWidth = normalizeTemplateEditorBorderWidth(options.width ?? getTemplateEditorBorderWidthInput?.()?.value ?? 1);
       const shouldRemoveBorder = rawWidth === 0 || style === "none";
-      const width = !shouldRemoveBorder && style === "double" ? Math.max(rawWidth, 3) : rawWidth;
+      const width = !shouldRemoveBorder && style === "double" ? rawWidth + 2 : rawWidth;
       const color = normalizeTemplateEditorColorValue(
         options.colorValue || options.color || getTemplateEditorBorderColorInput?.()?.value || "#000000",
         "#000000",
@@ -168,12 +168,362 @@
       return `${config.width}px ${config.style} ${config.color}`;
     }
 
+    function getTemplateEditorBorderTargetTables(targetCells) {
+      return Array.from(new Set(targetCells.map((cell) => cell?.closest("table")).filter(Boolean)));
+    }
+
+    function restoreTemplateEditorCollapsedTableBorderModel(targetCells) {
+      getTemplateEditorBorderTargetTables(targetCells).forEach((table) => {
+        table.style.borderCollapse = "collapse";
+        table.style.removeProperty("border-spacing");
+        table.style.removeProperty("border");
+      });
+    }
+
+    function formatTemplateEditorPixelValue(value) {
+      const normalizedValue = Number(value);
+
+      if (!Number.isFinite(normalizedValue)) {
+        return "0px";
+      }
+
+      return `${Math.max(0, Math.round(normalizedValue * 100) / 100)}px`;
+    }
+
+    function parseTemplateEditorCssPixelValue(value, fallback = 0) {
+      const parsedValue = Number.parseFloat(String(value || "").replace("px", ""));
+      return Number.isFinite(parsedValue) ? parsedValue : fallback;
+    }
+
+    function parseTemplateEditorInlinePixelValue(value, fallback = 0) {
+      const normalizedValue = String(value || "").trim();
+
+      if (!/^-?\d+(?:\.\d+)?px$/i.test(normalizedValue)) {
+        return fallback;
+      }
+
+      return parseTemplateEditorCssPixelValue(normalizedValue, fallback);
+    }
+
+    function getTemplateEditorMeasuredColumnWidth(cellMap, columnIndex) {
+      const { matrix, entries } = cellMap;
+
+      for (const row of matrix) {
+        const cell = row?.[columnIndex];
+        const entry = cell ? entries.get(cell) : null;
+
+        if (!entry) {
+          continue;
+        }
+
+        const measuredWidth = cell.getBoundingClientRect().width / entry.colSpan;
+
+        if (Number.isFinite(measuredWidth) && measuredWidth > 0) {
+          return Math.max(TEMPLATE_EDITOR_TABLE_MIN_SIZE, measuredWidth);
+        }
+      }
+
+      return TEMPLATE_EDITOR_TABLE_MIN_SIZE;
+    }
+
+    function stabilizeTemplateEditorTableColumns(table) {
+      if (!(table instanceof HTMLTableElement)) {
+        return;
+      }
+
+      const cellMap = buildTemplateTableCellMap(table);
+      const columnCount = cellMap.matrix.reduce(
+        (maxColumnCount, row) => Math.max(maxColumnCount, Array.isArray(row) ? row.length : 0),
+        0,
+      );
+
+      if (columnCount <= 0) {
+        return;
+      }
+
+      const measuredColumnWidths = Array.from({ length: columnCount }, (_, columnIndex) =>
+        getTemplateEditorMeasuredColumnWidth(cellMap, columnIndex),
+      );
+      let colGroup = Array.from(table.children).find((child) => child.tagName === "COLGROUP") || null;
+
+      if (!colGroup) {
+        colGroup = document.createElement("colgroup");
+        table.insertBefore(colGroup, table.firstElementChild);
+      }
+
+      while (colGroup.children.length < columnCount) {
+        colGroup.appendChild(document.createElement("col"));
+      }
+
+      while (colGroup.children.length > columnCount) {
+        colGroup.lastElementChild?.remove();
+      }
+
+      Array.from(colGroup.children).forEach((columnElement, columnIndex) => {
+        const configuredWidth = parseTemplateEditorInlinePixelValue(columnElement.style.width, 0);
+
+        if (configuredWidth >= TEMPLATE_EDITOR_TABLE_MIN_SIZE) {
+          return;
+        }
+
+        columnElement.style.width = formatTemplateEditorPixelValue(
+          measuredColumnWidths[columnIndex],
+        );
+      });
+    }
+
+    function stabilizeTemplateEditorTableRows(table) {
+      if (!(table instanceof HTMLTableElement)) {
+        return;
+      }
+
+      Array.from(table.rows || []).forEach((row) => {
+        const measuredHeight = row.getBoundingClientRect().height;
+
+        if (Number.isFinite(measuredHeight) && measuredHeight > 0) {
+          row.style.height = formatTemplateEditorPixelValue(measuredHeight);
+        }
+      });
+    }
+
+    function stabilizeTemplateEditorBorderTargetTables(targetCells) {
+      getTemplateEditorBorderTargetTables(targetCells).forEach((table) => {
+        stabilizeTemplateEditorTableColumns(table);
+        stabilizeTemplateEditorTableRows(table);
+      });
+    }
+
+    function getTemplateEditorBorderCompensationCells(targetCells) {
+      const compensationCells = new Set();
+      const targetTables = Array.from(new Set(targetCells.map((cell) => cell?.closest("table")).filter(Boolean)));
+
+      targetTables.forEach((table) => {
+        buildTemplateTableCellMap(table).entries.forEach((entry) => {
+          compensationCells.add(entry.cell);
+        });
+      });
+
+      targetCells.forEach((cell) => {
+        if (cell) {
+          compensationCells.add(cell);
+        }
+      });
+
+      return Array.from(compensationCells);
+    }
+
+    function getTemplateEditorBorderSideStyleProperties(side) {
+      const normalizedSide = side[0].toUpperCase() + side.slice(1);
+
+      return Object.freeze({
+        borderWidth: `border${normalizedSide}Width`,
+        padding: `padding${normalizedSide}`,
+      });
+    }
+
+    function createTemplateEditorBorderBoxSnapshot(targetCells) {
+      return getTemplateEditorBorderCompensationCells(targetCells).map((cell) => {
+        const computedStyle = window.getComputedStyle(cell);
+        const tableBorderCollapse = String(
+          window.getComputedStyle(cell.closest("table") || cell).borderCollapse || "",
+        ).trim();
+        const collapsedBorderFactor = tableBorderCollapse === "collapse" ? 0.5 : 1;
+        const sides = {};
+
+        ["top", "right", "bottom", "left"].forEach((side) => {
+          const properties = getTemplateEditorBorderSideStyleProperties(side);
+
+          sides[side] = Object.freeze({
+            borderWidth: parseTemplateEditorCssPixelValue(computedStyle[properties.borderWidth], 0),
+            padding: parseTemplateEditorCssPixelValue(computedStyle[properties.padding], 0),
+          });
+        });
+
+        return Object.freeze({
+          cell,
+          collapsedBorderFactor,
+          sides: Object.freeze(sides),
+        });
+      });
+    }
+
+    function restoreTemplateEditorBorderBoxSnapshot(snapshot) {
+      snapshot.forEach(({ cell, collapsedBorderFactor, sides }) => {
+        if (!cell?.isConnected) {
+          return;
+        }
+
+        const computedStyle = window.getComputedStyle(cell);
+
+        ["top", "right", "bottom", "left"].forEach((side) => {
+          const previousSide = sides[side];
+          const properties = getTemplateEditorBorderSideStyleProperties(side);
+          const nextBorderWidth = parseTemplateEditorCssPixelValue(computedStyle[properties.borderWidth], 0);
+          const borderDelta = (nextBorderWidth - previousSide.borderWidth) * collapsedBorderFactor;
+
+          if (Math.abs(borderDelta) < 0.01) {
+            return;
+          }
+
+          cell.style[properties.padding] = formatTemplateEditorPixelValue(previousSide.padding - borderDelta);
+        });
+      });
+    }
+
+    function getTemplateEditorTableSnapshotWidth(table) {
+      const inlineWidth = parseTemplateEditorInlinePixelValue(table?.style?.width, 0);
+
+      if (inlineWidth > 0) {
+        return inlineWidth;
+      }
+
+      const computedWidth = parseTemplateEditorCssPixelValue(window.getComputedStyle(table).width, 0);
+
+      if (computedWidth > 0) {
+        return computedWidth;
+      }
+
+      const tableRect = table.getBoundingClientRect();
+      return tableRect.width;
+    }
+
+    function createTemplateEditorTableGeometrySnapshot(targetCells) {
+      return getTemplateEditorBorderTargetTables(targetCells).map((table) => {
+        const rows = Array.from(table.rows || []).map((row) => {
+          const rowRect = row.getBoundingClientRect();
+
+          return Object.freeze({
+            row,
+            height: rowRect.height,
+          });
+        });
+        const cells = Array.from(buildTemplateTableCellMap(table).entries.values()).map(({ cell }) => {
+          const cellRect = cell.getBoundingClientRect();
+
+          return Object.freeze({
+            cell,
+            height: cellRect.height,
+            width: cellRect.width,
+          });
+        });
+
+        return Object.freeze({
+          table,
+          width: getTemplateEditorTableSnapshotWidth(table),
+          rows: Object.freeze(rows),
+          cells: Object.freeze(cells),
+        });
+      });
+    }
+
+    function reduceTemplateEditorCellPaddingForOverflow(cell, firstSide, secondSide, overflow) {
+      if (!cell?.isConnected || !Number.isFinite(overflow) || overflow <= 0.01) {
+        return;
+      }
+
+      const computedStyle = window.getComputedStyle(cell);
+      const firstProperty = `padding${firstSide}`;
+      const secondProperty = `padding${secondSide}`;
+      const firstPadding = parseTemplateEditorCssPixelValue(computedStyle[firstProperty], 0);
+      const firstReduction = Math.min(firstPadding, overflow);
+
+      if (firstReduction > 0.01) {
+        cell.style[firstProperty] = formatTemplateEditorPixelValue(firstPadding - firstReduction);
+      }
+
+      const remainingOverflow = overflow - firstReduction;
+
+      if (remainingOverflow <= 0.01) {
+        return;
+      }
+
+      const secondPadding = parseTemplateEditorCssPixelValue(computedStyle[secondProperty], 0);
+      const secondReduction = Math.min(secondPadding, remainingOverflow);
+
+      if (secondReduction > 0.01) {
+        cell.style[secondProperty] = formatTemplateEditorPixelValue(secondPadding - secondReduction);
+      }
+    }
+
+    function restoreTemplateEditorTableGeometrySnapshot(snapshot) {
+      snapshot.forEach(({ table, width, rows, cells }) => {
+        if (!table?.isConnected) {
+          return;
+        }
+
+        if (Number.isFinite(width) && width > 0) {
+          table.style.width = formatTemplateEditorPixelValue(width);
+        }
+
+        rows.forEach(({ row, height }) => {
+          if (row?.isConnected && Number.isFinite(height) && height > 0) {
+            row.style.height = formatTemplateEditorPixelValue(height);
+          }
+        });
+
+        cells.forEach(({ cell, height, width: cellWidth }) => {
+          if (!cell?.isConnected) {
+            return;
+          }
+
+          const currentRect = cell.getBoundingClientRect();
+          reduceTemplateEditorCellPaddingForOverflow(cell, "Bottom", "Top", currentRect.height - height);
+          reduceTemplateEditorCellPaddingForOverflow(cell, "Right", "Left", currentRect.width - cellWidth);
+        });
+
+        rows.forEach(({ row, height }) => {
+          if (row?.isConnected && Number.isFinite(height) && height > 0) {
+            row.style.height = formatTemplateEditorPixelValue(height);
+          }
+        });
+      });
+    }
+
+    function clearTemplateEditorLegacyDoubleBorderArtifacts(cell, side = "") {
+      if (!cell?.style) {
+        return;
+      }
+
+      const targetSides = side ? [side] : ["top", "right", "bottom", "left"];
+
+      targetSides.forEach((targetSide) => {
+        cell.removeAttribute(`data-template-double-border-${targetSide}`);
+        cell.removeAttribute(`data-template-double-border-native-${targetSide}`);
+      });
+
+      Array.from(cell.children || [])
+        .filter((child) => {
+          if (!child?.hasAttribute?.("data-template-double-border-overlay")) {
+            return false;
+          }
+
+          return !side || child.getAttribute("data-template-double-border-overlay") === side;
+        })
+        .forEach((child) => child.remove());
+
+      if (!cell.querySelector?.("[data-template-double-border-overlay]")) {
+        cell.style.removeProperty("background-image");
+        cell.style.removeProperty("background-size");
+        cell.style.removeProperty("background-position");
+        cell.style.removeProperty("background-repeat");
+        cell.style.removeProperty("background-origin");
+        cell.style.removeProperty("background-clip");
+        cell.style.removeProperty("box-shadow");
+
+        if (cell.dataset?.templateDoubleBorderPositioned === "true") {
+          cell.style.removeProperty("position");
+          delete cell.dataset.templateDoubleBorderPositioned;
+        }
+      }
+    }
+
     function applyTemplateEditorCellBorderSide(cell, side, borderValue) {
       if (!cell?.style) {
         return;
       }
 
       const propertyName = `border${side[0].toUpperCase()}${side.slice(1)}`;
+      clearTemplateEditorLegacyDoubleBorderArtifacts(cell, side);
       cell.style[propertyName] = borderValue;
     }
 
@@ -183,8 +533,12 @@
       side,
       borderValue,
       matrix,
-      shouldUpdateNeighbor = () => true,
+      options = {},
     ) {
+      const {
+        shouldUpdateNeighbor = () => true,
+      } = options;
+
       applyTemplateEditorCellBorderSide(cell, side, borderValue);
 
       const oppositeSide = getTemplateEditorOppositeBorderSide(side);
@@ -194,7 +548,7 @@
       }
 
       getTemplateEditorBorderNeighborCells(entry, side, matrix)
-        .filter((neighborCell) => shouldUpdateNeighbor(neighborCell))
+        .filter((neighborCell) => shouldUpdateNeighbor(neighborCell, oppositeSide))
         .forEach((neighborCell) => applyTemplateEditorCellBorderSide(neighborCell, oppositeSide, borderValue));
     }
 
@@ -313,14 +667,18 @@
       }
 
       const config = getTemplateEditorBorderConfig(options);
-      const borderValue = getTemplateEditorBorderCssValue(config);
       const sides = ["top", "right", "bottom", "left"];
       const { entries, matrix, selectedCoordinates } = buildSelectedTableCellCoordinateSet(tableSelection, targetCells);
       const selectedCellSet = new Set(targetCells);
+      restoreTemplateEditorCollapsedTableBorderModel(targetCells);
+      stabilizeTemplateEditorBorderTargetTables(targetCells);
+      const tableGeometrySnapshot = createTemplateEditorTableGeometrySnapshot(targetCells);
+      const borderBoxSnapshot = createTemplateEditorBorderBoxSnapshot(targetCells);
 
       if (config.target === "all") {
         targetCells.forEach((cell) => {
           const entry = entries.get(cell);
+          const borderValue = getTemplateEditorBorderCssValue(config);
 
           sides.forEach((side) => {
             applyTemplateEditorCellSharedBorderSide(
@@ -329,10 +687,14 @@
               side,
               borderValue,
               matrix,
-              config.style === "none" ? () => true : () => false,
+              {
+                shouldUpdateNeighbor: config.style === "none" ? () => true : () => false,
+              },
             );
           });
         });
+        restoreTemplateEditorBorderBoxSnapshot(borderBoxSnapshot);
+        restoreTemplateEditorTableGeometrySnapshot(tableGeometrySnapshot);
         clearTemplateEditorBorderControlDirtyState();
         return targetCells[0] || null;
       }
@@ -340,6 +702,7 @@
       if (sides.includes(config.target)) {
         targetCells.forEach((cell) => {
           const entry = entries.get(cell);
+          const borderValue = getTemplateEditorBorderCssValue(config);
 
           applyTemplateEditorCellSharedBorderSide(
             cell,
@@ -347,15 +710,20 @@
             config.target,
             borderValue,
             matrix,
-            config.style === "none" ? () => true : () => false,
+            {
+              shouldUpdateNeighbor: config.style === "none" ? () => true : () => false,
+            },
           );
         });
+        restoreTemplateEditorBorderBoxSnapshot(borderBoxSnapshot);
+        restoreTemplateEditorTableGeometrySnapshot(tableGeometrySnapshot);
         clearTemplateEditorBorderControlDirtyState();
         return targetCells[0] || null;
       }
 
       targetCells.forEach((cell) => {
         const entry = entries.get(cell);
+        const borderValue = getTemplateEditorBorderCssValue(config);
 
         sides.forEach((side) => {
           if (shouldApplyTemplateEditorSelectionBorderSide(entry, side, selectedCoordinates, config.target)) {
@@ -365,16 +733,21 @@
               side,
               borderValue,
               matrix,
-              config.style === "none" && config.target === "outside"
-                ? (neighborCell) => !selectedCellSet.has(neighborCell)
-                : config.style === "none"
-                  ? (neighborCell) => selectedCellSet.has(neighborCell)
-                  : () => false,
+              {
+                shouldUpdateNeighbor:
+                  config.style === "none" && config.target === "outside"
+                    ? (neighborCell) => !selectedCellSet.has(neighborCell)
+                    : config.style === "none"
+                      ? (neighborCell) => selectedCellSet.has(neighborCell)
+                      : () => false,
+              },
             );
           }
         });
       });
 
+      restoreTemplateEditorBorderBoxSnapshot(borderBoxSnapshot);
+      restoreTemplateEditorTableGeometrySnapshot(tableGeometrySnapshot);
       clearTemplateEditorBorderControlDirtyState();
       return targetCells[0] || null;
     }

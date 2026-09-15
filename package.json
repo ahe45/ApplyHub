@@ -1,24 +1,38 @@
 {
-  "name": "admin-card-system_ver_0.1",
+  "name": "apply-hub",
   "version": "1.0.0",
-  "description": "Admit Card System UI",
+  "description": "ApplyHub 원서접수시스템",
   "main": "server.js",
   "scripts": {
     "db:setup": "node scripts/setup-db.js",
     "start": "node server.js",
     "dev": "node server.js",
     "test": "node scripts/ui-smoke-test.js",
-    "test:ui-smoke": "node scripts/ui-smoke-test.js"
+    "test:ui-smoke": "node scripts/ui-smoke-test.js",
+    "test:membership": "node scripts/membership-smoke-test.js",
+    "test:document-settings": "node scripts/membership-smoke-test.js --document-settings",
+    "test:applicant-archive": "node scripts/archive-job-behavior-test.js && node scripts/membership-smoke-test.js --archive",
+    "test:public-frame": "node scripts/public-frame-layout-test.js",
+    "test:theme": "node scripts/theme-test.js",
+    "test:question-card-layout": "node scripts/question-card-layout-test.js",
+    "test:verification-ui": "node scripts/applicant-verification-ui-test.js",
+    "test:ticket-pdf": "node scripts/ticket-pdf-viewer-test.js",
+    "template-editor-kit:install": "node scripts/install-template-editor-kit.js",
+    "test:submission-tickets": "node scripts/membership-smoke-test.js --submission-tickets",
+    "smtp:check": "node scripts/check-smtp.js",
+    "test:verification-mail": "node scripts/verification-mail-test.js"
   },
   "private": true,
   "dependencies": {
     "adm-zip": "^0.5.16",
+    "archiver": "5.3.2",
     "bwip-js": "^4.8.0",
     "dotenv": "^17.3.1",
     "exceljs": "^4.4.0",
     "mysql2": "^3.20.0",
     "nodemailer": "^6.9.16",
     "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "6.3.289",
     "puppeteer-core": "^24.40.0",
     "qrcode": "^1.5.4"
   }

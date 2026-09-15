@@ -1,7 +1,12 @@
+const { injectIndexPagePartials } = require("../app/index-page-partials");
+const { gzip } = require('node:zlib');
+const { version: pdfJsVersion } = require('pdfjs-dist/package.json');
+
 const defaultMimeTypes = Object.freeze({
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
+  ".mjs": "application/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".png": "image/png",
   ".jpg": "image/jpeg",
@@ -10,6 +15,8 @@ const defaultMimeTypes = Object.freeze({
   ".gif": "image/gif",
   ".webp": "image/webp",
   ".ico": "image/x-icon",
+  ".txt": "text/plain; charset=utf-8",
+  ".wasm": "application/wasm",
 });
 
 function sendRedirect(response, location, statusCode = 302) {
@@ -27,6 +34,7 @@ function createPageRequestHandlers({
   mimeTypes = defaultMimeTypes,
   getRoleMenuVisibilitySettings,
   getAuthSessionPayload,
+  membershipService,
   getDefaultAccessibleView,
   getPublicSuperAdminSettings,
   getViewFromPathname,
@@ -65,6 +73,10 @@ function createPageRequestHandlers({
       .replaceAll(">", "&gt;");
   }
 
+  function injectScriptBeforeHead(markup, script) {
+    return markup.includes("</head>") ? markup.replace("</head>", `    ${script}\n  </head>`) : `${script}\n${markup}`;
+  }
+
   function resolveStaticFilePath(pathname) {
     const requestPath = pathname === "/" ? "/index.html" : pathname;
     const safePath = path
@@ -79,7 +91,16 @@ function createPageRequestHandlers({
   }
 
   function serveStaticFile(response, pathname, options = {}) {
-    const { filePath } = resolveStaticFilePath(pathname);
+    const { filePath, safePath } = resolveStaticFilePath(pathname);
+    const publicPath = safePath.replaceAll("\\", "/");
+    const allowed = /^(client\/|shared\/|styles\/|uploads\/img\/)/.test(publicPath)
+      || /^node_modules\/pdfjs-dist\/(legacy\/build\/pdf(?:\.worker)?(?:\.min)?\.mjs$|cmaps\/|standard_fonts\/|wasm\/)/.test(publicPath)
+      || publicPath === "styles.css";
+    if (!allowed || publicPath.split("/").some((part) => part.startsWith("."))) {
+      response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      response.end("404 Not Found");
+      return;
+    }
 
     fs.readFile(filePath, (error, data) => {
       if (error) {
@@ -91,10 +112,28 @@ function createPageRequestHandlers({
       }
 
       const extension = path.extname(filePath).toLowerCase();
-      response.writeHead(200, {
+      const isPdfLibrary = /^node_modules\/pdfjs-dist\/legacy\/build\/pdf(?:\.worker)?(?:\.min)?\.mjs$/.test(publicPath);
+      const headers = {
         "Content-Type": mimeTypes[extension] || "application/octet-stream",
+        ...(isPdfLibrary ? {
+          'Cache-Control': options.assetVersion === pdfJsVersion ? 'public, max-age=31536000, immutable' : 'no-cache',
+          Vary: 'Accept-Encoding',
+        } : {}),
         ...(options.headers || {}),
+      };
+      const acceptsGzip = String(options.acceptEncoding || '').split(',').some(value => {
+        const [encoding, ...parameters] = value.trim().split(';');
+        const quality = parameters.find(parameter => parameter.trim().startsWith('q='));
+        return encoding === 'gzip' && (!quality || Number(quality.trim().slice(2)) > 0);
       });
+      if (isPdfLibrary && acceptsGzip) {
+        gzip(data, (error, compressed) => {
+          response.writeHead(200, { ...headers, ...(!error ? { 'Content-Encoding': 'gzip' } : {}) });
+          response.end(error ? data : compressed);
+        });
+        return;
+      }
+      response.writeHead(200, headers);
       response.end(data);
     });
   }
@@ -104,6 +143,7 @@ function createPageRequestHandlers({
 
     try {
       let markup = await fs.promises.readFile(filePath, "utf-8");
+      markup = injectIndexPagePartials(markup);
 
       if (options.injectSuperAdminSettings && typeof getPublicSuperAdminSettings === "function") {
         const superAdminSettings = await getPublicSuperAdminSettings();
@@ -117,7 +157,7 @@ function createPageRequestHandlers({
           );
         }
 
-        markup = markup.includes("</head>") ? markup.replace("</head>", `    ${bootstrapScript}\n  </head>`) : `${bootstrapScript}\n${markup}`;
+        markup = injectScriptBeforeHead(markup, bootstrapScript);
       }
 
       response.writeHead(200, {
@@ -135,6 +175,15 @@ function createPageRequestHandlers({
 
   async function handlePageRequest(request, response, pathname) {
     const normalizedPath = normalizeRoutePath(pathname);
+    if (normalizedPath === '/account-recovery') {
+      await serveHtmlFile(response, '/account-recovery.html', { headers: { 'Cache-Control': 'no-store' }, injectSuperAdminSettings: true });
+      return true;
+    }
+
+    if (normalizedPath === "/applicant-signup-settings") {
+      sendRedirect(response, "/applicant-question-template-management?tab=signup");
+      return true;
+    }
 
     if (normalizedPath === "/index.html") {
       sendRedirect(response, "/");
@@ -155,6 +204,18 @@ function createPageRequestHandlers({
     }
 
     if (normalizedPath === "/applicant" || normalizedPath.startsWith("/applicant/")) {
+      const preview = new URL(request.url, "http://localhost").searchParams.get("preview") === "1";
+      if (!preview && normalizedPath !== "/applicant/signup") {
+        const auth = await getAuthSessionPayload(request);
+        if (auth.authenticated && auth.account) {
+          sendRedirect(response, await getDefaultAccessiblePath(auth.account.role));
+          return true;
+        }
+        if (!await membershipService.session(request)) {
+          sendRedirect(response, loginRoutePath);
+          return true;
+        }
+      }
       if (normalizedPath !== pathname) {
         sendRedirect(response, normalizedPath);
         return true;
@@ -179,6 +240,11 @@ function createPageRequestHandlers({
 
       if (authPayload.authenticated && authPayload.account) {
         sendRedirect(response, await getDefaultAccessiblePath(authPayload.account.role));
+        return true;
+      }
+
+      if (!authPayload.requiresPasswordChange && await membershipService.session(request)) {
+        sendRedirect(response, "/applicant");
         return true;
       }
 

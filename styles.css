@@ -54,7 +54,7 @@
   padding: 14px 16px;
   border-radius: 16px;
   background: var(--panel-muted);
-  border: 1px solid rgba(223, 229, 240, 0.9);
+  border: 1px solid rgba(var(--glass-line-rgb), 0.9);
 }
 
 .mini-item strong,
@@ -84,27 +84,27 @@
 
 .badge.blue {
   color: var(--accent-strong);
-  background: rgba(45, 99, 245, 0.12);
+  background: rgba(var(--glass-primary-rgb), 0.12);
 }
 
 .badge.green {
   color: var(--success);
-  background: rgba(31, 157, 107, 0.14);
+  background: var(--glass-success-bg);
 }
 
 .badge.gray {
-  color: #6b7280;
-  background: rgba(148, 163, 184, 0.18);
+  color: var(--glass-muted);
+  background: rgba(var(--glass-muted-rgb), 0.18);
 }
 
 .badge.orange {
   color: var(--warning);
-  background: rgba(245, 158, 11, 0.18);
+  background: var(--glass-warning-bg);
 }
 
 .badge.red {
   color: var(--danger);
-  background: rgba(210, 65, 91, 0.14);
+  background: var(--glass-error-bg);
 }
 
 
@@ -130,7 +130,7 @@
 .field label {
   font-size: 0.86rem;
   font-weight: 700;
-  color: #374151;
+  color: var(--glass-ink);
 }
 
 .field input,
@@ -139,8 +139,8 @@
   width: 100%;
   padding: 13px 14px;
   border-radius: 14px;
-  border: 1px solid rgba(203, 213, 225, 0.76);
-  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(var(--glass-line-rgb), 0.76);
+  background: rgba(var(--glass-surface-rgb), 0.88);
   color: var(--text);
 }
 
@@ -203,11 +203,10 @@
   height: auto;
   min-height: 0;
   aspect-ratio: 3 / 4;
-  border: 1px solid rgba(203, 213, 225, 0.84);
+  border: 1px solid rgba(var(--glass-line-rgb), 0.84);
   border-radius: 22px;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 247, 252, 0.94));
+  background: var(--glass-surface);
 }
 
 .examinee-detail-photo-image {
@@ -230,7 +229,7 @@
 
 .examinee-detail-photo-placeholder strong {
   font-size: 1rem;
-  color: #17324a;
+  color: var(--glass-ink);
 }
 
 .examinee-detail-photo-placeholder span {
@@ -247,11 +246,11 @@
   margin: 0;
   font-size: 0.82rem;
   font-weight: 700;
-  color: #0f6f50;
+  color: var(--glass-success);
 }
 
 .examinee-detail-status.warning {
-  color: #b42318;
+  color: var(--glass-error);
 }
 
 .examinee-detail-modal-sheet {
@@ -299,7 +298,7 @@
 
 .examinee-detail-confirm-message {
   margin: 0;
-  color: #31465d;
+  color: var(--glass-ink);
   font-size: 0.92rem;
   line-height: 1.55;
 }
@@ -317,9 +316,9 @@
 
 .examinee-detail-confirm-caption {
   margin: 0;
-  color: #5b7085;
+  color: var(--glass-muted);
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .examinee-detail-confirm-chip-list {
@@ -334,11 +333,11 @@
   min-height: 32px;
   padding: 0 12px;
   border-radius: 999px;
-  background: #eef4fb;
-  border: 1px solid #d7e3f0;
-  color: #294962;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-line);
+  color: var(--glass-ink);
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .examinee-detail-modal-body .examinee-detail-empty-card {
@@ -367,8 +366,8 @@ select {
   position: absolute;
   width: 7px;
   height: 7px;
-  border-right: 1.6px solid #5e6a80;
-  border-bottom: 1.6px solid #5e6a80;
+  border-right: 1.6px solid var(--glass-line);
+  border-bottom: 1.6px solid var(--glass-line);
   pointer-events: none;
 }
 
@@ -408,7 +407,7 @@ select {
 }
 
 .system-settings-field + .system-settings-field {
-  border-top: 1px solid rgba(203, 213, 225, 0.72);
+  border-top: 1px solid rgba(var(--glass-line-rgb), 0.72);
 }
 
 
@@ -451,9 +450,9 @@ select {
   place-items: center;
   min-height: 220px;
   padding: 22px;
-  border: 1px dashed rgba(45, 99, 245, 0.36);
+  border: 1px dashed rgba(var(--glass-primary-rgb), 0.36);
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(45, 99, 245, 0.06), rgba(45, 99, 245, 0.02));
+  background: var(--glass-surface);
   text-align: center;
 }
 
@@ -486,7 +485,7 @@ select {
   height: 10px;
   margin-top: 8px;
   border-radius: 999px;
-  background: rgba(203, 213, 225, 0.45);
+  background: rgba(var(--glass-tint-rgb), 0.45);
   overflow: hidden;
 }
 
@@ -495,7 +494,7 @@ select {
   width: 0;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #2d63f5, #54d3ba);
+  background: var(--glass-button);
   transition: width 0.2s ease, transform 0.2s ease;
 }
 
@@ -543,6 +542,6 @@ select {
 }
 
 .system-settings-status.warning {
-  color: #b42318;
+  color: var(--glass-error);
 }
 

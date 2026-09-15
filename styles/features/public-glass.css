@@ -1,0 +1,245 @@
+/* Quiet Glass public layout: exact reference geometry, using the project palette.
+   Shared by public routes and both administrator notice previews. */
+
+.app-shell.auth-locked,
+body.applicant-public-body { background: var(--glass-page); color: var(--glass-ink); }
+.app-shell.auth-locked .auth-background-media::after,
+.applicant-public-body .applicant-public-background-media::after { background: var(--glass-page); }
+.applicant-public-body {
+  --applicant-ink: var(--glass-ink);
+  --applicant-muted: var(--glass-muted);
+  --applicant-surface: var(--glass-surface);
+  --applicant-soft-surface: var(--glass-bg);
+  --applicant-border: var(--glass-line);
+  --applicant-primary: var(--glass-primary);
+  --applicant-primary-deep: var(--glass-primary-hover);
+  --applicant-shadow: var(--glass-shadow);
+  --applicant-shadow-soft: var(--glass-shadow);
+}
+/* Public frames meet the viewport edges on phones and remain outlined on desktop. */
+.app-shell.auth-locked .content-area,
+.applicant-public-body .applicant-public-shell {
+  padding: 0;
+  align-content: start;
+}
+.applicant-public-body .applicant-public-frame,
+.login-shell.common-login-stage,
+.login-shell.applicant-notice-editor-stage {
+  width: min(520px, 100%); min-width: 0; padding: 0; border: 0;
+  border-radius: 0; background: transparent; box-shadow: none;
+  gap: 0; align-content: start; font-family: 'Noto Sans KR', Arial, sans-serif;
+}
+.applicant-public-body .applicant-public-frame,
+.app-shell.auth-locked .login-shell.common-login-stage {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  border: 1px solid rgba(var(--glass-line-rgb), .4);
+  background: var(--glass-page);
+  align-content: safe center;
+}
+.applicant-public-body .applicant-public-home,
+.applicant-public-body .applicant-public-home-stage { gap: 0; }
+
+.public-glass-intro { display: grid; gap: 0; padding: 0 0 18px; min-width: 0; }
+.public-glass-page-brand { justify-self: start; padding: 4px; color: var(--glass-ink); font-size: 14px; font-weight: 700; }
+.public-glass-intro :is(.login-stage-brand, .applicant-public-brand) { gap: 10px; flex-direction: row; align-items: center; }
+.public-glass-intro :is(.login-stage-brand-mark, .applicant-public-brand-mark) { width: 34px; height: 34px; object-fit: contain; filter: none; }
+.public-glass-intro :is(.login-stage-brand-copy, .applicant-public-brand-copy) { min-width: 0; }
+.public-glass-intro :is(.login-stage-brand-copy, .applicant-public-brand-copy) strong { color: var(--glass-ink); font-size: 14px; font-weight: 700; line-height: 1.4; letter-spacing: -.03em; }
+.common-login-stage .login-stage-brand-mark { flex-shrink: 0; }
+.common-login-stage .login-stage-brand-copy strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.app-shell.auth-locked .login-stage-brand-copy strong { font-size: 20px; }
+.public-glass-intro .public-glass-product-name { margin-left: auto; color: var(--glass-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.public-glass-intro :is(.login-stage-brand-copy, .applicant-public-brand-copy) span { color: var(--glass-muted); font-size: 10px; letter-spacing: .14em; }
+
+/* A single quiet Notice surface, without a second nested card. */
+public-school-header { display: block; width: 100%; min-width: 0; }
+.public-school-header { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: 8px; min-height: 44px; }
+.applicant-public-body .public-school-header :is(.public-school-home, .public-school-logout) { display: flex; align-items: center; justify-content: center; width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; }
+.public-school-header svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.public-school-brand { display: flex; justify-content: center; align-items: center; gap: 8px; min-width: 0; }
+.public-school-brand img { width: 32px; height: 32px; flex: 0 0 32px; object-fit: contain; }
+.public-school-brand strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--glass-ink); font-size: 20px; font-weight: 700; }
+.public-school-action-spacer { width: 44px; }
+.public-school-header-error { margin: 8px 0 0; color: var(--glass-error); font-size: 13px; }
+.applicant-public-body #accountRecoveryRoot { gap: 16px; }
+
+.applicant-public-body .applicant-public-ticket-viewer-copy { width: 100%; min-width: 0; }
+.applicant-ticket-number-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.applicant-ticket-number-row p { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.applicant-public-body .applicant-ticket-download { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; padding: 10px 14px; text-decoration: none; white-space: nowrap; font-size: 14px; }
+ticket-pdf-viewer { display: grid; width: 100%; min-width: 0; gap: 12px; }
+ticket-pdf-viewer canvas { display: block; width: 100%; height: auto; background: #fff; }
+ticket-pdf-viewer canvas[hidden] { display: none; }
+.ticket-pdf-status { margin: 0; padding: 20px 0; color: var(--glass-muted); font-size: 14px; line-height: 1.6; }
+
+.login-shell.common-login-stage > .login-notice-card,
+.login-shell.applicant-notice-editor-stage > .login-notice-card,
+.applicant-public-body .applicant-public-hero.login-notice-card {
+  min-height: 0; padding: 14px 16px; gap: 0; margin-bottom: 18px;
+  background: var(--glass-tint); border: 0; border-radius: 16px;
+  box-shadow: var(--glass-shadow); backdrop-filter: none;
+}
+:is(.common-login-stage, .applicant-notice-editor-stage, .applicant-public-body) .login-notice-head h2 { color: var(--glass-tint-ink); font-size: 12px; font-weight: 700; line-height: 1.5; }
+.public-glass-notice > summary { display: block; cursor: pointer; min-height: 44px; list-style: none; }
+.public-glass-notice > summary::-webkit-details-marker { display: none; }
+.public-glass-notice .login-notice-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.public-glass-notice :is(.public-glass-notice-more, .public-glass-notice-less) { color: var(--glass-tint-ink); font-size: 11px; }
+.public-glass-notice .public-glass-notice-less,
+.public-glass-notice[open] .public-glass-notice-more { display: none; }
+.public-glass-notice[open] .public-glass-notice-less { display: inline; }
+.public-glass-notice .public-glass-notice-preview { margin: 0; color: var(--glass-tint-ink); font-size: 12px; font-weight: 400; line-height: 1.65; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.public-glass-notice[open] .public-glass-notice-preview { display: none; }
+.public-glass-notice > .login-notice-content { margin-top: 12px; }
+.public-glass-notice > summary:focus-visible { outline: 3px solid rgba(var(--glass-primary-rgb), .38); outline-offset: 4px; border-radius: 6px; }
+:is(.common-login-stage, .applicant-notice-editor-stage, .applicant-public-body) .login-notice-content {
+  padding: 0; height: auto; background: transparent; border: 0; border-radius: 0;
+  box-shadow: none; color: var(--glass-tint-ink);
+}
+:is(.common-login-stage, .applicant-notice-editor-stage) .login-notice-editor-surface { padding: 12px; border: 1px dashed var(--glass-line); border-radius: 12px; }
+
+.applicant-public-body :is(.applicant-public-panel, .applicant-public-slab, .applicant-public-form-section, .applicant-public-dialog),
+.login-shell.applicant-notice-editor-stage > .login-panel-card {
+  background: var(--glass-surface); border: 1px solid var(--glass-line); border-radius: 24px;
+  box-shadow: var(--glass-shadow); backdrop-filter: none;
+}
+.login-shell.common-login-stage > .login-panel-card {
+  padding: 0; border: 0; border-radius: 0; background: transparent;
+  grid-template-rows: auto; gap: 0; box-shadow: none; backdrop-filter: none;
+}
+.common-login-stage .login-stage-form { display: block; width: 100%; }
+.common-login-stage .login-stage-form h3 { margin: 0 0 18px; color: var(--glass-ink); font-size: 18px; font-weight: 700; }
+.common-login-stage .login-stage-description { color: var(--glass-muted); font-size: 13px; }
+.common-login-stage .login-field { display: grid; gap: 8px; margin-bottom: 16px; }
+.common-login-stage .login-field > span { color: var(--glass-muted); font-size: 12px; font-weight: 400; }
+.common-login-stage .login-field input { height: 48px; min-height: 48px; padding: 0 13px; font-weight: 400; }
+.common-login-stage :is(.login-submit-button, .common-login-signup, .login-stage-form-preview > .ghost-button) { width: 100%; padding: 10px; font-size: 14px; font-weight: 700; }
+.common-login-stage :is(.common-login-signup, .login-stage-form-preview > .ghost-button) { margin-top: 9px; }
+.common-login-stage .common-login-recovery { margin-top: 8px; }
+.common-login-stage .common-login-recovery a { font-size: 12px; }
+.common-login-stage .login-error:not(.hidden) { margin: 0 0 12px; }
+
+:is(.common-login-stage, .applicant-notice-editor-stage, .applicant-public-body) :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=range]):not([type=color]), select, textarea) {
+  background: var(--glass-bg); border: 1px solid var(--glass-line); border-radius: 12px;
+  color: var(--glass-ink); box-shadow: none; font-size: 16px;
+}
+:is(.common-login-stage, .applicant-notice-editor-stage, .applicant-public-body) :is(input, select, textarea):focus-visible { outline: 2px solid var(--glass-link); outline-offset: 2px; border-color: var(--glass-link); }
+:is(.common-login-stage, .applicant-notice-editor-stage, .applicant-public-body) :is(input, textarea)::placeholder { color: var(--glass-muted); }
+:is(.common-login-stage, .applicant-public-body) :is(input, select, textarea)[aria-invalid=true] { border-color: var(--glass-error); }
+:is(.common-login-stage, .applicant-notice-editor-stage, .applicant-public-body) :is(input[type=checkbox], input[type=radio]) { accent-color: var(--glass-primary); }
+
+:is(.common-login-stage, .applicant-notice-editor-stage, .applicant-public-body) :is(.primary-button, .ghost-button) {
+  border-radius: 12px; box-shadow: none; min-height: 48px;
+  transition: background-color .15s ease, border-color .15s ease, transform .15s ease;
+}
+:is(.common-login-stage, .applicant-notice-editor-stage, .applicant-public-body) .primary-button { background: var(--glass-button); box-shadow: var(--glass-button-shadow); border-color: var(--glass-primary); color: #fff; }
+:is(.common-login-stage, .applicant-notice-editor-stage, .applicant-public-body) .primary-button:hover:not(:disabled) { background: var(--glass-primary-hover); border-color: var(--glass-primary-hover); }
+:is(.common-login-stage, .applicant-notice-editor-stage, .applicant-public-body) .ghost-button { background: var(--glass-tint); border-color: transparent; color: var(--glass-tint-ink); }
+:is(.common-login-stage, .applicant-notice-editor-stage, .applicant-public-body) .ghost-button:hover:not(:disabled) { background: var(--glass-bg); border-color: var(--glass-line); }
+:is(.common-login-stage, .applicant-notice-editor-stage, .applicant-public-body) button:focus-visible { outline: 2px solid var(--glass-link); outline-offset: 3px; }
+:is(.common-login-stage, .applicant-notice-editor-stage, .applicant-public-body) button:active:not(:disabled) { transform: translateY(1px); }
+/* Verification actions must read as actionable versus unavailable, not just faded. */
+.applicant-public-body [data-applicant-action="member-verify-code"]:not(:disabled) {
+  background: var(--glass-button); border-color: var(--glass-primary); color: #fff;
+  box-shadow: var(--glass-button-shadow);
+}
+.applicant-public-body [data-applicant-action="member-verify-code"]:hover:not(:disabled) {
+  background: var(--glass-primary-hover); border-color: var(--glass-primary-hover);
+}
+.common-login-recovery a { color: var(--glass-muted); }
+
+/* The four existing actions become equal bento tiles, with one primary action. */
+.applicant-public-body .applicant-public-home > .applicant-public-action-grid,
+.login-shell.applicant-notice-editor-stage > .applicant-public-action-grid {
+  padding: 0; background: transparent; border: 0; box-shadow: none; gap: 0; min-height: 0;
+}
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-welcome { font-size: 13px; color: var(--glass-muted); justify-content: center; margin-top: 8px; order: 2; }
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-welcome > span { display: none; }
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-welcome .ghost-button { background: transparent; min-height: 44px; padding: 6px 10px; font-size: 12px; }
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-menu { gap: 12px; }
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-menu .applicant-member-tile {
+  min-height: 144px; padding: 18px; gap: 10px; justify-content: flex-start;
+  border: 1px solid var(--glass-line); border-radius: 24px;
+  background: var(--glass-surface); box-shadow: var(--glass-shadow);
+}
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile strong { font-size: 15px; font-weight: 700; color: var(--glass-ink); }
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile small { font-size: 11px; font-weight: 400; color: var(--glass-muted); }
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile-number { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--glass-tint); color: var(--glass-tint-ink); }
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile-number svg { width: 22px; height: 22px; stroke: currentColor; }
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-menu .applicant-member-tile:first-child { background: var(--glass-primary); border-color: var(--glass-primary); }
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile:first-child :is(strong, small) { color: #fff; }
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile:first-child .applicant-member-tile-number { color: #fff; background: #ffffff24; }
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-menu .applicant-member-tile:first-child:hover:not(:disabled) { background: var(--glass-primary-hover); }
+
+.applicant-public-body .applicant-public-slab.applicant-member-signup,
+.applicant-public-body #accountRecoveryRoot > .applicant-public-slab {
+  width: 100%; padding: 0; border: 0; border-radius: 0;
+  background: transparent; box-shadow: none; backdrop-filter: none; overflow: visible;
+}
+.applicant-public-body .applicant-member-signup .applicant-public-form { margin-top: 0; }
+.applicant-public-body .applicant-member-steps { gap: 8px; }
+.applicant-public-body .applicant-member-steps li { flex: 1; padding: 12px; border-radius: 12px; background: var(--glass-bg); color: var(--glass-muted); font-size: 13px; }
+.applicant-public-body .applicant-member-steps [aria-current=step] { background: var(--glass-tint); color: var(--glass-tint-ink); }
+.applicant-public-body .applicant-member-terms { background: transparent; border-color: var(--glass-line); border-radius: 18px; }
+.applicant-public-body .applicant-member-term-dialog { border-radius: 24px; border-color: var(--glass-line); color: var(--glass-ink); }
+.applicant-public-body .applicant-public-form-section-head h3 { font-size: 20px; color: var(--glass-ink); }
+.applicant-public-body :is(.applicant-public-summary-item, .applicant-public-selection-summary-item, .applicant-public-action-card) { background: var(--glass-bg); border-color: var(--glass-line); box-shadow: none; border-radius: 16px; }
+.applicant-public-body .applicant-public-application-panel { padding: 20px; }
+.applicant-public-body .applicant-public-application-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 0; border: 0; background: transparent; }
+.applicant-public-body .applicant-public-application-header-copy { min-width: 0; gap: 8px; }
+.applicant-public-body .applicant-public-application-header h2 { margin: 0; word-break: keep-all; }
+.applicant-public-body .applicant-public-application-home-button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 48px; width: 48px; min-width: 48px; height: 48px; padding: 0; }
+.applicant-public-application-home-button svg { width: 22px; height: 22px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.applicant-public-body .applicant-public-application-panel .applicant-public-form-section { padding: 0; border: 0; background: transparent; box-shadow: none; }
+.applicant-public-body .applicant-public-application-form { margin-top: 20px; }
+.applicant-public-body :is(.applicant-public-application-panel, .applicant-public-verification-panel) .applicant-public-preview-note { margin: 16px 0 0; }
+.applicant-public-body .applicant-public-application-actions { padding-inline: 0; }
+.applicant-public-body .applicant-public-application-panel .applicant-public-application-actions { padding: 0; }
+/* Page containers use the outer frame; controls, notices and dialogs keep their surfaces. */
+.applicant-public-body .applicant-public-step > .applicant-public-slab,
+.applicant-public-body .applicant-public-application-panel .applicant-public-form-section {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  /* Outward focus outlines and button shadows need the frame's safe padding. */
+  overflow: visible;
+}
+.applicant-public-body .applicant-public-step > .applicant-public-slab .applicant-public-preview-note {
+  margin-inline: 0;
+}
+/* Keep each question's label, control and feedback together, separated from the next question. */
+.applicant-public-body :is(.applicant-public-application-form, [data-applicant-form="member-documents"]) .applicant-public-form-stack {
+  gap: 20px;
+}
+.applicant-public-body :is(.applicant-public-application-form, [data-applicant-form="member-documents"]) .applicant-public-form-stack > .applicant-public-field + .applicant-public-field {
+  padding-top: 20px;
+  border-top: 1px solid var(--glass-line);
+}
+.applicant-public-body .applicant-public-step-navigation {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.applicant-public-body .applicant-public-step-navigation > button {
+  width: 100%; min-width: 0; white-space: nowrap;
+}
+.applicant-public-body .applicant-public-browser-home-link { min-height: 44px; background: transparent; font-size: 12px; order: 2; justify-self: center; }
+.applicant-public-body :is(.applicant-public-slab, .applicant-public-dialog) h2 { color: var(--glass-ink); }
+.applicant-public-body .page-kicker { color: var(--glass-tint-ink); }
+.common-login-stage .login-shell-copyright,
+.applicant-public-body .applicant-public-copyright,
+.applicant-notice-editor-stage .login-shell-copyright { color: var(--glass-muted); font-size: 10px; line-height: 1.7; margin-top: 22px; letter-spacing: .07em; }
+.applicant-public-body .applicant-public-home-stage > .applicant-public-copyright { margin-top: 12px; }
+
+@media (max-width: 360px) {
+  .public-glass-intro .public-glass-product-name { font-size: 9px; letter-spacing: 0; }
+  :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-menu .applicant-member-tile { padding: 14px; min-height: 144px; }
+  :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile strong { font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.common-login-stage, .applicant-notice-editor-stage, .applicant-public-body) :is(.primary-button, .ghost-button) { transition: none; }
+}

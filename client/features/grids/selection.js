@@ -9,8 +9,7 @@
   function createGridSelectionController({
     getGridRows,
     getTableState,
-    openExamineeDetail,
-    startApplicantAssignmentEdit,
+
     startApplicantRecruitmentUnitEdit,
     startApplicantScheduleEdit,
     state,
@@ -32,10 +31,9 @@
         return String(row.scheduleKey || row.id || "");
       }
 
-      if (gridKey === "applicantHistoryGrid" || gridKey === "applicantRecruitmentGrid" || gridKey === "applicantAssignmentGrid") {
+      if (gridKey === "applicantHistoryGrid" || gridKey === "applicantRecruitmentGrid") {
         return String(row.id || "");
       }
-
       return row.examineeNo || `${row.name}-${row.birth}-${row.date}`;
     }
 
@@ -93,18 +91,13 @@
 
     function isGridRowClickable(gridKey) {
       return (
-        gridKey === "examineeRegistrationGrid" ||
         usesSelectableGridRowSelection(gridKey) ||
         gridKey === "applicantRecruitmentGrid" ||
-        gridKey === "applicantAssignmentGrid" ||
         gridKey === "applicantScheduleGrid"
       );
     }
 
     function isGridRowHighlighted(gridKey, row, rowId = getGridRowId(gridKey, row)) {
-      if (gridKey === "examineeRegistrationGrid") {
-        return String(state.examineeDetail?.selectedExamineeNo || "").trim() === String(row?.examineeNo || rowId || "").trim();
-      }
 
       if (gridKey === "admitCardLookupGrid") {
         return isGridRowSelected(gridKey, rowId);
@@ -121,12 +114,11 @@
         return Number(state.applicantManager?.recruitmentUnitEditor?.editingId || 0) === Number(row?.id || rowId || 0);
       }
 
-      if (gridKey === "applicantAssignmentGrid") {
-        return Number(state.applicantManager?.assignmentEditor?.editingId || 0) === Number(row?.id || rowId || 0);
-      }
-
       if (gridKey === "applicantScheduleGrid") {
-        return String(state.applicantManager?.scheduleEditor?.scheduleKey || "").trim() === String(row?.scheduleKey || rowId || "").trim();
+        return (
+          isGridRowSelected(gridKey, rowId) ||
+          String(state.applicantManager?.scheduleEditor?.scheduleKey || "").trim() === String(row?.scheduleKey || rowId || "").trim()
+        );
       }
 
       return false;
@@ -238,9 +230,6 @@
     }
 
     function handleGridRowClickSelection(gridKey, rowId, options = {}) {
-      if (gridKey === "examineeRegistrationGrid") {
-        return openExamineeDetail(rowId);
-      }
 
       if (usesSelectableGridRowSelection(gridKey)) {
         handleSelectableGridRowSelection(gridKey, rowId, options);
@@ -249,11 +238,6 @@
 
       if (gridKey === "applicantRecruitmentGrid") {
         startApplicantRecruitmentUnitEdit(rowId);
-        return false;
-      }
-
-      if (gridKey === "applicantAssignmentGrid") {
-        startApplicantAssignmentEdit(rowId);
         return false;
       }
 

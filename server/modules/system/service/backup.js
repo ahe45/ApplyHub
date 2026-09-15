@@ -17,34 +17,28 @@ function createSystemBackupService({
   const legacyTableRestoreItemKey = "table-data";
   const tableDefinitions = Object.freeze([
     Object.freeze({ tableName: "accounts", orderByColumns: ["login_id"] }),
+    Object.freeze({ tableName: "applicant_members", orderByColumns: ["id"] }),
     Object.freeze({ tableName: "system_set", orderByColumns: ["setting_key"] }),
     Object.freeze({ tableName: "templates", orderByColumns: ["id"] }),
-    Object.freeze({ tableName: "examinee", orderByColumns: ["id"] }),
     Object.freeze({ tableName: "print_log", orderByColumns: ["id"] }),
     Object.freeze({ tableName: "app_form", orderByColumns: ["id"] }),
     Object.freeze({ tableName: "app_meta", orderByColumns: ["id"] }),
     Object.freeze({ tableName: "app_subm", orderByColumns: ["id", "field_key"] }),
     Object.freeze({ tableName: "app_unit", orderByColumns: ["id"] }),
     Object.freeze({ tableName: "app_schedule", orderByColumns: ["id"] }),
-    Object.freeze({ tableName: "app_assign", orderByColumns: ["id"] }),
     Object.freeze({ tableName: "app_email_log", orderByColumns: ["id"] }),
   ]);
   const autoIncrementTableNames = new Set([
+    "applicant_members",
     "app_meta",
     "app_unit",
     "app_schedule",
-    "app_assign",
     "app_email_log",
-    "examinee",
     "print_log",
     "app_form",
   ]);
   const assetDefinitions = Object.freeze([
-    Object.freeze({
-      assetKey: "examinee-photos",
-      directoryPath: path.join(rootDir, examineePhotoStorageDirName),
-      archivePrefix: "files/examinee-photos",
-    }),
+
     Object.freeze({
       assetKey: "applicant-photos",
       directoryPath: path.join(rootDir, applicantPhotoStorageDirName),
@@ -57,7 +51,7 @@ function createSystemBackupService({
     }),
   ]);
   const assetDefinitionMap = new Map(assetDefinitions.map((assetDefinition) => [assetDefinition.assetKey, assetDefinition]));
-  const restorableAssetKeySet = new Set(["examinee-photos", "applicant-photos", "applicant-files"]);
+  const restorableAssetKeySet = new Set(["applicant-photos", "applicant-files"]);
   const systemBackupAutomationSettingKey = "systemBackupAutomationJson";
   const systemAutoBackupDirectoryPath = path.join(rootDir, "backups", "system-auto");
   const defaultSystemBackupAutomationSettings = Object.freeze({
@@ -1038,6 +1032,8 @@ function createSystemBackupService({
       databaseName: String(manifest.databaseName || "").trim(),
       databaseIncluded: manifest?.databaseIncluded !== false,
       tableCount: tablePayloads.length,
+      memberCount: tablePayloads.find(table => table.tableName === 'applicant_members')?.rows.length || 0,
+      currentMemberCount: Number(currentState.tables?.find(table => table.tableName === 'applicant_members')?.rowCount || 0),
       totalRowCount: tablePayloads.reduce((count, tablePayload) => count + (Array.isArray(tablePayload.rows) ? tablePayload.rows.length : 0), 0),
       assets: normalizedManifestAssetEntries,
       currentState,
@@ -1406,6 +1402,9 @@ function createSystemBackupService({
       await connection.beginTransaction();
 
       ({ restoredRowCount } = await restoreTables(connection, tablePayloads));
+      await connection.query("DELETE FROM applicant_member_sessions");
+      await connection.query("DELETE FROM applicant_member_verifications");
+      await connection.query("DELETE FROM applicant_member_recovery");
 
       swapRecords = await swapAssets(stagedAssets, tempRoot);
       await connection.commit();
@@ -1422,6 +1421,7 @@ function createSystemBackupService({
         createdAt: String(manifest.createdAt || "").trim(),
         restoredDatabase: true,
         restoredTableCount: tablePayloads.length,
+        restoredMembers: tablePayloads.find(table => table.tableName === 'applicant_members')?.rows.length || 0,
         restoredRowCount,
         restoredFileCount,
         restoredAssetKeys: selectedManifestAssetEntries.map((assetEntry) => assetEntry.assetKey),

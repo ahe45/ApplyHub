@@ -1,0 +1,12 @@
+.recovery-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 24px; }
+.recovery-tabs a { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+.recovery-tabs a[aria-current=page] { color: #fff; background: var(--glass-primary); }
+.recovery-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 16px; }
+.recovery-fieldset[hidden], #recoveryForm[hidden], #recoverySuccess[hidden] { display: none; }
+.recovery-fieldset input { width: 100%; }
+.recovery-help { margin-top: 24px; font-size: 13px; line-height: 1.6; }
+#recoveryMessage { margin-top: 16px; }
+#recoveryMessage:empty { display: none; }
+#recoveryMessage.is-error { color: var(--glass-error); }
+#recoverySuccess { margin-block: 20px; }
+#recoveryIdResult { display: block; margin-top: 12px; font-size: 22px; overflow-wrap: anywhere; }

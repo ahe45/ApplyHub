@@ -32,7 +32,7 @@ main().catch((error) => {
 
   if (error.code === "AUTH_SWITCH_PLUGIN_ERROR" || String(error.message || "").includes("auth_gssapi_client")) {
     console.error(
-      "현재 MariaDB 계정은 auth_gssapi_client 인증을 사용 중입니다. mysql_native_password 기반의 앱 전용 계정을 만들어 .env에 넣어주세요.",
+      "현재 DB 계정은 auth_gssapi_client 인증을 사용 중입니다. mysql_native_password 기반의 앱 전용 계정을 만들어 .env에 넣어주세요.",
     );
   } else {
     console.error(error.message);

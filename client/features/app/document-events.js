@@ -55,10 +55,9 @@
     deleteSystemDataAction,
     downloadSystemBackupAction,
     runSystemBackupAutomationNow,
-    downloadExamineeGridWorkbook,
-    downloadExamineeTemplate,
+
     downloadPrintHistoryGridWorkbook,
-    examineeDetailEventHandlers,
+
     filterGridFilterOptionValues,
     getGridFilterOptionValues,
     getGridFilterSelectionState,
@@ -107,7 +106,7 @@
     saveSystemBackupAutomationSettings,
     saveSystemSettings,
     setAccountCreateError,
-    setExamineeUploadMode,
+
     setEditorToolbarBorderSelectMenuVisibility,
     setEditorToolbarColorPanelVisibility,
     setEditorToolbarFontSizeMenuVisibility,
@@ -138,7 +137,7 @@
     updateBatchPrintOutputMode,
     updateSystemBackupAutomationField,
     updateLookupTextFilter,
-    uploadSelectedExamineeFile,
+
     selectSystemBackupRestoreFile,
   }) {
     const gridDocumentEventHandlers = createGridDocumentEventHandlers({
@@ -152,7 +151,7 @@
       closeAllPageSizeMenus,
       closeGridFilterMenu,
       createLookupFilters,
-      downloadExamineeGridWorkbook,
+
       downloadPrintHistoryGridWorkbook,
       filterGridFilterOptionValues,
       getGridFilterOptionValues,
@@ -188,7 +187,7 @@
       toggleGridSelectAll,
       toggleGridSort,
       updateLookupTextFilter,
-      uploadSelectedExamineeFile,
+
     });
     const authDocumentEventHandlers = createAuthDocumentEventHandlers({
       cancelAccountEdit,
@@ -201,7 +200,7 @@
       downloadSystemBackupAction,
       loadSystemAuditLogs,
       runSystemBackupAutomationNow,
-      downloadExamineeTemplate,
+
       hasUnsavedSystemSettingsChanges,
       importSystemBackupAction,
       logoutCurrentUser,
@@ -216,7 +215,7 @@
       saveSystemBackupAutomationSettings,
       saveSystemSettings,
       setAccountCreateError,
-      setExamineeUploadMode,
+
       setSystemSettingsStatus,
       startAccountEdit,
       state,
@@ -291,10 +290,6 @@
         return;
       }
 
-      if (await examineeDetailEventHandlers.handleClick(event)) {
-        return;
-      }
-
       if (await gridDocumentEventHandlers.handleGridActionClick(event)) {
         return;
       }
@@ -349,10 +344,6 @@
         return;
       }
 
-      if (examineeDetailEventHandlers.handleKeydown(event)) {
-        return;
-      }
-
       if (event.key === "Escape") {
         const didCloseModals = await requestCloseAllModals();
 
@@ -397,10 +388,6 @@
         return;
       }
 
-      if (await examineeDetailEventHandlers.handleChange(event)) {
-        return;
-      }
-
       if (await authDocumentEventHandlers.handleChange(event)) {
         return;
       }
@@ -428,10 +415,6 @@
       }
 
       if (templateEditorEventHandlers.handleInput(event)) {
-        return;
-      }
-
-      if (examineeDetailEventHandlers.handleInput(event)) {
         return;
       }
 

@@ -84,6 +84,8 @@ function createApplicantSchemaBootstrap({
         applicant_schedule_end_at DATETIME NULL,
         admit_card_lookup_schedule_start_at DATETIME NULL,
         admit_card_lookup_schedule_end_at DATETIME NULL,
+        document_submission_schedule_start_at DATETIME NULL,
+        document_submission_schedule_end_at DATETIME NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
@@ -92,89 +94,6 @@ function createApplicantSchemaBootstrap({
         KEY idx_app_schedule_admission_name (admission_name)
       )
     `);
-  }
-
-  async function createApplicantAssignmentTable() {
-    await query(`
-      CREATE TABLE IF NOT EXISTS app_assign (
-        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-        track VARCHAR(100) NOT NULL DEFAULT '',
-        admission VARCHAR(100) NOT NULL,
-        series VARCHAR(100) NOT NULL DEFAULT '',
-        unit VARCHAR(100) NOT NULL DEFAULT '',
-        major VARCHAR(100) NOT NULL DEFAULT '',
-        exam_date DATE NOT NULL,
-        \`time\` VARCHAR(5) NOT NULL,
-        building_code VARCHAR(30) NOT NULL,
-        building VARCHAR(100) NOT NULL,
-        room_code VARCHAR(30) NOT NULL,
-        room VARCHAR(100) NOT NULL,
-        assigned_count INT NOT NULL,
-        sort_order INT NOT NULL DEFAULT 0,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
-        UNIQUE KEY uniq_app_assign_room_slot (exam_date, \`time\`, building_code, room_code),
-        KEY idx_app_assign_sort_order (sort_order)
-      )
-    `);
-  }
-
-  async function ensureApplicantAssignmentSchema() {
-    await createApplicantAssignmentTable();
-
-    let applicantAssignmentColumns =
-      typeof getTableColumns === "function" && typeof hasColumn === "function"
-        ? await getTableColumns("app_assign")
-        : await query(`SHOW COLUMNS FROM app_assign`);
-    const columnExists = (columnName) =>
-      typeof hasColumn === "function"
-        ? hasColumn(applicantAssignmentColumns, columnName)
-        : applicantAssignmentColumns.some((column) => String(column?.Field || "") === columnName);
-
-    if (!columnExists("track")) {
-      await query(`ALTER TABLE app_assign ADD COLUMN track VARCHAR(100) NOT NULL DEFAULT '' AFTER id`);
-      applicantAssignmentColumns =
-        typeof getTableColumns === "function" && typeof hasColumn === "function"
-          ? await getTableColumns("app_assign")
-          : await query(`SHOW COLUMNS FROM app_assign`);
-    }
-
-    if (!columnExists("series")) {
-      await query(`ALTER TABLE app_assign ADD COLUMN series VARCHAR(100) NOT NULL DEFAULT '' AFTER admission`);
-      applicantAssignmentColumns =
-        typeof getTableColumns === "function" && typeof hasColumn === "function"
-          ? await getTableColumns("app_assign")
-          : await query(`SHOW COLUMNS FROM app_assign`);
-    }
-
-    if (!columnExists("unit")) {
-      await query(`ALTER TABLE app_assign ADD COLUMN unit VARCHAR(100) NOT NULL DEFAULT '' AFTER series`);
-      applicantAssignmentColumns =
-        typeof getTableColumns === "function" && typeof hasColumn === "function"
-          ? await getTableColumns("app_assign")
-          : await query(`SHOW COLUMNS FROM app_assign`);
-    }
-
-    if (!columnExists("major")) {
-      await query(`ALTER TABLE app_assign ADD COLUMN major VARCHAR(100) NOT NULL DEFAULT '' AFTER unit`);
-      applicantAssignmentColumns =
-        typeof getTableColumns === "function" && typeof hasColumn === "function"
-          ? await getTableColumns("app_assign")
-          : await query(`SHOW COLUMNS FROM app_assign`);
-    }
-
-    const refreshedIndexes = await query(`SHOW INDEX FROM app_assign`);
-    const hasRoomSlotIndex = refreshedIndexes.some((index) => String(index.Key_name || "") === "uniq_app_assign_room_slot");
-    const hasSortOrderIndex = refreshedIndexes.some((index) => String(index.Key_name || "") === "idx_app_assign_sort_order");
-
-    if (!hasRoomSlotIndex) {
-      await query(`ALTER TABLE app_assign ADD UNIQUE KEY uniq_app_assign_room_slot (exam_date, \`time\`, building_code, room_code)`);
-    }
-
-    if (!hasSortOrderIndex) {
-      await query(`ALTER TABLE app_assign ADD KEY idx_app_assign_sort_order (sort_order)`);
-    }
   }
 
   function parseLegacyAnswerItems(rawAnswerItems = "") {
@@ -457,6 +376,12 @@ function createApplicantSchemaBootstrap({
     if (!columnExists("admit_card_lookup_schedule_end_at")) {
       await query(`ALTER TABLE app_schedule ADD COLUMN admit_card_lookup_schedule_end_at DATETIME NULL AFTER admit_card_lookup_schedule_start_at`);
     }
+    if (!columnExists("document_submission_schedule_start_at")) {
+      await query(`ALTER TABLE app_schedule ADD COLUMN document_submission_schedule_start_at DATETIME NULL`);
+    }
+    if (!columnExists("document_submission_schedule_end_at")) {
+      await query(`ALTER TABLE app_schedule ADD COLUMN document_submission_schedule_end_at DATETIME NULL`);
+    }
 
     const refreshedIndexes = await query(`SHOW INDEX FROM app_schedule`);
     const hasTrackAdmissionIndex = refreshedIndexes.some((index) => String(index.Key_name || "") === "uniq_app_schedule_track_admission");
@@ -480,6 +405,7 @@ function createApplicantSchemaBootstrap({
     await query(`
       CREATE TABLE IF NOT EXISTS app_form (
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        form_scope ENUM('application', 'documents') NOT NULL DEFAULT 'application',
         field_key VARCHAR(60) NOT NULL,
         question_text VARCHAR(255) NOT NULL,
         question_description VARCHAR(500) NOT NULL DEFAULT '',
@@ -499,6 +425,9 @@ function createApplicantSchemaBootstrap({
 
     if (typeof getTableColumns === "function" && typeof hasColumn === "function") {
       const applicantFieldColumns = await getTableColumns("app_form");
+      if (!hasColumn(applicantFieldColumns, "form_scope")) {
+        await query("ALTER TABLE app_form ADD COLUMN form_scope ENUM('application', 'documents') NOT NULL DEFAULT 'application' AFTER id");
+      }
       const inputTypeColumn = applicantFieldColumns.find((column) => String(column.Field || "") === "input_type");
 
       if (!hasColumn(applicantFieldColumns, "question_description")) {
@@ -514,6 +443,10 @@ function createApplicantSchemaBootstrap({
       }
     } else {
       const [descriptionColumn] = await query(`SHOW COLUMNS FROM app_form LIKE 'question_description'`);
+      const [scopeColumn] = await query("SHOW COLUMNS FROM app_form LIKE 'form_scope'");
+      if (!scopeColumn) {
+        await query("ALTER TABLE app_form ADD COLUMN form_scope ENUM('application', 'documents') NOT NULL DEFAULT 'application' AFTER id");
+      }
       const [inputTypeColumn] = await query(`SHOW COLUMNS FROM app_form LIKE 'input_type'`);
 
       if (!descriptionColumn) {
@@ -598,14 +531,12 @@ function createApplicantSchemaBootstrap({
     await renameLegacyTableIfNeeded("applicant_submission_meta", "app_meta");
     await renameLegacyTableIfNeeded("applicant_submissions", "app_subm");
     await renameLegacyTableIfNeeded("applicant_recruitment_units", "app_unit");
-    await renameLegacyTableIfNeeded("applicant_assignments", "app_assign");
     await renameLegacyTableIfNeeded("applicant_email_verifications", "app_email_log");
 
     await ensureApplicantFormSchema();
     await ensureApplicantUnitSchema();
     await ensureApplicantScheduleSchema();
     await ensureApplicantSubmissionSchema();
-    await ensureApplicantAssignmentSchema();
 
     await query(`
       CREATE TABLE IF NOT EXISTS app_email_log (

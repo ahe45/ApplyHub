@@ -12,8 +12,7 @@
       createTableState,
       escapeAttribute,
       escapeHtml,
-      examineePhotoColumn,
-      examineeRegistrationGridColumns,
+
       getAccountGridRows,
       getExamineeGridRows,
       getPrintHistoryRows,
@@ -22,13 +21,12 @@
       headerFilterFields,
       lookupSelectKeys,
       normalizeGridSortRules,
-      openExamineeDetail,
+
       printHistoryGridColumns,
       renderAccountRoleOptions,
       renderAdmitCardLookup,
       renderAdmitCardLookupGridSection,
       renderView,
-      resultGridColumns,
       admitCardLookupGridColumns,
       state,
     } = deps;

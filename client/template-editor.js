@@ -63,7 +63,7 @@ if (!templateEditorToolbarStateModule?.createTemplateEditorToolbarStateControlle
 }
 
 if (!templateEditorExamineePhotoUtilsModule) {
-  throw new Error("client/features/examinees/photo-utils.js must be loaded before client/template-editor.js.");
+  throw new Error("client/features/admit-cards/photo-utils.js must be loaded before client/template-editor.js.");
 }
 
 if (!templateEditorTableUtilsModule) {
@@ -227,7 +227,7 @@ const templatePreviewController = createTemplatePreviewController({
   recordExamineePrint,
   state,
   stripTemplateEditorTransientState,
-  templateTagDefinitions,
+  templateTagDefinitions: globalThis.AdmitCardAppConfig.templateRenderTagDefinitions,
 });
 
 const {

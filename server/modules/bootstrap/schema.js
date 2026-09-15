@@ -1,7 +1,7 @@
 const { createAccountSchemaBootstrap } = require("./schema/accounts");
 const { createApplicantSchemaBootstrap } = require("./schema/applications");
 const { COLUMN_COMMENTS_BY_TABLE, TABLE_COMMENTS_BY_TABLE } = require("./schema/comments");
-const { createExamineeSchemaBootstrap } = require("./schema/examinee");
+
 const { createPrintHistorySchemaBootstrap } = require("./schema/print-history");
 const { createSchemaQueryHelpers } = require("./schema/helpers");
 const { createSystemAuditLogSchemaBootstrap } = require("./schema/system-audit-log");
@@ -15,14 +15,6 @@ function createSchemaBootstrapService({
 }) {
   const schemaQueryHelpers = createSchemaQueryHelpers({ query });
   const { getTableColumns, hasColumn, hasTable, syncColumnComments, syncTableComments } = schemaQueryHelpers;
-
-  const examineeSchemaBootstrap = createExamineeSchemaBootstrap({
-    getTableColumns,
-    hasColumn,
-    hasTable,
-    query,
-  });
-  const { ensureExamineeSchema } = examineeSchemaBootstrap;
 
   const printHistorySchemaBootstrap = createPrintHistorySchemaBootstrap({
     getTableColumns,
@@ -71,7 +63,7 @@ function createSchemaBootstrapService({
     ensureAccountSchema,
     ensureApplicantSchema,
     ensureSchemaColumnComments,
-    ensureExamineeSchema,
+
     ensurePrintHistorySchema,
     ensureSystemAuditLogSchema,
     ensureSystemSettingsSchema,

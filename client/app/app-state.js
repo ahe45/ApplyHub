@@ -15,7 +15,7 @@
     createApplicantNoticeState,
     createAuthState,
     createBatchPrintState,
-    createExamineeDetailState,
+
     createHeaderFilters,
     createLoginNoticeState,
     createLookupFilters,
@@ -29,7 +29,6 @@
     createTemplateEditorState,
     createTemplatePreviewState,
     createToastState,
-    createUploadState,
     getViewFromPathname,
     isLoginRoutePath,
     loadStoredHeaderFilters,
@@ -69,7 +68,7 @@
       lookupFilters: createLookupFilters(),
       composingInputId: "",
       applicantManager: createApplicantManagementState(),
-      examineeDetail: createExamineeDetailState(),
+
       templateCards: [],
       templateCardEditor: createTemplateCardEditorState(),
       templateEditor: createTemplateEditorState(),
@@ -86,20 +85,18 @@
         isLoading: true,
         error: "",
         serverDate: "",
+        serverTimeOffsetMs: 0,
       },
       metrics: {
         registeredExaminees: 0,
         todayPrints: 0,
         totalPrints: 0,
       },
-      upload: createUploadState(),
       toast: createToastState(),
       noticeManagement: noticeManagementState,
       loginNotice: noticeManagementState.scopes.login,
       tableSettings: {
-        examineeRegistrationGrid: createTableState({
-          defaultSortRules: [{ key: "examineeNo", direction: "asc" }],
-        }),
+
         admitCardLookupGrid: createTableState({
           defaultSortRules: [{ key: "examineeNo", direction: "asc" }],
         }),
@@ -114,14 +111,7 @@
         }),
         applicantRecruitmentGrid: createTableState(),
         applicantScheduleGrid: createTableState(),
-        applicantAssignmentGrid: createTableState({
-          defaultSortRules: [
-            { key: "date", direction: "asc" },
-            { key: "time", direction: "asc" },
-            { key: "buildingCode", direction: "asc" },
-            { key: "roomCode", direction: "asc" },
-          ],
-        }),
+
       },
     };
 

@@ -394,53 +394,12 @@
     `;
   }
 
-  function renderSystemAdmitCardDataSourceField(selectedValue = "examinee") {
-    const normalizedSelectedValue = ["submission", "examinee"].includes(String(selectedValue || "").trim())
-      ? String(selectedValue || "").trim()
-      : "examinee";
-    const options = [
-      { value: "submission", label: "접수 데이터 기준" },
-      { value: "examinee", label: "수험생 데이터 기준" },
-    ];
-
-    return `
-      <div class="field system-settings-field">
-        <div class="system-settings-field-head">
-          <label class="system-settings-label" for="systemSettingsAdmitCardDataSourceSubmission">수험표 생성 데이터</label>
-          <small class="muted system-settings-help">수험표 조회 PDF를 생성할 때 사용할 데이터 기준을 선택합니다.</small>
-        </div>
-        <div class="system-settings-control-wrap system-settings-radio-control-wrap">
-          <div class="system-settings-radio-group" role="radiogroup" aria-label="수험표 생성 데이터">
-            ${options
-              .map(
-                (option) => `
-                  <label class="system-settings-radio-card">
-                    <input
-                      class="system-settings-radio-input"
-                      type="radio"
-                      name="systemSettingsAdmitCardDataSource"
-                      id="${escapeAttribute(option.value === "submission" ? "systemSettingsAdmitCardDataSourceSubmission" : "systemSettingsAdmitCardDataSourceExaminee")}"
-                      value="${escapeAttribute(option.value)}"
-                      data-system-settings-admit-card-data-source="${escapeAttribute(option.value)}"
-                      ${normalizedSelectedValue === option.value ? "checked" : ""}
-                    />
-                    <span class="system-settings-radio-label">${escapeHtml(option.label)}</span>
-                  </label>
-                `,
-              )
-              .join("")}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
   function getSystemDataDeleteItems() {
     return [
       {
         scope: "all",
         title: "전체 데이터",
-        description: "수험생 데이터, 사진 데이터, 전형 관리 데이터, 배정표 데이터, 수험표 출력 이력, 접수 이력 데이터를 모두 삭제합니다.",
+        description: "회원가입 정보·첨부파일·약관 동의, 접수 사진·서류, 전형 관리, 출력 이력, 접수 이력을 모두 삭제합니다. 관리자 계정과 가입·접수 설정은 유지합니다.",
         buttonLabel: "삭제",
       },
       {
@@ -449,34 +408,24 @@
         description: "모집시기, 전형, 계열, 모집단위, 전공으로 구성된 전형 관리 데이터만 삭제합니다.",
         buttonLabel: "삭제",
       },
+
       {
-        scope: "applicant-assignments",
-        title: "배정표 데이터",
-        description: "모집시기별 전형 고사실 배정표 데이터만 삭제합니다.",
+        scope: "applicant-members",
+        title: "회원가입 데이터",
+        description: "전체 회원의 계정, 가입 답변·첨부파일, 약관 동의, 로그인·인증 정보를 삭제합니다. 접수 이력은 보존하고 회원 연결만 해제합니다. 관리자 계정과 가입 양식은 유지합니다.",
         buttonLabel: "삭제",
       },
       {
         scope: "applicant-history",
         title: "접수 이력 데이터",
-        description: "수험생 접수 이력만 삭제하며 수험생 데이터와 출력 이력은 유지합니다.",
+        description: "수험생 접수 이력만 삭제하며 회원가입 정보, 출력 이력은 유지합니다.",
         buttonLabel: "삭제",
       },
-      {
-        scope: "examinees",
-        title: "수험생 데이터",
-        description: "수험생 데이터와 사진 파일을 삭제합니다.",
-        buttonLabel: "삭제",
-      },
-      {
-        scope: "photos",
-        title: "사진 데이터",
-        description: "업로드된 사진 파일과 사진 데이터를 삭제하고 수험생 기본 정보는 유지합니다.",
-        buttonLabel: "삭제",
-      },
+
       {
         scope: "print-history",
         title: "수험표 출력 이력",
-        description: "발급 이력만 삭제하며 수험생 데이터와 사진 데이터는 유지합니다.",
+        description: "발급 이력만 삭제하며 접수 이력과 사진 데이터는 유지합니다.",
         buttonLabel: "삭제",
       },
     ];
@@ -484,14 +433,10 @@
 
   function getSystemBackupAssetItems() {
     return [
-      {
-        assetKey: "examinee-photos",
-        title: "수험생 사진",
-        description: "수험표 생성과 조회에 사용하는 수험생 사진 파일을 포함합니다.",
-      },
+
       {
         assetKey: "applicant-photos",
-        title: "접수 사진",
+        title: "수험생 사진",
         description: "공개 접수에서 업로드한 사진 파일을 포함합니다.",
       },
       {
@@ -507,7 +452,7 @@
       {
         itemKey: "database",
         title: "데이터베이스",
-        description: "계정, 시스템 설정, 수험생, 접수/배정/출력 이력 등 데이터베이스를 포함합니다.",
+        description: "회원 계정·가입 답변·회원 첨부파일·약관 동의와 가입 양식, 관리자 계정, 수험생, 접수/출력 이력을 함께 백업합니다. 로그인 세션과 인증번호는 제외합니다.",
       },
       ...getSystemBackupAssetItems().map((item) => ({
         itemKey: item.assetKey,
@@ -522,16 +467,12 @@
       {
         itemKey: "database",
         title: "데이터베이스",
-        description: "계정, 시스템 설정, 수험생, 접수/배정/출력 이력 등 데이터베이스 테이블을 복원합니다.",
+        description: "회원 계정·가입 답변·회원 첨부파일·약관 동의·가입 양식과 접수 이력을 함께 복원합니다. 복원 후 회원은 다시 로그인해야 합니다.",
       },
-      {
-        itemKey: "examinee-photos",
-        title: "수험생 사진",
-        description: "수험표 생성과 조회에 사용하는 수험생 사진 파일을 복원합니다.",
-      },
+
       {
         itemKey: "applicant-photos",
-        title: "접수 사진",
+        title: "수험생 사진",
         description: "공개 접수에서 업로드한 사진 파일을 복원합니다.",
       },
       {
@@ -627,6 +568,7 @@
             : "유지",
         );
         pushDetail("복원 파일", `${Number(details.restoredFileCount || 0)}건`);
+        if (details.restoredDatabase === true) pushDetail('복원 회원', `${Number(details.restoredMembers || 0)}명`);
         pushDetail("반영 파일 종류", formatSystemAuditLogItemLabels(details.restoredAssetKeys));
       } else {
         pushDetail("오류 코드", details.errorCode);
@@ -642,6 +584,7 @@
         pushDetail("삭제 수험생", `${Number(details.deletedExaminees || 0)}건`);
         pushDetail("삭제 사진", `${Number(details.deletedPhotos || 0)}건`);
         pushDetail("삭제 접수 이력", `${Number(details.deletedApplicantSubmissions || 0)}건`);
+        pushDetail("삭제 회원", `${Number(details.deletedMembers || 0)}명`);
         pushDetail("삭제 출력 이력", `${Number(details.deletedPrintHistory || 0)}건`);
       } else {
         pushDetail("오류 코드", details.errorCode);
@@ -742,6 +685,7 @@
 
   function getSystemAuditLogScopeLabel(targetScope = "") {
     const normalizedScope = String(targetScope || "").trim();
+    if (normalizedScope === 'applicant-members') return '회원가입 데이터';
 
     if (normalizedScope === "system-backup") {
       return "백업 및 복구";
@@ -755,20 +699,8 @@
       return "전형 관리 데이터";
     }
 
-    if (normalizedScope === "applicant-assignments") {
-      return "배정표 데이터";
-    }
-
     if (normalizedScope === "applicant-history") {
       return "접수 이력 데이터";
-    }
-
-    if (normalizedScope === "examinees") {
-      return "수험생 데이터";
-    }
-
-    if (normalizedScope === "photos") {
-      return "사진 데이터";
     }
 
     if (normalizedScope === "print-history") {
@@ -1522,6 +1454,7 @@
                       <span>DB ${escapeHtml(String(restoreValidationSummary.databaseName || "-"))}</span>
                       <span>테이블 ${escapeHtml(String(restoreValidationSummary.tableCount || 0))}개</span>
                       <span>데이터 ${escapeHtml(String(restoreValidationSummary.totalRowCount || 0))}건</span>
+                      <span data-backup-member-summary>${restoreValidationSummary.databaseIncluded ? `회원 현재 ${escapeHtml(String(restoreValidationSummary.currentMemberCount || 0))}명 → 복원 ${escapeHtml(String(restoreValidationSummary.memberCount || 0))}명` : '회원 데이터 미포함'}</span>
                     </div>
                     <div class="system-backup-restore-summary-assets">
                       ${(Array.isArray(restoreValidationSummary.assets) ? restoreValidationSummary.assets : [])
@@ -1658,7 +1591,7 @@
   }
 
   function getActiveNoticeScopeLabel() {
-    return getActiveNoticeScope() === "applicant" ? "접수화면" : "로그인화면";
+    return getActiveNoticeScope() === "applicant" ? "수험생 로그인 후" : "공통 로그인";
   }
 
   function renderLoginNoticeEditorToolbar(defaultFontFamily, defaultFontSize) {
@@ -1704,47 +1637,26 @@
     const { getLoginNoticeMarkup, renderLoginStage } = getAuthRenderers();
     const activeScope = getActiveNoticeScope();
     const noticeTabs = [
-      { key: "login", label: "로그인화면" },
-      { key: "applicant", label: "접수화면" },
+      { key: "login", label: "공통 로그인 공지" },
+      { key: "applicant", label: "수험생 로그인 후 공지" },
     ];
     const renderApplicantNoticePreview = () => `
       <section class="login-shell login-notice-editor-stage applicant-notice-editor-stage">
-        <article class="applicant-public-hero login-hero-card login-notice-card">
-          <div class="login-notice-head">
-            <p class="page-kicker">Applicant Notice</p>
-            <h2>공지사항</h2>
+        <header class="public-glass-intro">
+          <div class="applicant-public-brand login-stage-brand">
+            <img class="applicant-public-brand-mark" src="${escapeAttribute(globalThis.AdmitCardAppConfig.resolveSuperAdminLogoImageUrl(state.superAdmin || {}))}" alt="" />
+            <div class="applicant-public-brand-copy login-stage-brand-copy"><strong>원서접수시스템</strong></div><applyhub-theme-toggle disabled></applyhub-theme-toggle>
           </div>
-          <div
-            id="loginNoticeEditor"
-            class="login-notice-content template-editor-surface login-notice-editor-surface applicant-public-notice-surface"
-            contenteditable="true"
-            spellcheck="false"
-          >${String(state.loginNotice?.draftHtml || "").trim() || getLoginNoticeMarkup("", "공지사항을 입력하세요.")}</div>
-        </article>
+        </header>
+        ${globalThis.AdmitCardApplicantPublicRenderingHelpers.renderCompactNotice({ html: String(state.loginNotice?.draftHtml || "").trim() || getLoginNoticeMarkup("", "공지사항을 입력하세요."), cardClassName: 'applicant-public-hero', contentClassName: 'template-editor-surface login-notice-editor-surface applicant-public-notice-surface', contentId: 'loginNoticeEditor', contentAttributes: 'contenteditable="true" spellcheck="false"', editing: true })}
 
         <article class="applicant-public-panel applicant-public-action-grid login-panel-card login-stage-panel applicant-notice-stage-panel">
-          <div class="applicant-public-action-header">
-            <div class="applicant-public-brand login-stage-brand">
-              <img
-                class="applicant-public-brand-mark"
-                src="/client/assets/logo.png"
-                alt=""
-                width="68"
-                height="68"
-              />
-              <div class="applicant-public-brand-copy login-stage-brand-copy">
-                <span>Admit Card System</span>
-                <strong>수험생 접수</strong>
-              </div>
-            </div>
-          </div>
-          <div class="applicant-public-action-stack applicant-public-home-actions">
-            <button class="primary-button" type="button" disabled>${renderApplicantPreviewHomeActionButtonLabel("접수하기", "apply")}</button>
-            <button class="ghost-button" type="button" disabled>${renderApplicantPreviewHomeActionButtonLabel("접수결과 조회", "summary")}</button>
-            <button class="ghost-button" type="button" disabled>${renderApplicantPreviewHomeActionButtonLabel("수험표 조회", "ticket")}</button>
+          <div class="applicant-member-welcome"><span>나의 접수 메뉴</span><button class="ghost-button" type="button" disabled>로그아웃</button></div>
+          <div class="applicant-member-menu">
+            ${["원서접수", "서류 제출", "접수결과 조회", "수험표 조회"].map((label, index) => `<button class="ghost-button applicant-member-tile" type="button" disabled><span class="applicant-member-tile-number">0${index + 1}</span><strong>${label}</strong></button>`).join("")}
           </div>
         </article>
-        <p class="login-shell-copyright">COPYRIGHT(c) 2026 BY U-PLUS SYSTEM. ALL RIGHTS RESERVED.</p>
+        <p class="login-shell-copyright">ApplyHub · 원서접수시스템<br>© 2026 U-PLUS SYSTEM</p>
       </section>
     `;
     const previewMarkup =
@@ -1753,7 +1665,7 @@
         : renderLoginStage({
             noticeHtml: state.loginNotice.draftHtml,
             heading: "로그인",
-            description: "계정 관리에 등록된 계정 ID와 비밀번호로 로그인합니다.",
+            description: "관리자와 수험생이 함께 사용하는 로그인 화면입니다.",
             submitLabel: "로그인",
             accountIdValue: "",
             passwordValue: "",
@@ -1771,7 +1683,7 @@
           <div class="section-header">
             <div class="menu-section-copy">
               <h3>공지사항 설정</h3>
-              <p>로그인화면과 접수화면의 공지사항을 관리합니다.</p>
+              <p>공통 로그인 전 공지와 수험생 로그인 후 공지를 각각 관리합니다. 기존 공지 내용은 유지됩니다.</p>
             </div>
           </div>
           <div class="template-management-tabs notice-settings-tabs" role="tablist" aria-label="공지사항 화면 선택">
@@ -1812,150 +1724,74 @@
 
   function renderSystemSettings() {
     const isSaving = state.systemSettings.isSaving;
-    const hasUnsavedChanges = state.systemSettings.hasUnsavedChanges === true;
-    const statusClass = state.systemSettings.statusType === "warning" ? " warning" : "";
-    const isDeletingSystemData = state.systemDataDeletion.isDeleting;
-    const isBackingUpSystemData = Boolean(state.systemDataDeletion.isBackingUp);
-    const isRestoringSystemData = Boolean(state.systemDataDeletion.isRestoring);
-    const applicantExamNoComponents = Array.isArray(state.systemSettings.applicantExamNoComponents)
-      ? state.systemSettings.applicantExamNoComponents
-      : ["admissionCode", "seriesCode", "unitCode", "sequence", ""];
-    const admitCardDataSource = ["submission", "examinee"].includes(String(state.systemSettings.admitCardDataSource || "").trim())
-      ? String(state.systemSettings.admitCardDataSource || "").trim()
-      : "examinee";
-
+    const disabled = isSaving ? 'disabled' : '';
+    const saveDisabled = !state.systemSettings.hasUnsavedChanges || isSaving || state.systemSettings.isUploadingLogo || state.systemDataDeletion.isDeleting || state.systemDataDeletion.isBackingUp || state.systemDataDeletion.isRestoring;
+    const logoDisabled = isSaving || state.systemSettings.isUploadingLogo;
+    const components = Array.isArray(state.systemSettings.applicantExamNoComponents) ? state.systemSettings.applicantExamNoComponents : ['admissionCode', 'seriesCode', 'unitCode', 'sequence', ''];
     return `
       <section class="view-stack system-settings-view">
-        <article class="form-card">
+        <article class="form-card system-settings-basic-card">
           <div class="section-header">
-            <div class="menu-section-copy">
-              <h3>시스템 설정</h3>
-              <p>초기 비밀번호, 자동 로그아웃 시간, 입학처 홈페이지 링크, 수험표 생성 기준, 수험번호 자동 생성 규칙을 설정합니다.</p>
-            </div>
-            <div class="inline-actions">
-              <button
-                class="primary-button system-settings-save-button"
-                data-system-settings-action="save"
-                type="button"
-                ${!hasUnsavedChanges || isSaving || isDeletingSystemData || isBackingUpSystemData || isRestoringSystemData ? "disabled" : ""}
-              >
-                ${isSaving ? "저장 중..." : "저장"}
-              </button>
-            </div>
+            <div class="menu-section-copy"><h3>시스템 설정</h3><p>학교 정보와 원서접수 운영에 필요한 기본 설정을 관리합니다.</p></div>
+            <button class="primary-button system-settings-save-button" data-system-settings-action="save" type="button" ${saveDisabled ? 'disabled' : ''}>${isSaving ? '저장 중...' : '기본 설정 저장'}</button>
           </div>
-
-          <div class="system-settings-form">
-            <div class="field system-settings-field">
-              <div class="system-settings-field-head">
-                <label class="system-settings-label" for="systemSettingsInitialPassword">초기 비밀번호</label>
-                <small class="muted system-settings-help">새 계정 등록과 비밀번호 초기화에 동일하게 적용됩니다.</small>
+          <div class="system-settings-layout">
+            <section class="settings-group settings-group-school" aria-labelledby="settingsSchoolHeading">
+              <h4 id="settingsSchoolHeading">학교 정보</h4>
+              <div class="settings-field-pair">
+                <label class="field" for="systemSettingsSchoolName"><span>학교명</span>
+                  <input class="system-settings-input" id="systemSettingsSchoolName" maxlength="100" value="${escapeAttribute(state.systemSettings.schoolName || '')}" ${disabled} />
+                </label>
+                <label class="field" for="systemSettingsAdmissionHomepageUrl"><span>입학처 홈페이지</span>
+                  <input class="system-settings-input" id="systemSettingsAdmissionHomepageUrl" type="url" maxlength="500" value="${escapeAttribute(state.systemSettings.admissionHomepageUrl || '')}" placeholder="https://admission.example.ac.kr" autocomplete="off" ${disabled} />
+                </label>
               </div>
-              <div class="system-settings-control-wrap">
-                <input
-                  class="system-settings-input"
-                  id="systemSettingsInitialPassword"
-                  type="text"
-                  maxlength="100"
-                  value="${escapeAttribute(getSystemInitialPassword())}"
-                  autocomplete="off"
-                />
-              </div>
-            </div>
-
-            <div class="field system-settings-field">
-              <div class="system-settings-field-head">
-                <label class="system-settings-label" for="systemSettingsAutoLogoutMinutes">자동 로그아웃 시간(분)</label>
-                <small class="muted system-settings-help">0분으로 저장하면 자동 로그아웃을 사용하지 않습니다.</small>
-              </div>
-              <div class="system-settings-control-wrap">
-                <input
-                  class="system-settings-input system-settings-number-input"
-                  id="systemSettingsAutoLogoutMinutes"
-                  type="number"
-                  min="0"
-                  max="${MAX_SYSTEM_AUTO_LOGOUT_MINUTES}"
-                  step="1"
-                  value="${escapeAttribute(String(state.systemSettings.autoLogoutMinutes))}"
-                />
-              </div>
-            </div>
-
-            <div class="field system-settings-field">
-              <div class="system-settings-field-head">
-                <label class="system-settings-label" for="systemSettingsAdmissionHomepageUrl">입학처 홈페이지 링크</label>
-                <small class="muted system-settings-help">수험생 접수 페이지의 입학처 홈페이지 버튼의 링크를 설정합니다.</small>
-              </div>
-              <div class="system-settings-control-wrap">
-                <input
-                  class="system-settings-input"
-                  id="systemSettingsAdmissionHomepageUrl"
-                  type="url"
-                  maxlength="500"
-                  value="${escapeAttribute(String(state.systemSettings.admissionHomepageUrl || ""))}"
-                  placeholder="https://admission.example.ac.kr"
-                  autocomplete="off"
-                />
-              </div>
-            </div>
-
-            ${renderSystemAdmitCardDataSourceField(admitCardDataSource)}
-
-            <div class="field system-settings-field system-settings-exam-no-field">
-              <div class="system-settings-column">
-                <div class="system-settings-section-head">
-                  <span class="system-settings-label">수험번호 자동 생성</span>
-                  <small class="muted system-settings-help">자리수를 먼저 정하고, 최대 5개의 코드/순번을 조합해 자동 생성 순서를 구성합니다.</small>
-                </div>
-                <div class="system-settings-exam-no-grid">
-                  <label class="field system-settings-exam-no-digits" for="systemSettingsApplicantExamNoDigitCount">
-                    <span>수험번호 자리수</span>
-                    <input
-                      class="system-settings-input system-settings-number-input"
-                      id="systemSettingsApplicantExamNoDigitCount"
-                      type="number"
-                      min="1"
-                      max="30"
-                      step="1"
-                      value="${escapeAttribute(String(state.systemSettings.applicantExamNoDigitCount || 10))}"
-                    />
-                  </label>
-                  <div class="system-settings-exam-no-components">
-                    ${Array.from({ length: 5 }, (_, index) => {
-                      const selectedValue = String(applicantExamNoComponents[index] || "");
-
-                      return `
-                        <label class="field system-settings-exam-no-component-field" for="systemSettingsApplicantExamNoComponent${index + 1}">
-                          <span>조합${index + 1}</span>
-                          <select
-                            class="system-settings-input"
-                            id="systemSettingsApplicantExamNoComponent${index + 1}"
-                            data-system-settings-exam-component-index="${index}"
-                          >
-                            ${applicantExamNoComponentOptions
-                              .map(
-                                (option) => `
-                                  <option value="${escapeAttribute(option.key)}" ${selectedValue === option.key ? "selected" : ""}>
-                                    ${escapeHtml(option.label)}
-                                  </option>
-                                `,
-                              )
-                              .join("")}
-                          </select>
-                        </label>
-                      `;
-                    }).join("")}
+              <div class="settings-logo-field">
+                <span class="settings-field-label">학교 로고</span>
+                <div class="settings-logo-row">
+                  <img class="system-settings-school-logo-preview" src="${escapeAttribute(state.systemSettings.schoolLogoImageUrl || '/client/assets/logo.png')}" alt="학교 로고 미리보기" />
+                  <div class="settings-logo-controls">
+                    <div class="settings-logo-actions">
+                      <input id="systemSettingsSchoolLogo" type="file" aria-label="학교 로고 업로드" accept="image/png,image/jpeg,image/webp" ${logoDisabled ? 'disabled' : ''} />
+                      <button class="ghost-button" type="button" data-school-logo-reset ${logoDisabled || !state.systemSettings.schoolLogoImageUrl ? 'disabled' : ''}>기본 로고 사용</button>
+                    </div>
+                    <small class="muted">PNG·JPG·WEBP, 최대 2MB. 학교명과 로고는 수험생 화면에 표시됩니다.</small>
                   </div>
                 </div>
               </div>
-            </div>
+            </section>
+            <section class="settings-group settings-group-security" aria-labelledby="settingsSecurityHeading">
+              <h4 id="settingsSecurityHeading">계정·보안</h4>
+              <div class="settings-field-pair">
+                <label class="field" for="systemSettingsInitialPassword"><span>초기 비밀번호</span>
+                  <input class="system-settings-input" id="systemSettingsInitialPassword" type="text" maxlength="100" value="${escapeAttribute(getSystemInitialPassword())}" autocomplete="off" ${disabled} />
+                  <small class="muted">관리자 계정 생성·초기화에 사용</small>
+                </label>
+                <label class="field" for="systemSettingsAutoLogoutMinutes"><span>자동 로그아웃 (분)</span>
+                  <input class="system-settings-input" id="systemSettingsAutoLogoutMinutes" type="number" min="0" max="${MAX_SYSTEM_AUTO_LOGOUT_MINUTES}" step="1" value="${escapeAttribute(String(state.systemSettings.autoLogoutMinutes))}" ${disabled} />
+                  <small class="muted">0분이면 자동 로그아웃 안 함</small>
+                </label>
+              </div>
+            </section>
+            <section class="settings-group settings-group-exam" aria-labelledby="settingsExamHeading">
+              <div class="settings-group-heading"><h4 id="settingsExamHeading">수험번호 생성</h4><small class="muted">전체 자리수와 코드·순번의 조합 순서를 설정합니다.</small></div>
+              <div class="settings-exam-fields">
+                <label class="field" for="systemSettingsApplicantExamNoDigitCount"><span>전체 자리수</span>
+                  <input class="system-settings-input" id="systemSettingsApplicantExamNoDigitCount" type="number" min="1" max="30" step="1" value="${escapeAttribute(String(state.systemSettings.applicantExamNoDigitCount || 10))}" ${disabled} />
+                </label>
+                ${Array.from({length: 5}, (_, index) => `
+                  <label class="field" for="systemSettingsApplicantExamNoComponent${index + 1}"><span>조합 ${index + 1}</span>
+                    <select class="system-settings-input" id="systemSettingsApplicantExamNoComponent${index + 1}" data-system-settings-exam-component-index="${index}" ${disabled}>
+                      ${applicantExamNoComponentOptions.map(option => `<option value="${escapeAttribute(option.key)}" ${String(components[index] || '') === option.key ? 'selected' : ''}>${escapeHtml(option.label)}</option>`).join('')}
+                    </select>
+                  </label>`).join('')}
+              </div>
+            </section>
           </div>
-
-          <p class="system-settings-status${statusClass}${state.systemSettings.statusMessage ? "" : " hidden"}" id="systemSettingsStatus">
-            ${escapeHtml(state.systemSettings.statusMessage)}
-          </p>
+          <p class="system-settings-status${state.systemSettings.statusType === 'warning' ? ' warning' : ''}${state.systemSettings.statusMessage ? '' : ' hidden'}" id="systemSettingsStatus">${escapeHtml(state.systemSettings.statusMessage)}</p>
         </article>
-      </section>
-    `;
+        <applyhub-email-settings></applyhub-email-settings>
+      </section>`;
   }
 
   function renderSuperAdminManagement() {
@@ -2001,7 +1837,7 @@
             <section class="super-admin-setting-card">
               <div class="system-settings-section-head">
                 <span class="system-settings-label">학교명 설정</span>
-                <small class="muted system-settings-help">학교 이름 입력 UI만 우선 제공합니다.</small>
+                <small class="muted system-settings-help">사용자 페이지 헤더에 표시됩니다. 시스템설정의 학교명과 동일한 값입니다.</small>
               </div>
               <label class="field super-admin-text-field" for="superAdminSchoolName">
                 <span>학교 이름</span>
@@ -2086,7 +1922,7 @@
             <section class="super-admin-setting-card">
               <div class="system-settings-section-head">
                 <span class="system-settings-label">접수 사용 여부</span>
-                <small class="muted system-settings-help">사용하지 않으면 관리자와 운영자 메뉴에서 전형 관리, 일정 관리, 질문 양식 관리, 배정표 관리, 접수 이력이 숨겨집니다.</small>
+                <small class="muted system-settings-help">사용하지 않으면 관리자와 운영자 메뉴에서 전형 관리, 일정 관리, 가입·접수 설정, 접수 이력이 숨겨집니다.</small>
               </div>
               <label class="super-admin-switch" for="superAdminRecruitmentEnabled">
                 <input

@@ -94,7 +94,7 @@
       renderLeadingGridCells,
       renderLeadingGridHeaders,
       renderTableFilterStrip,
-      renderUploadHeaderAction,
+
     } = gridTableControlController;
 
     function renderExamineeResultTable({
@@ -137,16 +137,8 @@
         cardClasses.push("is-empty-grid");
       }
 
-      if (["examineeRegistrationGrid", "admitCardLookupGrid", "printHistoryGrid"].includes(gridKey)) {
-        cardClasses.push("examinee-data-table");
-      }
-
       if (["applicantHistoryGrid", "applicantRecruitmentGrid", "applicantScheduleGrid"].includes(gridKey)) {
         cardClasses.push("applicant-admin-grid-card");
-      }
-
-      if (gridKey === "examineeRegistrationGrid") {
-        cardClasses.push("examinee-registration-table");
       }
 
       if (gridKey === "admitCardLookupGrid") {
@@ -272,7 +264,7 @@
       renderBatchPrintButton,
       renderExamineeResultTable,
       renderGridHeaderActions,
-      renderUploadHeaderAction,
+
       syncGridSelectionIndicators,
       syncOpenGridFilterMenuPosition,
     });

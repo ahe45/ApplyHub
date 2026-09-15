@@ -174,7 +174,12 @@
       if (templateEditorBorderWidth && selectedCell) {
         const computedStyle = window.getComputedStyle(selectedCell);
         const widthProperty = getTemplateEditorBorderStyleProperty(borderControlSide, "Width");
-        const borderWidth = Number.parseFloat(selectedCell.style[widthProperty] || computedStyle[widthProperty] || "1");
+        const styleProperty = getTemplateEditorBorderStyleProperty(borderControlSide, "Style");
+        const borderStyle = String(selectedCell.style[styleProperty] || computedStyle[styleProperty] || "solid");
+        const actualBorderWidth = Number.parseFloat(selectedCell.style[widthProperty] || computedStyle[widthProperty] || "1");
+        const borderWidth = borderStyle === "double" && Number.isFinite(actualBorderWidth)
+          ? Math.max(1, actualBorderWidth - 2)
+          : actualBorderWidth;
         templateEditorBorderWidth.value = String(Number.isFinite(borderWidth) ? Math.max(0, Math.round(borderWidth)) : 1);
       }
 

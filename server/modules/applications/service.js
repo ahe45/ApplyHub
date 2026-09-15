@@ -1,216 +1,54 @@
 const { randomInt, randomUUID } = require("crypto");
 const AdmZip = require("adm-zip");
-const fs = require("fs");
-const ExcelJS = require("exceljs");
 const path = require("path");
+const { getApplicantDocumentSubmissionScheduleState } = require("../../../shared/domain/applicant-form");
+const { normalizeFileUploadSettings, isAllowedUploadExtension } = require("../../../shared/domain/applicant-form");
+const {
 
-const applicantFormConfig = require("../../../shared/domain/applicant-form");
+  createApplicantImportHelpers,
+  getApplicantRecruitmentImportRowLabel,
+  normalizeApplicantImportExistingDataPolicy,
+  shouldProcessApplicantImportOperation,
+} = require("./import-utils");
+const { createApplicantAttachmentStorage } = require("./attachment-storage");
+
+const { createApplicantPublicAccessStore } = require("./public-access-store");
+const { createApplicantWorkbookService } = require("./workbook-service");
+const { createApplicantArchiveJobs } = require("./archive-jobs");
 
 const {
+
+  APPLICANT_CODE_PATTERN,
+  APPLICANT_DATE_PATTERN,
+  APPLICANT_DEFAULT_EXAM_NO_COMPONENTS,
+  APPLICANT_DEFAULT_EXAM_NO_DIGIT_COUNT,
+  APPLICANT_DEFAULT_RECRUITMENT_EXAM_NO_PATTERN,
+  APPLICANT_EMAIL_DELIVERY_STATUSES,
+  APPLICANT_EMAIL_PATTERN,
+  APPLICANT_EXAM_NO_CODE_TOKEN_PATTERN,
+  APPLICANT_EXAM_NO_COMPONENT_TYPES,
+  APPLICANT_EXAM_NO_TOKEN_PATTERN,
+  APPLICANT_FORM_INPUT_TYPES,
+  APPLICANT_IMPORT_PREVIEW_ROW_LIMIT,
+  APPLICANT_MAX_EXAM_NO_DIGIT_COUNT,
+  APPLICANT_PHONE_PATTERN,
+  STORED_TICKET_OVERRIDE_KEYS,
+  APPLICANT_PUBLIC_ACCESS_TYPES,
+  APPLICANT_PUBLIC_LOOKUP_TARGETS,
+  APPLICANT_RECRUITMENT_SELECTION_FIELDS,
+  APPLICANT_RECRUITMENT_SELECTION_FIELD_KEY_MAP,
+  APPLICANT_RECRUITMENT_SELECTION_SYSTEM_FIELD_MAP,
+  APPLICANT_RECRUITMENT_UNIT_PAIR_FIELDS,
+  APPLICANT_SCHEDULE_DATE_TIME_PATTERN,
+  APPLICANT_TIME_PATTERN,
+  DEFAULT_APPLICANT_FORM_FIELD_SEEDS,
   defaultApplicantExamNoPattern,
   defaultApplicantExamNoSequenceStart,
   findApplicantNationalityOption,
-  getApplicantStatusLabel: getSharedApplicantStatusLabel,
+  getSharedApplicantStatusLabel,
+  isApplicantUploadInputType,
   protectedApplicantSystemFields,
-} = applicantFormConfig;
-
-const APPLICANT_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const APPLICANT_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const APPLICANT_TIME_PATTERN = /^\d{2}:\d{2}$/;
-const APPLICANT_SCHEDULE_DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
-const APPLICANT_PHONE_PATTERN = /^\d+$/;
-const APPLICANT_CODE_PATTERN = /^[A-Z0-9_-]+$/;
-const APPLICANT_EXAM_NO_TOKEN_PATTERN = /\{(?:YYYY|YY|MM|DD|SEQ(?::\d{1,2})?|ADMISSION_CODE|SERIES_CODE|UNIT_CODE)\}/g;
-const APPLICANT_EXAM_NO_CODE_TOKEN_PATTERN = /\{(?:ADMISSION_CODE|SERIES_CODE|UNIT_CODE)\}/;
-const APPLICANT_FORM_INPUT_TYPES = Object.freeze(["text", "textarea", "select", "date", "birthdate", "time", "photo", "file", "phone", "nationality"]);
-const APPLICANT_UPLOAD_INPUT_TYPES = Object.freeze(["photo", "file"]);
-const APPLICANT_DEFAULT_RECRUITMENT_EXAM_NO_PATTERN = "{ADMISSION_CODE}{SERIES_CODE}{UNIT_CODE}-{SEQ:4}";
-const APPLICANT_EXAM_NO_COMPONENT_TYPES = Object.freeze(["admissionCode", "seriesCode", "unitCode", "nationalityCode", "sequence"]);
-const APPLICANT_DEFAULT_EXAM_NO_DIGIT_COUNT = 10;
-const APPLICANT_MAX_EXAM_NO_DIGIT_COUNT = 30;
-const APPLICANT_DEFAULT_EXAM_NO_COMPONENTS = Object.freeze(["admissionCode", "seriesCode", "unitCode", "sequence", ""]);
-const APPLICANT_PUBLIC_ACCESS_TYPES = Object.freeze({
-  lookup: "lookup",
-  verified: "verified",
-});
-const APPLICANT_PUBLIC_LOOKUP_TARGETS = Object.freeze({
-  result: "result",
-  ticket: "ticket",
-});
-const APPLICANT_EMAIL_DELIVERY_STATUSES = Object.freeze({
-  PENDING: "pending",
-  SENT: "sent",
-  FAILED: "failed",
-});
-const APPLICANT_ADMIT_CARD_DATA_SOURCES = Object.freeze({
-  submission: "submission",
-  examinee: "examinee",
-});
-const APPLICANT_PROMOTION_REQUIRED_FIELDS = Object.freeze([
-  "date",
-  "time",
-  "track",
-  "admission",
-  "series",
-  "unit",
-  "building",
-  "room",
-  "name",
-  "birth",
-]);
-const DEFAULT_APPLICANT_FORM_FIELD_SEEDS = Object.freeze([
-  Object.freeze({ fieldKey: "applicant-name", questionText: "이름", inputType: "text", systemFieldKey: "name", required: true }),
-  Object.freeze({ fieldKey: "exam-date", questionText: "시험날짜", inputType: "date", systemFieldKey: "date", required: true }),
-  Object.freeze({ fieldKey: "exam-time", questionText: "시간", inputType: "time", systemFieldKey: "time", required: true }),
-  Object.freeze({ fieldKey: "track", questionText: "모집시기", inputType: "text", systemFieldKey: "track", required: true }),
-  Object.freeze({ fieldKey: "admission", questionText: "전형", inputType: "text", systemFieldKey: "admission", required: true }),
-  Object.freeze({ fieldKey: "series", questionText: "계열", inputType: "text", systemFieldKey: "series", required: true }),
-  Object.freeze({ fieldKey: "unit", questionText: "모집단위", inputType: "text", systemFieldKey: "unit", required: true }),
-  Object.freeze({ fieldKey: "major", questionText: "전공", inputType: "text", systemFieldKey: "major", required: false }),
-  Object.freeze({ fieldKey: "building", questionText: "고사건물", inputType: "text", systemFieldKey: "building", required: true }),
-  Object.freeze({ fieldKey: "room", questionText: "고사실", inputType: "text", systemFieldKey: "room", required: true }),
-  Object.freeze({ fieldKey: "group", questionText: "조", inputType: "text", systemFieldKey: "group", required: false }),
-  Object.freeze({ fieldKey: "birth", questionText: "생년월일", inputType: "birthdate", systemFieldKey: "birth", required: true }),
-  Object.freeze({ fieldKey: "photo", questionText: "수험생 사진", inputType: "photo", systemFieldKey: "photo", required: false }),
-]);
-const APPLICANT_UNIT_TEMPLATE_COLUMNS = Object.freeze([
-  Object.freeze({ key: "trackName", header: "모집시기", width: 18, sample: "수시" }),
-  Object.freeze({ key: "admissionCode", header: "전형코드", width: 16, sample: "SU" }),
-  Object.freeze({ key: "admissionName", header: "전형", width: 18, sample: "수시" }),
-  Object.freeze({ key: "seriesCode", header: "계열코드", width: 16, sample: "EN" }),
-  Object.freeze({ key: "seriesName", header: "계열", width: 18, sample: "공학계열" }),
-  Object.freeze({ key: "unitCode", header: "모집단위코드", width: 18, sample: "CSE" }),
-  Object.freeze({ key: "unitName", header: "모집단위", width: 24, sample: "컴퓨터공학부" }),
-  Object.freeze({ key: "majorCode", header: "전공코드", width: 16, sample: "SE" }),
-  Object.freeze({ key: "majorName", header: "전공", width: 24, sample: "소프트웨어전공" }),
-]);
-const APPLICANT_ASSIGNMENT_SUMMARY_COLUMNS = Object.freeze([
-  Object.freeze({ key: "track", header: "모집시기", width: 18 }),
-  Object.freeze({ key: "admission", header: "전형", width: 18 }),
-  Object.freeze({ key: "series", header: "계열", width: 18 }),
-  Object.freeze({ key: "unit", header: "모집단위", width: 22 }),
-  Object.freeze({ key: "major", header: "전공", width: 20 }),
-  Object.freeze({ key: "applicantCount", header: "대상인원", width: 12 }),
-  Object.freeze({ key: "missingPhotoCount", header: "사진미등록", width: 12 }),
-]);
-const APPLICANT_ASSIGNMENT_COLUMNS = Object.freeze([
-  Object.freeze({ key: "track", header: "모집시기", width: 18 }),
-  Object.freeze({ key: "admission", header: "전형", width: 18 }),
-  Object.freeze({ key: "series", header: "계열", width: 18 }),
-  Object.freeze({ key: "unit", header: "모집단위", width: 22 }),
-  Object.freeze({ key: "major", header: "전공", width: 20 }),
-  Object.freeze({ key: "date", header: "날짜", width: 14 }),
-  Object.freeze({ key: "time", header: "시간", width: 10 }),
-  Object.freeze({ key: "buildingCode", header: "고사건물코드", width: 16 }),
-  Object.freeze({ key: "building", header: "고사건물", width: 18 }),
-  Object.freeze({ key: "roomCode", header: "고사실코드", width: 16 }),
-  Object.freeze({ key: "room", header: "고사실", width: 18 }),
-  Object.freeze({ key: "assignedCount", header: "배정인원", width: 12 }),
-]);
-const APPLICANT_PROMOTION_SORT_FIELD_KEYS = Object.freeze(["examineeNo", "admission", "series", "unit", "major"]);
-const APPLICANT_PROMOTION_BREAK_FIELD_KEYS = Object.freeze(["admission", "series", "unit", "major"]);
-const DEFAULT_APPLICANT_PROMOTION_SORT_FIELDS = Object.freeze(["examineeNo", "unit", ""]);
-const DEFAULT_APPLICANT_PROMOTION_BREAK_FIELD = "unit";
-const APPLICANT_PROMOTION_CAPACITY_ERROR_MESSAGE = "배정표에 배정 가능한 고사실이 부족합니다.";
-const APPLICANT_PROMOTION_FIELD_LABELS = Object.freeze({
-  examineeNo: "수험번호",
-  track: "모집시기",
-  admission: "전형",
-  series: "계열",
-  unit: "모집단위",
-  major: "전공",
-});
-const APPLICANT_PROMOTION_PREVIEW_COLUMNS = Object.freeze([
-  Object.freeze({ key: "examineeNo", header: "수험번호", width: 18 }),
-  Object.freeze({ key: "name", header: "이름", width: 16 }),
-  Object.freeze({ key: "birth", header: "생년월일", width: 14 }),
-  Object.freeze({ key: "track", header: "모집시기", width: 18 }),
-  Object.freeze({ key: "admission", header: "전형", width: 18 }),
-  Object.freeze({ key: "series", header: "계열", width: 18 }),
-  Object.freeze({ key: "unit", header: "모집단위", width: 22 }),
-  Object.freeze({ key: "major", header: "전공", width: 20 }),
-  Object.freeze({ key: "date", header: "날짜", width: 14 }),
-  Object.freeze({ key: "time", header: "시간", width: 10 }),
-  Object.freeze({ key: "buildingCode", header: "고사건물코드", width: 16 }),
-  Object.freeze({ key: "building", header: "고사건물", width: 18 }),
-  Object.freeze({ key: "roomCode", header: "고사실코드", width: 16 }),
-  Object.freeze({ key: "room", header: "고사실", width: 18 }),
-  Object.freeze({ key: "photoStatusLabel", header: "사진상태", width: 12 }),
-  Object.freeze({ key: "statusLabel", header: "상태", width: 14 }),
-  Object.freeze({ key: "errorMessage", header: "오류", width: 42 }),
-]);
-const APPLICANT_PROMOTION_OVERRIDE_KEYS = Object.freeze([
-  "date",
-  "time",
-  "building",
-  "buildingCode",
-  "room",
-  "roomCode",
-  "admissionCode",
-  "seriesCode",
-  "unitCode",
-  "majorCode",
-]);
-const APPLICANT_IMPORT_PREVIEW_ROW_LIMIT = 8;
-const APPLICANT_RECRUITMENT_IMPORT_COMPARE_FIELDS = Object.freeze([
-  "trackName",
-  "admissionCode",
-  "admissionName",
-  "seriesCode",
-  "seriesName",
-  "unitCode",
-  "unitName",
-  "majorCode",
-  "majorName",
-]);
-const APPLICANT_ASSIGNMENT_IMPORT_COMPARE_FIELDS = Object.freeze([
-  "track",
-  "admission",
-  "series",
-  "unit",
-  "major",
-  "date",
-  "time",
-  "buildingCode",
-  "building",
-  "roomCode",
-  "room",
-  "assignedCount",
-]);
-const APPLICANT_IMPORT_EXISTING_DATA_POLICIES = Object.freeze({
-  INSERT_ONLY: "insert-only",
-  INSERT_UPDATE: "insert-update",
-  ALL: "all",
-});
-const APPLICANT_RECRUITMENT_UNIT_PAIR_FIELDS = Object.freeze([
-  Object.freeze({ codeKey: "admissionCode", nameKey: "admissionName", codeLabel: "전형코드", nameLabel: "전형" }),
-  Object.freeze({ codeKey: "seriesCode", nameKey: "seriesName", codeLabel: "계열코드", nameLabel: "계열" }),
-  Object.freeze({ codeKey: "unitCode", nameKey: "unitName", codeLabel: "모집단위코드", nameLabel: "모집단위" }),
-  Object.freeze({ codeKey: "majorCode", nameKey: "majorName", codeLabel: "전공코드", nameLabel: "전공" }),
-]);
-const APPLICANT_RECRUITMENT_SELECTION_FIELDS = Object.freeze([
-  Object.freeze({ key: "track", fieldKey: "__applicant_selection_track", questionText: "모집시기", systemFieldKey: "track", unitKey: "trackName" }),
-  Object.freeze({ key: "admission", fieldKey: "__applicant_selection_admission", questionText: "전형", systemFieldKey: "admission", unitKey: "admissionName" }),
-  Object.freeze({ key: "series", fieldKey: "__applicant_selection_series", questionText: "계열", systemFieldKey: "series", unitKey: "seriesName" }),
-  Object.freeze({ key: "unit", fieldKey: "__applicant_selection_unit", questionText: "모집단위", systemFieldKey: "unit", unitKey: "unitName" }),
-  Object.freeze({ key: "major", fieldKey: "__applicant_selection_major", questionText: "전공", systemFieldKey: "major", unitKey: "majorName" }),
-]);
-const APPLICANT_RECRUITMENT_SELECTION_FIELD_KEY_MAP = Object.freeze(
-  APPLICANT_RECRUITMENT_SELECTION_FIELDS.reduce((fieldMap, definition) => {
-    fieldMap[definition.fieldKey] = definition;
-    return fieldMap;
-  }, {}),
-);
-const APPLICANT_RECRUITMENT_SELECTION_SYSTEM_FIELD_MAP = Object.freeze(
-  APPLICANT_RECRUITMENT_SELECTION_FIELDS.reduce((fieldMap, definition) => {
-    fieldMap[definition.systemFieldKey] = definition;
-    return fieldMap;
-  }, {}),
-);
-
-function isApplicantUploadInputType(inputType = "") {
-  return APPLICANT_UPLOAD_INPUT_TYPES.includes(String(inputType || "").trim());
-}
+} = require("./config");
 
 function createApplicantService({
   applicantFileStorageDirName = "uploads/file",
@@ -229,17 +67,10 @@ function createApplicantService({
   sendVerificationEmail,
   verifyPassword = (plainPassword, storedPassword) => String(plainPassword ?? "") === String(storedPassword ?? ""),
 }) {
-  const publicAccessStore = new Map();
-  const applicantFileStorageDirectoryPath = path.join(rootDir, applicantFileStorageDirName);
-  const applicantPhotoStorageDirectoryPath = path.join(rootDir, applicantPhotoStorageDirName);
-  const legacyApplicantPhotoStorageDirectoryPath = path.join(rootDir, "uploads", "applicant-photos");
-  const examineePhotoStorageDirectoryPath = path.join(rootDir, examineePhotoStorageDirName);
-  const buildExamineeAdmitCardPdfBuffer =
-    typeof buildAdmitCardPdfBuffer === "function"
-      ? buildAdmitCardPdfBuffer
-      : async () => {
-          throw createHttpError(500, "수험표 PDF 생성기를 사용할 수 없습니다.", "APPLICANT_ADMIT_CARD_PDF_BUILDER_UNAVAILABLE");
-        };
+  const attachmentArchiveJobs = createApplicantArchiveJobs({
+    query, getSubmission: getApplicantSubmissionById, getPhoto: getApplicantSubmissionPhoto,
+    getFile: getApplicantSubmissionFile, createHttpError,
+  });
   const buildSubmissionAdmitCardPdfBuffer =
     typeof buildAdmitCardPdfBufferFromRecord === "function"
       ? buildAdmitCardPdfBufferFromRecord
@@ -256,6 +87,72 @@ function createApplicantService({
             "APPLICANT_VERIFICATION_EMAIL_NOT_CONFIGURED",
           );
         };
+  const {
+    createPublicAccessToken,
+    getPublicAccessRecordOrThrow,
+  } = createApplicantPublicAccessStore({
+    createHttpError,
+    publicAccessTtlMs,
+  });
+  const applicantWorkbookService = createApplicantWorkbookService({
+    createHttpError,
+  });
+  const {
+
+    buildStoredApplicantFileAnswerData,
+    buildStoredApplicantFileRecord,
+    buildStoredApplicantPhotoAnswerData,
+    buildStoredApplicantPhotoRecord,
+
+    deleteApplicantSubmissionArtifacts,
+    normalizeApplicantFilePayload,
+    normalizeApplicantPhotoPayload,
+    normalizeApplicantStoredFileValue,
+    normalizeApplicantStoredPhotoValue,
+    persistApplicantFile,
+    persistApplicantPhotoFile,
+
+    readStoredApplicantFile,
+    readStoredApplicantPhotoFile,
+    readStoredPromotedPhotoFile,
+  } = createApplicantAttachmentStorage({
+    applicantFileStorageDirName,
+    applicantPhotoStorageDirName,
+    createHttpError,
+    examineePhotoStorageDirName,
+    rootDir,
+  });
+  function normalizeStoredTicketOverrides(rawValue = null) {
+    const sourceValue =
+      typeof rawValue === "string"
+        ? (() => {
+            try {
+              return JSON.parse(rawValue);
+            } catch (error) {
+              return {};
+            }
+          })()
+        : rawValue && typeof rawValue === "object"
+          ? rawValue
+          : {};
+    const normalizedSourceValue =
+      sourceValue.seriesCode || !sourceValue.trackCode
+        ? sourceValue
+        : {
+            ...sourceValue,
+            seriesCode: sourceValue.trackCode,
+          };
+
+    return STORED_TICKET_OVERRIDE_KEYS.reduce((override, key) => {
+      const normalizedValue = String(normalizedSourceValue?.[key] || "").trim();
+
+      if (normalizedValue) {
+        override[key] = normalizedValue;
+      }
+
+      return override;
+    }, {});
+  }
 
   function normalizeApplicantEmailDeliveryStatus(value) {
     const normalizedValue = String(value || "").trim().toLowerCase();
@@ -263,52 +160,6 @@ function createApplicantService({
     return Object.values(APPLICANT_EMAIL_DELIVERY_STATUSES).includes(normalizedValue)
       ? normalizedValue
       : APPLICANT_EMAIL_DELIVERY_STATUSES.PENDING;
-  }
-
-  function cleanupPublicAccessStore() {
-    const now = Date.now();
-
-    publicAccessStore.forEach((record, token) => {
-      if (!record || record.expiresAt <= now) {
-        publicAccessStore.delete(token);
-      }
-    });
-  }
-
-  function createPublicAccessToken(payload = {}) {
-    cleanupPublicAccessStore();
-    const token = randomUUID();
-
-    publicAccessStore.set(token, {
-      ...payload,
-      expiresAt: Date.now() + publicAccessTtlMs,
-    });
-
-    return token;
-  }
-
-  function getPublicAccessRecordOrThrow(token, allowedTypes = []) {
-    const normalizedToken = String(token || "").trim();
-
-    if (!normalizedToken) {
-      throw createHttpError(401, "접근 토큰이 필요합니다.", "PUBLIC_ACCESS_TOKEN_REQUIRED");
-    }
-
-    cleanupPublicAccessStore();
-    const record = publicAccessStore.get(normalizedToken);
-
-    if (!record) {
-      throw createHttpError(401, "유효하지 않거나 만료된 접근 토큰입니다.", "PUBLIC_ACCESS_TOKEN_INVALID");
-    }
-
-    if (Array.isArray(allowedTypes) && allowedTypes.length > 0 && !allowedTypes.includes(record.type)) {
-      throw createHttpError(403, "허용되지 않은 접근 유형입니다.", "PUBLIC_ACCESS_TYPE_INVALID");
-    }
-
-    return {
-      token: normalizedToken,
-      ...record,
-    };
   }
 
   async function executeRows(queryable, sql, params = []) {
@@ -325,16 +176,6 @@ function createApplicantService({
 
     const candidateDate = value instanceof Date ? value : new Date(value);
     return Number.isNaN(candidateDate.getTime()) ? "" : candidateDate.toISOString().slice(0, 19).replace("T", " ");
-  }
-
-  function normalizeApplicantAdmitCardDataSource(value, options = {}) {
-    const normalizedValue = String(value ?? "").trim();
-    const defaultValue =
-      options.defaultValue && Object.values(APPLICANT_ADMIT_CARD_DATA_SOURCES).includes(options.defaultValue)
-        ? options.defaultValue
-        : APPLICANT_ADMIT_CARD_DATA_SOURCES.examinee;
-
-    return Object.values(APPLICANT_ADMIT_CARD_DATA_SOURCES).includes(normalizedValue) ? normalizedValue : defaultValue;
   }
 
   function normalizeApplicantPublicLookupTarget(value, options = {}) {
@@ -540,6 +381,8 @@ function createApplicantService({
         items,
         allowCustomOption,
         customOptionLabel,
+        fileNamePattern: String(parsedValue.fileNamePattern || ""),
+        allowedExtensions: Array.isArray(parsedValue.allowedExtensions) ? parsedValue.allowedExtensions : [],
       };
     } catch (error) {
       return defaultConfig;
@@ -591,6 +434,7 @@ function createApplicantService({
 
     return {
       id: Number(row.id || 0),
+      formScope: row.formScope === 'documents' ? 'documents' : 'application',
       fieldKey: String(row.fieldKey || "").trim(),
       questionText: String(row.questionText || "").trim(),
       questionDescription: String(row.questionDescription || "").trim(),
@@ -598,6 +442,8 @@ function createApplicantService({
       systemFieldKey: String(row.systemFieldKey || "").trim(),
       options,
       optionValuesText: options.join("\n"),
+      fileNamePattern: optionConfig.fileNamePattern || "",
+      allowedExtensions: optionConfig.allowedExtensions || [],
       allowCustomOption: optionConfig.allowCustomOption === true,
       customOptionLabel: String(optionConfig.customOptionLabel || "").trim(),
       required: Number(row.required) === 1 || row.required === true,
@@ -646,317 +492,6 @@ function createApplicantService({
     }
 
     return normalizedValue;
-  }
-
-  function extractExcelCellValue(value) {
-    if (value == null) {
-      return "";
-    }
-
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-      return String(value);
-    }
-
-    if (value instanceof Date) {
-      const year = value.getFullYear();
-      const month = String(value.getMonth() + 1).padStart(2, "0");
-      const day = String(value.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    }
-
-    if (typeof value === "object") {
-      if (typeof value.text === "string") {
-        return value.text;
-      }
-
-      if (Array.isArray(value.richText)) {
-        return value.richText.map((segment) => segment?.text || "").join("");
-      }
-
-      if (value.result != null) {
-        return extractExcelCellValue(value.result);
-      }
-
-      if (value.hyperlink) {
-        return String(value.text || value.hyperlink || "");
-      }
-    }
-
-    return "";
-  }
-
-  function getExcelCellText(cell) {
-    return extractExcelCellValue(cell?.value)
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n")
-      .trim();
-  }
-
-  function normalizeApplicantPromotionOverride(rawValue = null) {
-    const sourceValue =
-      typeof rawValue === "string"
-        ? (() => {
-            try {
-              return JSON.parse(rawValue);
-            } catch (error) {
-              return {};
-            }
-          })()
-        : rawValue && typeof rawValue === "object"
-          ? rawValue
-          : {};
-    const normalizedSourceValue =
-      sourceValue.seriesCode || !sourceValue.trackCode
-        ? sourceValue
-        : {
-            ...sourceValue,
-            seriesCode: sourceValue.trackCode,
-          };
-
-    return APPLICANT_PROMOTION_OVERRIDE_KEYS.reduce((override, key) => {
-      const normalizedValue = String(normalizedSourceValue?.[key] || "").trim();
-
-      if (normalizedValue) {
-        override[key] = normalizedValue;
-      }
-
-      return override;
-    }, {});
-  }
-
-  function stringifyApplicantPromotionOverride(override = {}) {
-    const normalizedOverride = normalizeApplicantPromotionOverride(override);
-    return Object.keys(normalizedOverride).length > 0 ? JSON.stringify(normalizedOverride) : null;
-  }
-
-  function compareApplicantPromotionText(leftValue = "", rightValue = "") {
-    return String(leftValue || "").localeCompare(String(rightValue || ""), "ko", {
-      numeric: true,
-      sensitivity: "base",
-    });
-  }
-
-  function getApplicantPromotionFieldLabel(fieldKey = "", options = {}) {
-    const normalizedFieldKey = String(fieldKey || "").trim();
-
-    if (!normalizedFieldKey) {
-      return String(options.emptyLabel || "선택 안 함").trim();
-    }
-
-    return APPLICANT_PROMOTION_FIELD_LABELS[normalizedFieldKey] || normalizedFieldKey;
-  }
-
-  function buildApplicantPromotionGroupKey(record = {}) {
-    return [
-      String(record.track || "").trim(),
-      String(record.admission || "").trim(),
-      String(record.series || "").trim(),
-      String(record.unit || "").trim(),
-      String(record.major || "").trim(),
-    ].join("\u241f");
-  }
-
-  function buildApplicantPromotionAssignmentBaseKey(record = {}) {
-    return [String(record.track || "").trim(), String(record.admission || "").trim()].join("\u241f");
-  }
-
-  function buildApplicantPromotionAssignmentKey(record = {}) {
-    return [
-      String(record.track || "").trim(),
-      String(record.admission || "").trim(),
-      String(record.series || "").trim(),
-      String(record.unit || "").trim(),
-      String(record.major || "").trim(),
-    ].join("\u241f");
-  }
-
-  function doesApplicantAssignmentRowMatchPromotableRecord(assignmentRow = {}, promotableRecord = {}) {
-    const assignmentTrack = String(assignmentRow?.track || "").trim();
-    const assignmentAdmission = String(assignmentRow?.admission || "").trim();
-    const assignmentSeries = String(assignmentRow?.series || "").trim();
-    const assignmentUnit = String(assignmentRow?.unit || "").trim();
-    const assignmentMajor = String(assignmentRow?.major || "").trim();
-    const promotableTrack = String(promotableRecord?.track || "").trim();
-    const promotableAdmission = String(promotableRecord?.admission || "").trim();
-    const promotableSeries = String(promotableRecord?.series || "").trim();
-    const promotableUnit = String(promotableRecord?.unit || "").trim();
-    const promotableMajor = String(promotableRecord?.major || "").trim();
-
-    if (assignmentTrack && compareApplicantPromotionText(assignmentTrack, promotableTrack) !== 0) {
-      return false;
-    }
-
-    if (assignmentAdmission && compareApplicantPromotionText(assignmentAdmission, promotableAdmission) !== 0) {
-      return false;
-    }
-
-    if (assignmentSeries && compareApplicantPromotionText(assignmentSeries, promotableSeries) !== 0) {
-      return false;
-    }
-
-    if (assignmentUnit && compareApplicantPromotionText(assignmentUnit, promotableUnit) !== 0) {
-      return false;
-    }
-
-    if (assignmentMajor && compareApplicantPromotionText(assignmentMajor, promotableMajor) !== 0) {
-      return false;
-    }
-
-    return true;
-  }
-
-  function buildApplicantPromotionRoomKey(record = {}) {
-    return [
-      String(record.date || "").trim(),
-      String(record.time || "").trim(),
-      String(record.buildingCode || "").trim(),
-      String(record.roomCode || "").trim(),
-    ].join("\u241f");
-  }
-
-  function normalizeApplicantPromotionSortField(value, options = {}) {
-    const normalizedValue = String(value || "").trim();
-
-    if (!normalizedValue) {
-      return options.allowEmpty === true ? "" : String(options.defaultValue || "").trim();
-    }
-
-    if (APPLICANT_PROMOTION_SORT_FIELD_KEYS.includes(normalizedValue)) {
-      return normalizedValue;
-    }
-
-    throw createHttpError(400, "고사실 배정 정렬 기준이 올바르지 않습니다.", "APPLICANT_PROMOTION_SORT_FIELD_INVALID");
-  }
-
-  function normalizeApplicantPromotionBreakField(value) {
-    const normalizedValue = String(value || "").trim();
-
-    if (!normalizedValue) {
-      return DEFAULT_APPLICANT_PROMOTION_BREAK_FIELD;
-    }
-
-    if (APPLICANT_PROMOTION_BREAK_FIELD_KEYS.includes(normalizedValue)) {
-      return normalizedValue;
-    }
-
-    throw createHttpError(400, "고사실 배정 구분 기준이 올바르지 않습니다.", "APPLICANT_PROMOTION_BREAK_FIELD_INVALID");
-  }
-
-  function normalizeApplicantPromotionOverbookingPercent(value, options = {}) {
-    const normalizedStringValue = String(value ?? "").trim();
-    const defaultValue = Number.isFinite(Number(options.defaultValue)) ? Number(options.defaultValue) : 10;
-
-    if (!normalizedStringValue) {
-      return defaultValue;
-    }
-
-    if (!/^\d+$/.test(normalizedStringValue)) {
-      throw createHttpError(400, "오버부킹 비율은 1~100 사이의 정수여야 합니다.", "APPLICANT_PROMOTION_OVERBOOKING_PERCENT_INVALID");
-    }
-
-    const normalizedValue = Number(normalizedStringValue);
-
-    if (!Number.isInteger(normalizedValue) || normalizedValue < 1 || normalizedValue > 100) {
-      throw createHttpError(400, "오버부킹 비율은 1~100 사이의 정수여야 합니다.", "APPLICANT_PROMOTION_OVERBOOKING_PERCENT_INVALID");
-    }
-
-    return normalizedValue;
-  }
-
-  function normalizeApplicantPromotionOptions(payload = {}) {
-    const hasSortField1 = Object.prototype.hasOwnProperty.call(payload || {}, "sortField1");
-    const hasSortField2 = Object.prototype.hasOwnProperty.call(payload || {}, "sortField2");
-    const hasSortField3 = Object.prototype.hasOwnProperty.call(payload || {}, "sortField3");
-    const hasBreakField = Object.prototype.hasOwnProperty.call(payload || {}, "breakField");
-    const hasOverbookingPercent = Object.prototype.hasOwnProperty.call(payload || {}, "overbookingPercent");
-
-    return {
-      allowMissingPhoto: payload.allowMissingPhoto === true,
-      allowOverbooking: payload.allowOverbooking === true,
-      overbookingPercent: hasOverbookingPercent ? normalizeApplicantPromotionOverbookingPercent(payload.overbookingPercent) : 10,
-      sortFields: [
-        hasSortField1
-          ? normalizeApplicantPromotionSortField(payload.sortField1, {
-              defaultValue: DEFAULT_APPLICANT_PROMOTION_SORT_FIELDS[0],
-            })
-          : DEFAULT_APPLICANT_PROMOTION_SORT_FIELDS[0],
-        hasSortField2
-          ? normalizeApplicantPromotionSortField(payload.sortField2, {
-              allowEmpty: true,
-            })
-          : DEFAULT_APPLICANT_PROMOTION_SORT_FIELDS[1],
-        hasSortField3
-          ? normalizeApplicantPromotionSortField(payload.sortField3, {
-              allowEmpty: true,
-            })
-          : DEFAULT_APPLICANT_PROMOTION_SORT_FIELDS[2],
-      ],
-      breakField: hasBreakField ? normalizeApplicantPromotionBreakField(payload.breakField) : DEFAULT_APPLICANT_PROMOTION_BREAK_FIELD,
-    };
-  }
-
-  function resolveApplicantPromotionRoomCapacity(assignmentRow = {}, promotionOptions = {}) {
-    const baseCapacity = Number(assignmentRow?.assignedCount || 0);
-
-    if (!Number.isInteger(baseCapacity) || baseCapacity <= 0) {
-      return 0;
-    }
-
-    if (promotionOptions.allowOverbooking !== true) {
-      return baseCapacity;
-    }
-
-    const overbookingPercent = Number(promotionOptions.overbookingPercent || 0);
-
-    if (!Number.isFinite(overbookingPercent) || overbookingPercent <= 0) {
-      return baseCapacity;
-    }
-
-    return Math.max(baseCapacity, Math.round(baseCapacity * (1 + overbookingPercent / 100)));
-  }
-
-  function getApplicantPromotionSortValue(entryOrRecord = {}, fieldKey = "") {
-    const normalizedFieldKey = String(fieldKey || "").trim();
-
-    if (normalizedFieldKey === "examineeNo") {
-      return String(
-        entryOrRecord?.examineeNo ||
-          entryOrRecord?.preparedRecord?.examineeNo ||
-          entryOrRecord?.basePromotableRecord?.examineeNo ||
-          "",
-      ).trim();
-    }
-
-    const sourceRecord =
-      entryOrRecord?.basePromotableRecord && typeof entryOrRecord.basePromotableRecord === "object"
-        ? entryOrRecord.basePromotableRecord
-        : entryOrRecord;
-
-    return String(sourceRecord?.[normalizedFieldKey] || "").trim();
-  }
-
-  function buildApplicantPromotionCodeOverrides(recruitmentUnit = null) {
-    if (!recruitmentUnit) {
-      return {};
-    }
-
-    return normalizeApplicantPromotionOverride({
-      admissionCode: recruitmentUnit.admissionCode,
-      seriesCode: recruitmentUnit.seriesCode,
-      unitCode: recruitmentUnit.unitCode,
-      majorCode: recruitmentUnit.majorCode,
-    });
-  }
-
-  function buildApplicantPromotionRoomOverrides(assignmentRow = {}) {
-    return normalizeApplicantPromotionOverride({
-      date: assignmentRow.date,
-      time: assignmentRow.time,
-      building: assignmentRow.building,
-      buildingCode: assignmentRow.buildingCode,
-      room: assignmentRow.room,
-      roomCode: assignmentRow.roomCode,
-    });
   }
 
   function getApplicantSubmissionHasPhoto(submission = {}) {
@@ -1015,230 +550,6 @@ function createApplicantService({
     }
 
     return normalizedIds;
-  }
-
-  function normalizeApplicantAssignmentText(value, fieldLabel, rowNumber, options = {}) {
-    const normalizedValue = String(value ?? "").trim();
-
-    if (normalizedValue) {
-      return normalizedValue;
-    }
-
-    if (options.required === false) {
-      return "";
-    }
-
-    const suffix = Number.isInteger(rowNumber) && rowNumber > 0 ? ` (${rowNumber}행)` : "";
-    throw createHttpError(400, `${fieldLabel} 값을 입력하세요.${suffix}`, "APPLICANT_ASSIGNMENT_VALUE_REQUIRED");
-  }
-
-  function normalizeApplicantAssignmentDate(value, rowNumber) {
-    const normalizedValue = normalizeApplicantAssignmentText(value, "날짜", rowNumber);
-
-    if (!APPLICANT_DATE_PATTERN.test(normalizedValue)) {
-      const suffix = Number.isInteger(rowNumber) && rowNumber > 0 ? ` (${rowNumber}행)` : "";
-      throw createHttpError(400, `날짜 형식은 YYYY-MM-DD여야 합니다.${suffix}`, "APPLICANT_ASSIGNMENT_DATE_INVALID");
-    }
-
-    return normalizedValue;
-  }
-
-  function normalizeApplicantAssignmentTime(value, rowNumber) {
-    const normalizedValue = normalizeApplicantAssignmentText(value, "시간", rowNumber);
-
-    if (!APPLICANT_TIME_PATTERN.test(normalizedValue)) {
-      const suffix = Number.isInteger(rowNumber) && rowNumber > 0 ? ` (${rowNumber}행)` : "";
-      throw createHttpError(400, `시간 형식은 HH:MM이어야 합니다.${suffix}`, "APPLICANT_ASSIGNMENT_TIME_INVALID");
-    }
-
-    return normalizedValue;
-  }
-
-  function normalizeApplicantAssignmentCount(value, rowNumber) {
-    const normalizedValue = Math.round(Number(value));
-
-    if (Number.isInteger(normalizedValue) && normalizedValue > 0) {
-      return normalizedValue;
-    }
-
-    const suffix = Number.isInteger(rowNumber) && rowNumber > 0 ? ` (${rowNumber}행)` : "";
-    throw createHttpError(400, `배정인원은 1 이상의 정수여야 합니다.${suffix}`, "APPLICANT_ASSIGNMENT_COUNT_INVALID");
-  }
-
-  function normalizeApplicantAssignmentPayload(payload = {}, rowNumber = 0) {
-    return {
-      id: Number(payload?.id || 0),
-      rowNumber: Number.isInteger(Number(payload?.rowNumber || rowNumber)) ? Number(payload?.rowNumber || rowNumber) : 0,
-      track: normalizeApplicantAssignmentText(payload?.track, "모집시기", rowNumber, { required: false }),
-      admission: normalizeApplicantAssignmentText(payload?.admission, "전형", rowNumber),
-      series: normalizeApplicantAssignmentText(payload?.series, "계열", rowNumber, { required: false }),
-      unit: normalizeApplicantAssignmentText(payload?.unit, "모집단위", rowNumber, { required: false }),
-      major: normalizeApplicantAssignmentText(payload?.major, "전공", rowNumber, { required: false }),
-      date: normalizeApplicantAssignmentDate(payload?.date, rowNumber),
-      time: normalizeApplicantAssignmentTime(payload?.time, rowNumber),
-      buildingCode: normalizeApplicantAssignmentText(payload?.buildingCode, "고사건물코드", rowNumber),
-      building: normalizeApplicantAssignmentText(payload?.building, "고사건물", rowNumber),
-      roomCode: normalizeApplicantAssignmentText(payload?.roomCode, "고사실코드", rowNumber),
-      room: normalizeApplicantAssignmentText(payload?.room, "고사실", rowNumber),
-      assignedCount: normalizeApplicantAssignmentCount(payload?.assignedCount, rowNumber),
-    };
-  }
-
-  function stripApplicantAssignmentMeta(row = {}) {
-    return {
-      id: Number(row?.id || 0),
-      track: String(row?.track || "").trim(),
-      admission: String(row?.admission || "").trim(),
-      series: String(row?.series || "").trim(),
-      unit: String(row?.unit || "").trim(),
-      major: String(row?.major || "").trim(),
-      date: String(row?.date || "").trim(),
-      time: String(row?.time || "").trim(),
-      buildingCode: String(row?.buildingCode || "").trim(),
-      building: String(row?.building || "").trim(),
-      roomCode: String(row?.roomCode || "").trim(),
-      room: String(row?.room || "").trim(),
-      assignedCount: Number(row?.assignedCount || 0),
-    };
-  }
-
-  function areApplicantAssignmentRowsEqual(leftRow = {}, rightRow = {}) {
-    return APPLICANT_ASSIGNMENT_IMPORT_COMPARE_FIELDS.every((fieldKey) => {
-      return String(leftRow?.[fieldKey] || "").trim() === String(rightRow?.[fieldKey] || "").trim();
-    });
-  }
-
-  function classifyApplicantAssignmentImportRows(normalizedRows = [], currentAssignments = []) {
-    const currentAssignmentMap = new Map(
-      (Array.isArray(currentAssignments) ? currentAssignments : []).map((row) => {
-        const normalizedRow = stripApplicantAssignmentMeta(row);
-        return [buildApplicantPromotionRoomKey(normalizedRow), normalizedRow];
-      }),
-    );
-
-    return (Array.isArray(normalizedRows) ? normalizedRows : []).map((row, index) => {
-      const normalizedRow = stripApplicantAssignmentMeta(row);
-      const assignmentKey = buildApplicantPromotionRoomKey(normalizedRow);
-      const existingRow = currentAssignmentMap.get(assignmentKey) || null;
-      const operation = existingRow ? (areApplicantAssignmentRowsEqual(normalizedRow, existingRow) ? "unchanged" : "update") : "insert";
-
-      return {
-        row: normalizedRow,
-        rowNumber: Number(row?.rowNumber || index + 2),
-        operation,
-      };
-    });
-  }
-
-  function buildApplicantAssignmentRowLabel(row = {}, index = 0) {
-    const rowNumber = Number(row?.rowNumber || 0);
-    const rowId = Number(row?.id || 0);
-
-    if (Number.isInteger(rowNumber) && rowNumber > 0) {
-      return `${rowNumber}행`;
-    }
-
-    if (Number.isInteger(rowId) && rowId > 0) {
-      return `배정표 ${rowId}번`;
-    }
-
-    return `${index + 1}행`;
-  }
-
-  function validateApplicantAssignmentRows(rows = [], options = {}) {
-    const normalizedRows = (Array.isArray(rows) ? rows : []).map((row, index) =>
-      normalizeApplicantAssignmentPayload(row, Number(row?.rowNumber || index + 1)),
-    );
-    const buildingPairState = {
-      codeToNameMap: new Map(),
-      nameToCodeMap: new Map(),
-    };
-    const roomPairState = {
-      codeToNameMap: new Map(),
-      nameToCodeMap: new Map(),
-    };
-    const roomKeyMap = new Map();
-
-    normalizedRows.forEach((row, index) => {
-      const rowLabel = buildApplicantAssignmentRowLabel(row, index);
-      const roomKey = buildApplicantPromotionRoomKey(row);
-      const hasSeries = String(row.series || "").trim() !== "";
-      const hasUnit = String(row.unit || "").trim() !== "";
-      const hasMajor = String(row.major || "").trim() !== "";
-
-      if (roomKeyMap.has(roomKey)) {
-        throw createHttpError(
-          400,
-          `${rowLabel}의 날짜/시간/고사건물코드/고사실코드 조합이 ${roomKeyMap.get(roomKey)}과 중복됩니다.`,
-          "APPLICANT_ASSIGNMENT_ROOM_DUPLICATED",
-        );
-      }
-
-      if (hasUnit && !hasSeries) {
-        throw createHttpError(
-          400,
-          `${rowLabel}에서 모집단위를 입력한 경우 계열도 함께 입력해야 합니다.`,
-          "APPLICANT_ASSIGNMENT_SERIES_REQUIRED_FOR_UNIT",
-        );
-      }
-
-      if (hasMajor && (!hasSeries || !hasUnit)) {
-        throw createHttpError(
-          400,
-          `${rowLabel}에서 전공을 입력한 경우 계열과 모집단위를 함께 입력해야 합니다.`,
-          "APPLICANT_ASSIGNMENT_SERIES_UNIT_REQUIRED_FOR_MAJOR",
-        );
-      }
-
-      ensureApplicantPromotionPairConsistency(buildingPairState, row.buildingCode, row.building, rowLabel, "고사건물");
-      ensureApplicantPromotionPairConsistency(roomPairState, row.roomCode, row.room, rowLabel, "고사실");
-      roomKeyMap.set(roomKey, rowLabel);
-    });
-
-    if (options.requireRows !== false && normalizedRows.length === 0) {
-      throw createHttpError(400, "배정표에는 최소 1개 이상의 데이터 행이 필요합니다.", "APPLICANT_ASSIGNMENT_ROW_REQUIRED");
-    }
-
-    return normalizedRows;
-  }
-
-  async function buildApplicantAssignmentWorkbookBuffer(rows = []) {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("배정표", {
-      views: [{ state: "frozen", ySplit: 1 }],
-    });
-    const normalizedRows = (Array.isArray(rows) ? rows : []).map((row) => stripApplicantAssignmentMeta(row));
-
-    worksheet.columns = APPLICANT_ASSIGNMENT_COLUMNS.map((column) => ({
-      header: column.header,
-      key: column.key,
-      width: column.width,
-      style: { numFmt: "@" },
-    }));
-
-    applyWorkbookHeaderStyle(worksheet);
-    worksheet.addRows(normalizedRows);
-
-    for (let rowIndex = 1; rowIndex <= worksheet.rowCount; rowIndex += 1) {
-      for (let columnIndex = 1; columnIndex <= worksheet.columnCount; columnIndex += 1) {
-        worksheet.getRow(rowIndex).getCell(columnIndex).numFmt = "@";
-      }
-    }
-
-    return workbook.xlsx.writeBuffer();
-  }
-
-  async function buildApplicantAssignmentTemplateBuffer() {
-    return buildApplicantAssignmentWorkbookBuffer([]);
-  }
-
-  function applyWorkbookHeaderStyle(worksheet) {
-    worksheet.getRow(1).font = { bold: true };
-    worksheet.getRow(1).fill = {
-      type: "pattern",
-      pattern: "solid",
-      fgColor: { argb: "FFF4F7FB" },
-    };
   }
 
   function normalizeApplicantRecruitmentUnitRecord(row = {}) {
@@ -1378,80 +689,9 @@ function createApplicantService({
     };
   }
 
-  function normalizeApplicantImportExistingDataPolicy(value) {
-    const normalizedValue = String(value || "").trim().toLowerCase();
-
-    if (Object.values(APPLICANT_IMPORT_EXISTING_DATA_POLICIES).includes(normalizedValue)) {
-      return normalizedValue;
-    }
-
-    return APPLICANT_IMPORT_EXISTING_DATA_POLICIES.INSERT_UPDATE;
-  }
-
-  function shouldProcessApplicantImportOperation(operation = "", existingDataPolicy = "") {
-    const normalizedPolicy = normalizeApplicantImportExistingDataPolicy(existingDataPolicy);
-    const normalizedOperation = String(operation || "").trim();
-
-    if (normalizedPolicy === APPLICANT_IMPORT_EXISTING_DATA_POLICIES.ALL) {
-      return true;
-    }
-
-    if (normalizedPolicy === APPLICANT_IMPORT_EXISTING_DATA_POLICIES.INSERT_ONLY) {
-      return normalizedOperation === "insert";
-    }
-
-    return normalizedOperation === "insert" || normalizedOperation === "update";
-  }
-
-  function buildApplicantRecruitmentUnitImportKey(row = {}) {
-    return [
-      String(row?.trackName || "").trim(),
-      String(row?.admissionCode || "").trim(),
-      String(row?.seriesCode || "").trim(),
-      String(row?.unitCode || "").trim(),
-      String(row?.majorCode || "").trim(),
-    ].join("\u241f");
-  }
-
-  function areApplicantRecruitmentUnitRowsEqual(leftRow = {}, rightRow = {}) {
-    return APPLICANT_RECRUITMENT_IMPORT_COMPARE_FIELDS.every((fieldKey) => {
-      return String(leftRow?.[fieldKey] || "").trim() === String(rightRow?.[fieldKey] || "").trim();
-    });
-  }
-
-  function classifyApplicantRecruitmentUnitImportRows(normalizedRows = [], currentUnits = []) {
-    const workingUnitMap = new Map(
-      (Array.isArray(currentUnits) ? currentUnits : []).map((row) => {
-        const normalizedRow = normalizeApplicantRecruitmentUnitPayload(row);
-        return [buildApplicantRecruitmentUnitImportKey(normalizedRow), normalizedRow];
-      }),
-    );
-
-    return (Array.isArray(normalizedRows) ? normalizedRows : []).map((row, index) => {
-      const unitKey = buildApplicantRecruitmentUnitImportKey(row);
-      const existingRow = workingUnitMap.get(unitKey) || null;
-      const operation = existingRow ? (areApplicantRecruitmentUnitRowsEqual(row, existingRow) ? "unchanged" : "update") : "insert";
-
-      workingUnitMap.set(unitKey, row);
-
-      return {
-        row,
-        rowNumber: Number(row?.rowNumber || index + 2),
-        operation,
-      };
-    });
-  }
-
-  function getApplicantRecruitmentImportRowLabel(row = {}, fallbackIndex = 0) {
-    const normalizedRowNumber = Math.round(Number(row.rowNumber || row._rowNumber || 0));
-
-    if (Number.isInteger(normalizedRowNumber) && normalizedRowNumber > 0) {
-      return `업로드 ${normalizedRowNumber}행`;
-    }
-
-    const normalizedFallbackIndex = Math.round(Number(fallbackIndex));
-    return `업로드 ${Number.isInteger(normalizedFallbackIndex) && normalizedFallbackIndex >= 0 ? normalizedFallbackIndex + 1 : "?"}행`;
-  }
+  const { classifyApplicantRecruitmentUnitImportRows } = createApplicantImportHelpers({
+    normalizeApplicantRecruitmentUnitPayload,
+  });
 
   function normalizeApplicantRecruitmentImportCodeValue(value) {
     return String(value ?? "").trim().toUpperCase();
@@ -1535,73 +775,12 @@ function createApplicantService({
   }
 
   async function buildApplicantRecruitmentUnitTemplateBuffer() {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("전형관리", {
-      views: [{ state: "frozen", ySplit: 1 }],
-    });
-
-    worksheet.columns = APPLICANT_UNIT_TEMPLATE_COLUMNS.map((column) => ({
-      header: column.header,
-      key: column.key,
-      width: column.width,
-      style: { numFmt: "@" },
-    }));
-
-    applyWorkbookHeaderStyle(worksheet);
-    worksheet.addRow(
-      APPLICANT_UNIT_TEMPLATE_COLUMNS.reduce((row, column) => {
-        row[column.key] = column.sample;
-        return row;
-      }, {}),
-    );
-
-    for (let rowIndex = 1; rowIndex <= worksheet.rowCount; rowIndex += 1) {
-      for (let columnIndex = 1; columnIndex <= APPLICANT_UNIT_TEMPLATE_COLUMNS.length; columnIndex += 1) {
-        worksheet.getRow(rowIndex).getCell(columnIndex).numFmt = "@";
-      }
-    }
-
-    return workbook.xlsx.writeBuffer();
+    return applicantWorkbookService.buildApplicantRecruitmentUnitTemplateWorkbookBuffer();
   }
 
   async function buildApplicantRecruitmentUnitExportBuffer(rows = []) {
-    const normalizedRows = (Array.isArray(rows) ? rows : [])
-      .map((row) => normalizeApplicantRecruitmentUnitRecord(row))
-      .filter((row) => APPLICANT_UNIT_TEMPLATE_COLUMNS.some((column) => String(row?.[column.key] || "").trim() !== ""));
-
-    if (normalizedRows.length === 0) {
-      throw createHttpError(400, "다운로드할 전형 관리 데이터가 없습니다.");
-    }
-
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("전형관리", {
-      views: [{ state: "frozen", ySplit: 1 }],
-    });
-
-    worksheet.columns = APPLICANT_UNIT_TEMPLATE_COLUMNS.map((column) => ({
-      header: column.header,
-      key: column.key,
-      width: column.width,
-      style: { numFmt: "@" },
-    }));
-
-    applyWorkbookHeaderStyle(worksheet);
-    worksheet.addRows(
-      normalizedRows.map((row) =>
-        APPLICANT_UNIT_TEMPLATE_COLUMNS.reduce((record, column) => {
-          record[column.key] = String(row?.[column.key] || "").trim();
-          return record;
-        }, {}),
-      ),
-    );
-
-    for (let rowIndex = 1; rowIndex <= worksheet.rowCount; rowIndex += 1) {
-      for (let columnIndex = 1; columnIndex <= APPLICANT_UNIT_TEMPLATE_COLUMNS.length; columnIndex += 1) {
-        worksheet.getRow(rowIndex).getCell(columnIndex).numFmt = "@";
-      }
-    }
-
-    return workbook.xlsx.writeBuffer();
+    const normalizedRows = (Array.isArray(rows) ? rows : []).map((row) => normalizeApplicantRecruitmentUnitRecord(row));
+    return applicantWorkbookService.buildApplicantRecruitmentUnitExportWorkbookBuffer(normalizedRows);
   }
 
   async function buildApplicantSubmissionExportBuffer(rows = []) {
@@ -1644,65 +823,7 @@ function createApplicantService({
       throw createHttpError(400, "다운로드할 접수 이력 데이터가 없습니다.");
     }
 
-    const maxAnswerCount = exportableRows.reduce(
-      (maximum, row) => Math.max(maximum, Array.isArray(row.answerValues) ? row.answerValues.length : 0),
-      0,
-    );
-    const fixedColumns = [
-      { header: "접수번호", key: "id", width: 14 },
-      { header: "이름", key: "name", width: 20 },
-      { header: "이메일", key: "email", width: 28 },
-      { header: "상태", key: "statusLabel", width: 12 },
-      { header: "수험번호", key: "promotedExamineeNo", width: 18 },
-      { header: "접수일시", key: "createdAt", width: 22 },
-      { header: "최종수정", key: "updatedAt", width: 22 },
-    ];
-    const answerColumns = Array.from({ length: maxAnswerCount }, (_, index) => ({
-      header: `질문${index + 1}`,
-      key: `answer${index + 1}`,
-      width: 24,
-    }));
-    const worksheetColumns = [...fixedColumns, ...answerColumns];
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("접수이력", {
-      views: [{ state: "frozen", ySplit: 1 }],
-    });
-
-    worksheet.columns = worksheetColumns.map((column) => ({
-      header: column.header,
-      key: column.key,
-      width: column.width,
-      style: { numFmt: "@" },
-    }));
-
-    applyWorkbookHeaderStyle(worksheet);
-    worksheet.addRows(
-      exportableRows.map((row) => {
-        const record = {
-          id: row.id,
-          name: row.name,
-          email: row.email,
-          statusLabel: row.statusLabel,
-          promotedExamineeNo: row.promotedExamineeNo,
-          createdAt: row.createdAt,
-          updatedAt: row.updatedAt,
-        };
-
-        answerColumns.forEach((column, index) => {
-          record[column.key] = String(row.answerValues[index] || "").trim();
-        });
-
-        return record;
-      }),
-    );
-
-    for (let rowIndex = 1; rowIndex <= worksheet.rowCount; rowIndex += 1) {
-      for (let columnIndex = 1; columnIndex <= worksheetColumns.length; columnIndex += 1) {
-        worksheet.getRow(rowIndex).getCell(columnIndex).numFmt = "@";
-      }
-    }
-
-    return workbook.xlsx.writeBuffer();
+    return applicantWorkbookService.buildApplicantSubmissionExportWorkbookBuffer(exportableRows);
   }
 
   async function buildApplicantSubmissionPhotoArchiveBuffer(rows = []) {
@@ -1762,440 +883,8 @@ function createApplicantService({
     return zip.toBuffer();
   }
 
-  function ensureApplicantPromotionPairConsistency(state = {}, codeValue = "", nameValue = "", rowLabel = "", pairLabel = "") {
-    const normalizedCodeValue = String(codeValue || "").trim();
-    const normalizedNameValue = String(nameValue || "").trim();
-
-    if (!normalizedCodeValue || !normalizedNameValue) {
-      return;
-    }
-
-    const existingNameValue = state.codeToNameMap.get(normalizedCodeValue);
-    const existingCodeValue = state.nameToCodeMap.get(normalizedNameValue);
-
-    if (existingNameValue && existingNameValue !== normalizedNameValue) {
-      throw createHttpError(
-        400,
-        `${rowLabel}의 ${pairLabel} 코드 '${normalizedCodeValue}'는 '${existingNameValue}'로 이미 사용 중입니다.`,
-        "APPLICANT_ASSIGNMENT_CODE_NAME_MISMATCH",
-      );
-    }
-
-    if (existingCodeValue && existingCodeValue !== normalizedCodeValue) {
-      throw createHttpError(
-        400,
-        `${rowLabel}의 ${pairLabel}명 '${normalizedNameValue}'는 코드 '${existingCodeValue}'로 이미 사용 중입니다.`,
-        "APPLICANT_ASSIGNMENT_CODE_NAME_MISMATCH",
-      );
-    }
-
-    state.codeToNameMap.set(normalizedCodeValue, normalizedNameValue);
-    state.nameToCodeMap.set(normalizedNameValue, normalizedCodeValue);
-  }
-
-  async function buildApplicantPromotionAssignmentTemplateBuffer(submissionIds = []) {
-    const normalizedSubmissionIds = normalizeApplicantSubmissionIdList(submissionIds);
-    await assertApplicantPromotionWindowClosed(normalizedSubmissionIds);
-    const submissions = await getApplicantSubmissionsByIds(normalizedSubmissionIds, { includeInternal: true });
-    const submissionIdSet = new Set(submissions.map((submission) => Number(submission?.id || 0)));
-    const missingSubmissionIds = normalizedSubmissionIds.filter((submissionId) => !submissionIdSet.has(submissionId));
-
-    if (missingSubmissionIds.length > 0) {
-      throw createHttpError(404, "선택한 접수 이력 중 일부를 찾을 수 없습니다.", "APPLICANT_PROMOTION_SUBMISSION_NOT_FOUND");
-    }
-
-    if (submissions.some((submission) => String(submission?.status || "").trim() === "promoted")) {
-      throw createHttpError(409, "이미 수험생으로 이관된 접수 이력이 포함되어 있습니다.", "APPLICANT_PROMOTION_ALREADY_PROMOTED");
-    }
-
-    const summaryRowsByGroupKey = new Map();
-
-    submissions.forEach((submission) => {
-      const promotableRecord = buildPromotableApplicantRecord(submission);
-      const groupKey = buildApplicantPromotionGroupKey(promotableRecord);
-      const groupRow = summaryRowsByGroupKey.get(groupKey) || {
-        track: String(promotableRecord.track || "").trim(),
-        admission: String(promotableRecord.admission || "").trim(),
-        series: String(promotableRecord.series || "").trim(),
-        unit: String(promotableRecord.unit || "").trim(),
-        major: String(promotableRecord.major || "").trim(),
-        applicantCount: 0,
-        missingPhotoCount: 0,
-      };
-
-      groupRow.applicantCount += 1;
-
-      if (!getApplicantSubmissionHasPhoto(submission)) {
-        groupRow.missingPhotoCount += 1;
-      }
-
-      summaryRowsByGroupKey.set(groupKey, groupRow);
-    });
-
-    const summaryRows = Array.from(summaryRowsByGroupKey.values()).sort((leftRow, rightRow) => {
-      return (
-        compareApplicantPromotionText(leftRow.track, rightRow.track) ||
-        compareApplicantPromotionText(leftRow.admission, rightRow.admission) ||
-        compareApplicantPromotionText(leftRow.series, rightRow.series) ||
-        compareApplicantPromotionText(leftRow.unit, rightRow.unit) ||
-        compareApplicantPromotionText(leftRow.major, rightRow.major)
-      );
-    });
-    const assignmentRowsByAssignmentKey = new Map();
-
-    summaryRows.forEach((row) => {
-      const assignmentKey = buildApplicantPromotionAssignmentKey(row);
-      const assignmentRow = assignmentRowsByAssignmentKey.get(assignmentKey) || {
-        track: String(row.track || "").trim(),
-        admission: String(row.admission || "").trim(),
-        series: String(row.series || "").trim(),
-        unit: String(row.unit || "").trim(),
-        major: String(row.major || "").trim(),
-        date: "",
-        time: "",
-        buildingCode: "",
-        building: "",
-        roomCode: "",
-        room: "",
-        assignedCount: 0,
-      };
-
-      assignmentRow.assignedCount += Number(row.applicantCount || 0);
-      assignmentRowsByAssignmentKey.set(assignmentKey, assignmentRow);
-    });
-
-    const assignmentRows = Array.from(assignmentRowsByAssignmentKey.values()).sort((leftRow, rightRow) => {
-      return (
-        compareApplicantPromotionText(leftRow.track, rightRow.track) ||
-        compareApplicantPromotionText(leftRow.admission, rightRow.admission) ||
-        compareApplicantPromotionText(leftRow.series, rightRow.series) ||
-        compareApplicantPromotionText(leftRow.unit, rightRow.unit) ||
-        compareApplicantPromotionText(leftRow.major, rightRow.major)
-      );
-    });
-    const workbook = new ExcelJS.Workbook();
-    const summaryWorksheet = workbook.addWorksheet("대상자요약", {
-      views: [{ state: "frozen", ySplit: 1 }],
-    });
-    const assignmentWorksheet = workbook.addWorksheet("배정표", {
-      views: [{ state: "frozen", ySplit: 1 }],
-    });
-
-    summaryWorksheet.columns = APPLICANT_ASSIGNMENT_SUMMARY_COLUMNS.map((column) => ({
-      header: column.header,
-      key: column.key,
-      width: column.width,
-      style: { numFmt: "@" },
-    }));
-    assignmentWorksheet.columns = APPLICANT_ASSIGNMENT_COLUMNS.map((column) => ({
-      header: column.header,
-      key: column.key,
-      width: column.width,
-      style: { numFmt: "@" },
-    }));
-
-    applyWorkbookHeaderStyle(summaryWorksheet);
-    applyWorkbookHeaderStyle(assignmentWorksheet);
-    summaryWorksheet.addRows(summaryRows);
-    assignmentWorksheet.addRows(assignmentRows);
-
-    for (const worksheet of [summaryWorksheet, assignmentWorksheet]) {
-      for (let rowIndex = 1; rowIndex <= worksheet.rowCount; rowIndex += 1) {
-        for (let columnIndex = 1; columnIndex <= worksheet.columnCount; columnIndex += 1) {
-          worksheet.getRow(rowIndex).getCell(columnIndex).numFmt = "@";
-        }
-      }
-    }
-
-    return workbook.xlsx.writeBuffer();
-  }
-
-  async function parseApplicantPromotionAssignmentWorkbook(fileContentBase64) {
-    if (!fileContentBase64) {
-      throw createHttpError(400, "배정표 XLSX 파일 데이터가 없습니다.", "APPLICANT_ASSIGNMENT_WORKBOOK_REQUIRED");
-    }
-
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(Buffer.from(fileContentBase64, "base64"));
-
-    const worksheet =
-      workbook.getWorksheet("배정표") ||
-      workbook.worksheets.find((candidateWorksheet) => String(candidateWorksheet?.name || "").trim() === "배정표") ||
-      workbook.worksheets[1] ||
-      workbook.worksheets[0];
-
-    if (!worksheet) {
-      throw createHttpError(400, "배정표 시트를 찾을 수 없습니다.", "APPLICANT_ASSIGNMENT_SHEET_NOT_FOUND");
-    }
-
-    const headerRow = worksheet.getRow(1);
-    const columnIndexes = APPLICANT_ASSIGNMENT_COLUMNS.reduce((indexes, column) => {
-      const matchedColumnIndex =
-        headerRow.actualCellCount === 0
-          ? -1
-          : Array.from({ length: Math.max(worksheet.columnCount, APPLICANT_ASSIGNMENT_COLUMNS.length) }, (_, offset) => offset + 1).find(
-              (columnIndex) => getExcelCellText(headerRow.getCell(columnIndex)) === column.header,
-            ) ?? -1;
-
-      if (matchedColumnIndex === -1) {
-        throw createHttpError(400, `배정표 헤더에 '${column.header}' 컬럼이 없습니다.`, "APPLICANT_ASSIGNMENT_HEADER_INVALID");
-      }
-
-      indexes[column.key] = matchedColumnIndex;
-      return indexes;
-    }, {});
-
-    const assignmentRows = [];
-
-    for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber += 1) {
-      const row = worksheet.getRow(rowNumber);
-      const rawRow = {};
-      let hasAnyValue = false;
-
-      APPLICANT_ASSIGNMENT_COLUMNS.forEach((column) => {
-        const value = getExcelCellText(row.getCell(columnIndexes[column.key]));
-        rawRow[column.key] = value;
-        hasAnyValue = hasAnyValue || value !== "";
-      });
-
-      if (!hasAnyValue) {
-        continue;
-      }
-
-      assignmentRows.push({
-        ...rawRow,
-        rowNumber,
-      });
-    }
-
-    return validateApplicantAssignmentRows(assignmentRows);
-  }
-
-  async function previewApplicantAssignmentsImport(payload = {}) {
-    const sourceRows =
-      Array.isArray(payload.rows) && payload.rows.length > 0
-        ? payload.rows
-        : payload.fileContentBase64
-          ? await parseApplicantPromotionAssignmentWorkbook(payload.fileContentBase64)
-          : [];
-    const normalizedRows = validateApplicantAssignmentRows(sourceRows);
-    const currentAssignments = await getApplicantAssignments();
-    const classifiedRows = classifyApplicantAssignmentImportRows(normalizedRows, currentAssignments);
-    const previewRows = [];
-    let insertCount = 0;
-    let updateCount = 0;
-    let unchangedCount = 0;
-
-    classifiedRows.forEach(({ row, rowNumber, operation }) => {
-      if (operation === "insert") {
-        insertCount += 1;
-      } else if (operation === "update") {
-        updateCount += 1;
-      } else {
-        unchangedCount += 1;
-      }
-
-      if (previewRows.length < APPLICANT_IMPORT_PREVIEW_ROW_LIMIT) {
-        previewRows.push({
-          rowNumber,
-          operation,
-          track: row.track,
-          admission: row.admission,
-          series: row.series,
-          unit: row.unit,
-          major: row.major,
-          date: row.date,
-          time: row.time,
-          buildingCode: row.buildingCode,
-          building: row.building,
-          roomCode: row.roomCode,
-          room: row.room,
-          assignedCount: row.assignedCount,
-        });
-      }
-    });
-
-    return {
-      fileName: String(payload.fileName || "").trim(),
-      currentTotalCount: currentAssignments.length,
-      resultTotalCount: currentAssignments.length + insertCount,
-      totalRows: normalizedRows.length,
-      insertCount,
-      updateCount,
-      unchangedCount,
-      previewRows,
-    };
-  }
-
-  function normalizeApplicantPromotionPreviewRows(rows = []) {
-    return (Array.isArray(rows) ? rows : []).map((row) => {
-      const hasPhoto = row?.hasPhoto === true || Number(row?.hasPhoto) === 1;
-      const errors = Array.isArray(row?.errors)
-        ? row.errors.map((errorMessage) => String(errorMessage || "").trim()).filter(Boolean)
-        : String(row?.errorMessage || "")
-            .split(/\r?\n|;\s*/)
-            .map((errorMessage) => String(errorMessage || "").trim())
-            .filter(Boolean);
-      const status = errors.length > 0 ? "error" : hasPhoto ? "ready" : "warning";
-
-      return {
-        submissionId: Number(row?.submissionId || 0),
-        examineeNo: String(row?.examineeNo || "").trim(),
-        name: String(row?.name || "").trim(),
-        birth: String(row?.birth || "").trim(),
-        track: String(row?.track || "").trim(),
-        admission: String(row?.admission || "").trim(),
-        series: String(row?.series || "").trim(),
-        unit: String(row?.unit || "").trim(),
-        major: String(row?.major || "").trim(),
-        date: String(row?.date || "").trim(),
-        time: String(row?.time || "").trim(),
-        buildingCode: String(row?.buildingCode || "").trim(),
-        building: String(row?.building || "").trim(),
-        roomCode: String(row?.roomCode || "").trim(),
-        room: String(row?.room || "").trim(),
-        hasPhoto,
-        photoStatusLabel: hasPhoto ? "등록" : "미등록",
-        status,
-        statusLabel: status === "error" ? "오류" : status === "warning" ? "사진 확인" : "준비 완료",
-        errors,
-        errorMessage: errors.join("; "),
-      };
-    });
-  }
-
-  async function buildApplicantPromotionPreviewExportBuffer(rows = [], summary = {}) {
-    const normalizedRows = normalizeApplicantPromotionPreviewRows(rows);
-
-    if (normalizedRows.length === 0) {
-      throw createHttpError(400, "내려받을 프리뷰 결과가 없습니다.", "APPLICANT_PROMOTION_PREVIEW_EMPTY");
-    }
-
-    const readyRows = normalizedRows.filter((row) => row.status !== "error");
-    const errorRows = normalizedRows.filter((row) => row.status === "error");
-    const workbook = new ExcelJS.Workbook();
-    const resultWorksheet = workbook.addWorksheet("배정결과", {
-      views: [{ state: "frozen", ySplit: 1 }],
-    });
-    const summaryWorksheet = workbook.addWorksheet("요약", {
-      views: [{ state: "frozen", ySplit: 1 }],
-    });
-
-    resultWorksheet.columns = APPLICANT_PROMOTION_PREVIEW_COLUMNS.map((column) => ({
-      header: column.header,
-      key: column.key,
-      width: column.width,
-      style: { numFmt: "@" },
-    }));
-    summaryWorksheet.columns = [
-      { header: "항목", key: "label", width: 22, style: { numFmt: "@" } },
-      { header: "값", key: "value", width: 18, style: { numFmt: "@" } },
-    ];
-
-    applyWorkbookHeaderStyle(resultWorksheet);
-    applyWorkbookHeaderStyle(summaryWorksheet);
-    resultWorksheet.addRows(readyRows.map((row) => ({
-      ...row,
-      errorMessage: row.errorMessage,
-    })));
-    summaryWorksheet.addRows([
-      { label: "전체건수", value: String(summary?.totalCount ?? normalizedRows.length) },
-      { label: "정상건수", value: String(summary?.readyCount ?? readyRows.filter((row) => row.status === "ready").length) },
-      { label: "오류건수", value: String(summary?.errorCount ?? errorRows.length) },
-      { label: "사진미등록", value: String(summary?.missingPhotoCount ?? normalizedRows.filter((row) => !row.hasPhoto).length) },
-      { label: "커밋가능", value: summary?.canCommit === true ? "예" : "아니오" },
-    ]);
-
-    for (const worksheet of [resultWorksheet, summaryWorksheet]) {
-      for (let rowIndex = 1; rowIndex <= worksheet.rowCount; rowIndex += 1) {
-        for (let columnIndex = 1; columnIndex <= worksheet.columnCount; columnIndex += 1) {
-          worksheet.getRow(rowIndex).getCell(columnIndex).numFmt = "@";
-        }
-      }
-    }
-
-    if (errorRows.length > 0) {
-      const errorWorksheet = workbook.addWorksheet("오류", {
-        views: [{ state: "frozen", ySplit: 1 }],
-      });
-
-      errorWorksheet.columns = APPLICANT_PROMOTION_PREVIEW_COLUMNS.map((column) => ({
-        header: column.header,
-        key: column.key,
-        width: column.width,
-        style: { numFmt: "@" },
-      }));
-      applyWorkbookHeaderStyle(errorWorksheet);
-      errorWorksheet.addRows(errorRows.map((row) => ({
-        ...row,
-        errorMessage: row.errorMessage,
-      })));
-
-      for (let rowIndex = 1; rowIndex <= errorWorksheet.rowCount; rowIndex += 1) {
-        for (let columnIndex = 1; columnIndex <= errorWorksheet.columnCount; columnIndex += 1) {
-          errorWorksheet.getRow(rowIndex).getCell(columnIndex).numFmt = "@";
-        }
-      }
-    }
-
-    return workbook.xlsx.writeBuffer();
-  }
-
   async function parseApplicantRecruitmentUnitWorkbook(fileContentBase64) {
-    if (!fileContentBase64) {
-      throw createHttpError(400, "XLSX 파일 데이터가 없습니다.");
-    }
-
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(Buffer.from(fileContentBase64, "base64"));
-
-    const worksheet = workbook.worksheets[0];
-
-    if (!worksheet) {
-      throw createHttpError(400, "XLSX 파일에서 시트를 찾을 수 없습니다.");
-    }
-
-    const headerRow = worksheet.getRow(1);
-    const columnIndexes = APPLICANT_UNIT_TEMPLATE_COLUMNS.reduce((indexes, column) => {
-      const matchedColumnIndex =
-        headerRow.actualCellCount === 0
-          ? -1
-          : Array.from({ length: Math.max(worksheet.columnCount, APPLICANT_UNIT_TEMPLATE_COLUMNS.length) }, (_, offset) => offset + 1).find(
-              (columnIndex) => getExcelCellText(headerRow.getCell(columnIndex)) === column.header,
-            ) ?? -1;
-
-      if (matchedColumnIndex === -1) {
-        throw createHttpError(400, `XLSX 헤더에 '${column.header}' 컬럼이 없습니다.`);
-      }
-
-      indexes[column.key] = matchedColumnIndex;
-      return indexes;
-    }, {});
-
-    const units = [];
-
-    for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber += 1) {
-      const row = worksheet.getRow(rowNumber);
-      const unit = {};
-      let hasAnyValue = false;
-
-      APPLICANT_UNIT_TEMPLATE_COLUMNS.forEach((column) => {
-        const value = getExcelCellText(row.getCell(columnIndexes[column.key]));
-        unit[column.key] = value;
-        hasAnyValue = hasAnyValue || value !== "";
-      });
-
-      if (hasAnyValue) {
-        unit.rowNumber = rowNumber;
-        units.push(unit);
-      }
-    }
-
-    if (units.length === 0) {
-      throw createHttpError(400, "XLSX에는 헤더와 최소 1개 이상의 데이터 행이 필요합니다.");
-    }
-
-    return units;
+    return applicantWorkbookService.parseApplicantRecruitmentUnitWorkbookRows(fileContentBase64);
   }
 
   async function previewApplicantRecruitmentUnitImport(payload = {}) {
@@ -2398,7 +1087,6 @@ function createApplicantService({
 
     return {
       admissionHomepageUrl: String(rowsByKey.get("admissionHomepageUrl") || "").trim(),
-      admitCardDataSource: normalizeApplicantAdmitCardDataSource(rowsByKey.get("admitCardDataSource")),
     };
   }
 
@@ -2479,6 +1167,8 @@ function createApplicantService({
     const admissionName = String(row.admissionName || "").trim();
     const applicantScheduleStartAt = normalizeApplicantScheduleDateTime(row.applicantScheduleStartAt);
     const applicantScheduleEndAt = normalizeApplicantScheduleDateTime(row.applicantScheduleEndAt);
+    const documentSubmissionScheduleStartAt = normalizeApplicantScheduleDateTime(row.documentSubmissionScheduleStartAt);
+    const documentSubmissionScheduleEndAt = normalizeApplicantScheduleDateTime(row.documentSubmissionScheduleEndAt);
     const admitCardLookupScheduleStartAt = normalizeApplicantScheduleDateTime(row.admitCardLookupScheduleStartAt);
     const admitCardLookupScheduleEndAt = normalizeApplicantScheduleDateTime(row.admitCardLookupScheduleEndAt);
 
@@ -2492,6 +1182,10 @@ function createApplicantService({
       applicantScheduleStartAtLabel: formatApplicantScheduleDateTimeLabel(applicantScheduleStartAt),
       applicantScheduleEndAt,
       applicantScheduleEndAtLabel: formatApplicantScheduleDateTimeLabel(applicantScheduleEndAt),
+      documentSubmissionScheduleStartAt,
+      documentSubmissionScheduleEndAt,
+      documentSubmissionScheduleStartAtLabel: formatApplicantScheduleDateTimeLabel(documentSubmissionScheduleStartAt),
+      documentSubmissionScheduleEndAtLabel: formatApplicantScheduleDateTimeLabel(documentSubmissionScheduleEndAt),
       applicantScheduleLabel:
         applicantScheduleStartAt && applicantScheduleEndAt
           ? `${formatApplicantScheduleDateTimeLabel(applicantScheduleStartAt)} ~ ${formatApplicantScheduleDateTimeLabel(applicantScheduleEndAt)}`
@@ -2580,6 +1274,11 @@ function createApplicantService({
       payload.admitCardLookupScheduleStartAt ?? existingSchedule.admitCardLookupScheduleStartAt,
       payload.admitCardLookupScheduleEndAt ?? existingSchedule.admitCardLookupScheduleEndAt,
     );
+    const documentSubmissionScheduleRange = normalizeOptionalApplicantScheduleRange(
+      "서류 제출 기간",
+      payload.documentSubmissionScheduleStartAt ?? existingSchedule.documentSubmissionScheduleStartAt,
+      payload.documentSubmissionScheduleEndAt ?? existingSchedule.documentSubmissionScheduleEndAt,
+    );
 
     return {
       trackName,
@@ -2587,6 +1286,8 @@ function createApplicantService({
       admissionName,
       applicantScheduleStartAt: applicantScheduleRange.startAt,
       applicantScheduleEndAt: applicantScheduleRange.endAt,
+      documentSubmissionScheduleStartAt: documentSubmissionScheduleRange.startAt,
+      documentSubmissionScheduleEndAt: documentSubmissionScheduleRange.endAt,
       admitCardLookupScheduleStartAt: admitCardLookupScheduleRange.startAt,
       admitCardLookupScheduleEndAt: admitCardLookupScheduleRange.endAt,
     };
@@ -2809,79 +1510,6 @@ function createApplicantService({
     );
   }
 
-  async function assertApplicantPromotionWindowClosed(submissionIds = []) {
-    const normalizedSubmissionIds = normalizeApplicantSubmissionIdList(submissionIds);
-    const [submissions, schedules] = await Promise.all([
-      getApplicantSubmissionsByIds(normalizedSubmissionIds, { includeInternal: true }),
-      getApplicantSchedules(),
-    ]);
-    const foundSubmissionIds = new Set(
-      submissions
-        .map((submission) => Number(submission?.id || 0))
-        .filter((submissionId) => Number.isInteger(submissionId) && submissionId > 0),
-    );
-    const missingSubmissionIds = normalizedSubmissionIds.filter((submissionId) => !foundSubmissionIds.has(submissionId));
-
-    if (missingSubmissionIds.length > 0) {
-      throw createHttpError(404, "선택한 접수 이력 중 일부를 찾을 수 없습니다.", "APPLICANT_SUBMISSION_NOT_FOUND");
-    }
-
-    const uniqueScheduleStates = [];
-    const handledScheduleKeys = new Set();
-
-    submissions.forEach((submission) => {
-      const criteria = resolveApplicantScheduleCriteria(submission);
-      const matchedSchedule = findApplicantScheduleRecord(schedules, criteria);
-      const scheduleKey =
-        matchedSchedule?.scheduleKey || buildApplicantAdmissionScheduleKey(criteria.trackName, criteria.admissionCode, criteria.admissionName);
-
-      if (handledScheduleKeys.has(scheduleKey)) {
-        return;
-      }
-
-      handledScheduleKeys.add(scheduleKey);
-      uniqueScheduleStates.push({
-        criteria,
-        scheduleState: getApplicantSubmissionScheduleState(matchedSchedule),
-      });
-    });
-
-    const blockingSchedule = uniqueScheduleStates.find((entry) => entry.scheduleState.reason !== "after_end");
-
-    if (!blockingSchedule) {
-      return uniqueScheduleStates;
-    }
-
-    const scheduleRangeLabel = buildApplicantScheduleRangeLabel(blockingSchedule.scheduleState, "submission");
-    const contextLabel = buildApplicantScheduleContextLabel(blockingSchedule.criteria);
-
-    if (blockingSchedule.scheduleState.reason === "open") {
-      throw createHttpError(
-        409,
-        `${contextLabel} 접수기간 중에는 수험생 이관을 진행할 수 없습니다.${scheduleRangeLabel ? ` 접수 기간: ${scheduleRangeLabel}` : ""}`,
-        "APPLICANT_PROMOTION_SCHEDULE_OPEN",
-      );
-    }
-
-    if (blockingSchedule.scheduleState.reason === "before_start") {
-      throw createHttpError(
-        409,
-        `${contextLabel} 접수기간이 종료된 뒤에만 수험생 이관이 가능합니다.${scheduleRangeLabel ? ` 접수 기간: ${scheduleRangeLabel}` : ""}`,
-        "APPLICANT_PROMOTION_SCHEDULE_NOT_ENDED",
-      );
-    }
-
-    if (blockingSchedule.scheduleState.reason === "not_configured") {
-      throw createHttpError(
-        409,
-        `${contextLabel}의 접수 기간이 아직 설정되지 않았습니다.`,
-        "APPLICANT_PROMOTION_SCHEDULE_NOT_CONFIGURED",
-      );
-    }
-
-    throw createHttpError(409, "현재는 수험생 이관을 진행할 수 없습니다.", "APPLICANT_PROMOTION_SCHEDULE_CLOSED");
-  }
-
   async function assertApplicantAdmitCardLookupIsOpen(submission = null) {
     const schedules = await getApplicantSchedules();
     const criteria = resolveApplicantScheduleCriteria(submission || {});
@@ -2954,8 +1582,7 @@ function createApplicantService({
         setting_value AS settingValue
       FROM system_set
       WHERE setting_key IN (
-        'admissionHomepageUrl',
-        'admitCardDataSource'
+        'admissionHomepageUrl'
       )
     `);
 
@@ -3001,12 +1628,13 @@ function createApplicantService({
     return getApplicantSettings();
   }
 
-  async function getApplicantFormFields({ activeOnly = false } = {}) {
+  async function getApplicantFormFields({ activeOnly = false, formScope = null } = {}) {
     const rows = await query(
       `
         SELECT
           id,
           field_key AS fieldKey,
+          form_scope AS formScope,
           question_text AS questionText,
           question_description AS questionDescription,
           input_type AS inputType,
@@ -3023,7 +1651,7 @@ function createApplicantService({
       `,
     );
 
-    return rows.map(normalizeApplicantFormFieldRecord);
+    return rows.map(normalizeApplicantFormFieldRecord).filter(field => !formScope || field.formScope === formScope);
   }
 
   async function getApplicantFormFieldById(fieldId, options = {}) {
@@ -3038,6 +1666,7 @@ function createApplicantService({
         SELECT
           id,
           field_key AS fieldKey,
+          form_scope AS formScope,
           question_text AS questionText,
           question_description AS questionDescription,
           input_type AS inputType,
@@ -3062,331 +1691,6 @@ function createApplicantService({
     }
 
     return field.id ? field : null;
-  }
-
-  function normalizeApplicantAssignmentRecord(row = {}) {
-    return {
-      id: Number(row.id || 0),
-      track: String(row.track || "").trim(),
-      admission: String(row.admission || "").trim(),
-      series: String(row.series || "").trim(),
-      unit: String(row.unit || "").trim(),
-      major: String(row.major || "").trim(),
-      date: String(row.date || "").trim(),
-      time: String(row.time || "").trim(),
-      buildingCode: String(row.buildingCode || "").trim(),
-      building: String(row.building || "").trim(),
-      roomCode: String(row.roomCode || "").trim(),
-      room: String(row.room || "").trim(),
-      assignedCount: Number(row.assignedCount || 0),
-      sortOrder: Number(row.sortOrder || 0),
-      createdAt: String(row.createdAt || "").trim(),
-      updatedAt: String(row.updatedAt || "").trim(),
-    };
-  }
-
-  async function getApplicantAssignments(options = {}) {
-    const rows = await executeRows(
-      options.queryable || query,
-      `
-        SELECT
-          id,
-          track,
-          admission,
-          series,
-          unit,
-          major,
-          COALESCE(DATE_FORMAT(exam_date, '%Y-%m-%d'), '') AS date,
-          \`time\` AS time,
-          building_code AS buildingCode,
-          building,
-          room_code AS roomCode,
-          room,
-          assigned_count AS assignedCount,
-          sort_order AS sortOrder,
-          COALESCE(DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
-          COALESCE(DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), '') AS updatedAt
-        FROM app_assign
-        ORDER BY exam_date ASC, \`time\` ASC, building_code ASC, room_code ASC, id ASC
-      `,
-    );
-
-    return rows.map((row) => normalizeApplicantAssignmentRecord(row));
-  }
-
-  async function getApplicantAssignmentById(assignmentId, options = {}) {
-    const normalizedAssignmentId = Number(assignmentId || 0);
-
-    if (!Number.isInteger(normalizedAssignmentId) || normalizedAssignmentId <= 0) {
-      throw createHttpError(404, "배정표 행을 찾을 수 없습니다.", "APPLICANT_ASSIGNMENT_NOT_FOUND");
-    }
-
-    const rows = await executeRows(
-      options.queryable || query,
-      `
-        SELECT
-          id,
-          track,
-          admission,
-          series,
-          unit,
-          major,
-          COALESCE(DATE_FORMAT(exam_date, '%Y-%m-%d'), '') AS date,
-          \`time\` AS time,
-          building_code AS buildingCode,
-          building,
-          room_code AS roomCode,
-          room,
-          assigned_count AS assignedCount,
-          sort_order AS sortOrder,
-          COALESCE(DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
-          COALESCE(DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), '') AS updatedAt
-        FROM app_assign
-        WHERE id = ?
-        LIMIT 1
-      `,
-      [normalizedAssignmentId],
-    );
-    const assignment = normalizeApplicantAssignmentRecord(rows[0] || {});
-
-    if (!assignment.id && options.required !== false) {
-      throw createHttpError(404, "배정표 행을 찾을 수 없습니다.", "APPLICANT_ASSIGNMENT_NOT_FOUND");
-    }
-
-    return assignment.id ? assignment : null;
-  }
-
-  async function resequenceApplicantAssignments(connection, rows = []) {
-    for (let index = 0; index < rows.length; index += 1) {
-      await connection.query(`UPDATE app_assign SET sort_order = ? WHERE id = ?`, [index + 1, rows[index].id]);
-    }
-  }
-
-  async function buildApplicantAssignmentExportBuffer(rows = []) {
-    const normalizedRows =
-      Array.isArray(rows) && rows.length > 0 ? validateApplicantAssignmentRows(rows) : await getApplicantAssignments();
-
-    if (normalizedRows.length === 0) {
-      throw createHttpError(400, "내려받을 배정표 데이터가 없습니다.", "APPLICANT_ASSIGNMENT_EXPORT_EMPTY");
-    }
-
-    return buildApplicantAssignmentWorkbookBuffer(normalizedRows);
-  }
-
-  async function createApplicantAssignment(payload = {}) {
-    const normalizedPayload = normalizeApplicantAssignmentPayload(payload);
-    const existingRows = await getApplicantAssignments();
-    const [summaryRows] = await query(`SELECT COALESCE(MAX(sort_order), 0) + 1 AS nextSortOrder FROM app_assign`);
-    const nextSortOrder = Number(summaryRows?.nextSortOrder || summaryRows?.[0]?.nextSortOrder || 1);
-
-    validateApplicantAssignmentRows([...existingRows, normalizedPayload]);
-
-    await query(
-      `
-        INSERT INTO app_assign (
-          track,
-          admission,
-          series,
-          unit,
-          major,
-          exam_date,
-          \`time\`,
-          building_code,
-          building,
-          room_code,
-          room,
-          assigned_count,
-          sort_order
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      [
-        normalizedPayload.track,
-        normalizedPayload.admission,
-        normalizedPayload.series,
-        normalizedPayload.unit,
-        normalizedPayload.major,
-        normalizedPayload.date,
-        normalizedPayload.time,
-        normalizedPayload.buildingCode,
-        normalizedPayload.building,
-        normalizedPayload.roomCode,
-        normalizedPayload.room,
-        normalizedPayload.assignedCount,
-        nextSortOrder,
-      ],
-    );
-
-    return getApplicantAssignments();
-  }
-
-  async function updateApplicantAssignment(assignmentId, payload = {}) {
-    const existingAssignment = await getApplicantAssignmentById(assignmentId);
-    const normalizedPayload = normalizeApplicantAssignmentPayload(payload);
-    const existingRows = await getApplicantAssignments();
-
-    validateApplicantAssignmentRows([
-      ...existingRows.filter((row) => Number(row.id || 0) !== existingAssignment.id),
-      { ...normalizedPayload, id: existingAssignment.id },
-    ]);
-
-    await query(
-      `
-        UPDATE app_assign
-        SET
-          track = ?,
-          admission = ?,
-          series = ?,
-          unit = ?,
-          major = ?,
-          exam_date = ?,
-          \`time\` = ?,
-          building_code = ?,
-          building = ?,
-          room_code = ?,
-          room = ?,
-          assigned_count = ?
-        WHERE id = ?
-      `,
-      [
-        normalizedPayload.track,
-        normalizedPayload.admission,
-        normalizedPayload.series,
-        normalizedPayload.unit,
-        normalizedPayload.major,
-        normalizedPayload.date,
-        normalizedPayload.time,
-        normalizedPayload.buildingCode,
-        normalizedPayload.building,
-        normalizedPayload.roomCode,
-        normalizedPayload.room,
-        normalizedPayload.assignedCount,
-        existingAssignment.id,
-      ],
-    );
-
-    return getApplicantAssignments();
-  }
-
-  async function deleteApplicantAssignment(assignmentId) {
-    const existingAssignment = await getApplicantAssignmentById(assignmentId);
-    const connection = await getPool().getConnection();
-
-    try {
-      await connection.beginTransaction();
-      await connection.query(`DELETE FROM app_assign WHERE id = ?`, [existingAssignment.id]);
-      const rows = await getApplicantAssignments({
-        queryable: connection.query.bind(connection),
-      });
-      await resequenceApplicantAssignments(connection, rows);
-      await connection.commit();
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-
-    return getApplicantAssignments();
-  }
-
-  async function importApplicantAssignments(payload = {}) {
-    const sourceRows =
-      Array.isArray(payload.rows) && payload.rows.length > 0
-        ? payload.rows
-        : payload.fileContentBase64
-          ? await parseApplicantPromotionAssignmentWorkbook(payload.fileContentBase64)
-          : [];
-    const normalizedRows = validateApplicantAssignmentRows(sourceRows);
-    const existingDataPolicy = normalizeApplicantImportExistingDataPolicy(payload.existingDataPolicy);
-
-    if (normalizedRows.length === 0) {
-      throw createHttpError(400, "업로드할 배정표 데이터가 없습니다.", "APPLICANT_ASSIGNMENT_IMPORT_EMPTY");
-    }
-
-    const currentAssignments = await getApplicantAssignments();
-    const selectedRows = classifyApplicantAssignmentImportRows(normalizedRows, currentAssignments)
-      .filter((entry) => shouldProcessApplicantImportOperation(entry.operation, existingDataPolicy))
-      .map((entry) => entry.row);
-
-    if (selectedRows.length === 0) {
-      throw createHttpError(
-        400,
-        "선택한 기존 데이터 처리 방식에 따라 반영할 배정표 데이터가 없습니다.",
-        "APPLICANT_ASSIGNMENT_IMPORT_NOTHING_SELECTED",
-      );
-    }
-
-    const connection = await getPool().getConnection();
-
-    try {
-      await connection.beginTransaction();
-      const [summaryRows] = await connection.query(`SELECT COALESCE(MAX(sort_order), 0) AS maxSortOrder FROM app_assign`);
-      let nextSortOrder = Number(summaryRows?.[0]?.maxSortOrder || 0);
-
-      for (const row of selectedRows) {
-        nextSortOrder += 1;
-
-        await connection.query(
-          `
-            INSERT INTO app_assign (
-              track,
-              admission,
-              series,
-              unit,
-              major,
-              exam_date,
-              \`time\`,
-              building_code,
-              building,
-              room_code,
-              room,
-              assigned_count,
-              sort_order
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-              track = VALUES(track),
-              admission = VALUES(admission),
-              series = VALUES(series),
-              unit = VALUES(unit),
-              major = VALUES(major),
-              exam_date = VALUES(exam_date),
-              \`time\` = VALUES(\`time\`),
-              building = VALUES(building),
-              room = VALUES(room),
-              assigned_count = VALUES(assigned_count)
-          `,
-          [
-            row.track,
-            row.admission,
-            row.series,
-            row.unit,
-            row.major,
-            row.date,
-            row.time,
-            row.buildingCode,
-            row.building,
-            row.roomCode,
-            row.room,
-            row.assignedCount,
-            nextSortOrder,
-          ],
-        );
-      }
-
-      await connection.commit();
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-
-    return {
-      processed: selectedRows.length,
-      assignments: await getApplicantAssignments(),
-    };
   }
 
   async function getApplicantRecruitmentUnits(options = {}) {
@@ -3426,6 +1730,8 @@ function createApplicantService({
           grouped_units.admission_name AS admissionName,
           COALESCE(DATE_FORMAT(schedule.applicant_schedule_start_at, '%Y-%m-%dT%H:%i'), '') AS applicantScheduleStartAt,
           COALESCE(DATE_FORMAT(schedule.applicant_schedule_end_at, '%Y-%m-%dT%H:%i'), '') AS applicantScheduleEndAt,
+          COALESCE(DATE_FORMAT(schedule.document_submission_schedule_start_at, '%Y-%m-%dT%H:%i'), '') AS documentSubmissionScheduleStartAt,
+          COALESCE(DATE_FORMAT(schedule.document_submission_schedule_end_at, '%Y-%m-%dT%H:%i'), '') AS documentSubmissionScheduleEndAt,
           COALESCE(DATE_FORMAT(schedule.admit_card_lookup_schedule_start_at, '%Y-%m-%dT%H:%i'), '') AS admitCardLookupScheduleStartAt,
           COALESCE(DATE_FORMAT(schedule.admit_card_lookup_schedule_end_at, '%Y-%m-%dT%H:%i'), '') AS admitCardLookupScheduleEndAt,
           COALESCE(DATE_FORMAT(schedule.created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
@@ -3520,13 +1826,17 @@ function createApplicantService({
           admission_name,
           applicant_schedule_start_at,
           applicant_schedule_end_at,
+          document_submission_schedule_start_at,
+          document_submission_schedule_end_at,
           admit_card_lookup_schedule_start_at,
           admit_card_lookup_schedule_end_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           applicant_schedule_start_at = VALUES(applicant_schedule_start_at),
           applicant_schedule_end_at = VALUES(applicant_schedule_end_at),
+          document_submission_schedule_start_at = VALUES(document_submission_schedule_start_at),
+          document_submission_schedule_end_at = VALUES(document_submission_schedule_end_at),
           admit_card_lookup_schedule_start_at = VALUES(admit_card_lookup_schedule_start_at),
           admit_card_lookup_schedule_end_at = VALUES(admit_card_lookup_schedule_end_at)
       `,
@@ -3536,10 +1846,119 @@ function createApplicantService({
         normalizedPayload.admissionName,
         normalizedPayload.applicantScheduleStartAt || null,
         normalizedPayload.applicantScheduleEndAt || null,
+        normalizedPayload.documentSubmissionScheduleStartAt || null,
+        normalizedPayload.documentSubmissionScheduleEndAt || null,
         normalizedPayload.admitCardLookupScheduleStartAt || null,
         normalizedPayload.admitCardLookupScheduleEndAt || null,
       ],
     );
+
+    return getApplicantSchedules();
+  }
+
+  async function saveApplicantSchedules(payload = {}) {
+    const schedulePayloads = Array.isArray(payload?.schedules) ? payload.schedules : [];
+
+    if (schedulePayloads.length === 0) {
+      throw createHttpError(400, "일괄 설정할 전형을 한 개 이상 선택하세요.", "APPLICANT_SCHEDULE_BULK_TARGET_REQUIRED");
+    }
+
+    if (schedulePayloads.length > 1000) {
+      throw createHttpError(400, "일괄 설정은 한 번에 최대 1,000개 전형까지 가능합니다.", "APPLICANT_SCHEDULE_BULK_TARGET_LIMIT");
+    }
+
+    const normalizedSchedules = [];
+    const handledScheduleKeys = new Set();
+
+    schedulePayloads.forEach((schedulePayload) => {
+      const normalizedSchedule = normalizeApplicantSchedulePayload(schedulePayload);
+      const scheduleKey = buildApplicantAdmissionScheduleKey(
+        normalizedSchedule.trackName,
+        normalizedSchedule.admissionCode,
+        normalizedSchedule.admissionName,
+      );
+
+      if (handledScheduleKeys.has(scheduleKey)) {
+        return;
+      }
+
+      handledScheduleKeys.add(scheduleKey);
+      normalizedSchedules.push(normalizedSchedule);
+    });
+
+    const connection = await getPool().getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      for (const normalizedSchedule of normalizedSchedules) {
+        const [matchingUnits] = await connection.query(
+          `
+            SELECT id
+            FROM app_unit
+            WHERE track_name = ?
+              AND admission_code = ?
+              AND admission_name = ?
+            LIMIT 1
+          `,
+          [normalizedSchedule.trackName, normalizedSchedule.admissionCode, normalizedSchedule.admissionName],
+        );
+
+        if (matchingUnits.length === 0) {
+          const targetLabel = [normalizedSchedule.trackName, normalizedSchedule.admissionName]
+            .filter(Boolean)
+            .join(" · ");
+
+          throw createHttpError(
+            404,
+            `${targetLabel || "선택한 전형"}의 일정 설정 대상을 찾을 수 없습니다.`,
+            "APPLICANT_SCHEDULE_TARGET_NOT_FOUND",
+          );
+        }
+
+        await connection.query(
+          `
+            INSERT INTO app_schedule (
+              track_name,
+              admission_code,
+              admission_name,
+              applicant_schedule_start_at,
+              applicant_schedule_end_at,
+              document_submission_schedule_start_at,
+              document_submission_schedule_end_at,
+              admit_card_lookup_schedule_start_at,
+              admit_card_lookup_schedule_end_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+              applicant_schedule_start_at = VALUES(applicant_schedule_start_at),
+              applicant_schedule_end_at = VALUES(applicant_schedule_end_at),
+              document_submission_schedule_start_at = VALUES(document_submission_schedule_start_at),
+              document_submission_schedule_end_at = VALUES(document_submission_schedule_end_at),
+              admit_card_lookup_schedule_start_at = VALUES(admit_card_lookup_schedule_start_at),
+              admit_card_lookup_schedule_end_at = VALUES(admit_card_lookup_schedule_end_at)
+          `,
+          [
+            normalizedSchedule.trackName,
+            normalizedSchedule.admissionCode,
+            normalizedSchedule.admissionName,
+            normalizedSchedule.applicantScheduleStartAt || null,
+            normalizedSchedule.applicantScheduleEndAt || null,
+            normalizedSchedule.documentSubmissionScheduleStartAt || null,
+            normalizedSchedule.documentSubmissionScheduleEndAt || null,
+            normalizedSchedule.admitCardLookupScheduleStartAt || null,
+            normalizedSchedule.admitCardLookupScheduleEndAt || null,
+          ],
+        );
+      }
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
 
     return getApplicantSchedules();
   }
@@ -3626,6 +2045,10 @@ function createApplicantService({
   }
 
   function normalizeApplicantFormFieldPayload(payload = {}, existingField = {}) {
+    const formScope = String(payload.formScope ?? existingField.formScope ?? 'application');
+    if (!['application', 'documents'].includes(formScope) || (existingField.id && formScope !== existingField.formScope)) {
+      throw createHttpError(400, '질문 구분을 변경할 수 없습니다.', 'APPLICANT_FIELD_SCOPE_INVALID');
+    }
     const questionText = normalizeApplicantText(payload.questionText ?? existingField.questionText, "질문 제목", {
       maxLength: 255,
       errorCode: "APPLICANT_FIELD_QUESTION_INVALID",
@@ -3641,14 +2064,25 @@ function createApplicantService({
     );
     const inputType = String(payload.inputType ?? existingField.inputType ?? "text").trim();
     const systemFieldKey = String(payload.systemFieldKey ?? existingField.systemFieldKey ?? "").trim();
+    if (formScope === 'documents' && (systemFieldKey || ['photo', 'birthdate'].includes(inputType))) {
+      throw createHttpError(400, '서류제출 질문은 일반 항목으로 등록하세요. 사진은 파일 업로드 유형을 사용하세요.', 'DOCUMENT_FIELD_TYPE_INVALID');
+    }
     const required = payload.required ?? existingField.required ?? false;
     const options = normalizeApplicantOptionValues(payload, existingField);
     const customOptionLabel = normalizeApplicantCustomOptionLabel(payload, existingField);
     const allowCustomOption = normalizeApplicantAllowCustomOption(payload, existingField) || Boolean(customOptionLabel);
     const fieldKey = String(existingField.fieldKey || payload.fieldKey || buildApplicantFieldKey(questionText)).trim();
+    let fileSettings = { fileNamePattern: "", allowedExtensions: [] };
+    if (inputType === "file") {
+      try { fileSettings = normalizeFileUploadSettings({ ...existingField, ...payload }); }
+      catch (error) { throw createHttpError(400, error.message, "APPLICANT_FILE_SETTINGS_INVALID"); }
+    }
 
     if (!APPLICANT_FORM_INPUT_TYPES.includes(inputType)) {
       throw createHttpError(400, "지원하지 않는 답변 유형입니다.", "APPLICANT_FIELD_INPUT_TYPE_INVALID");
+    }
+    if ((inputType === 'birthdate' && existingField.inputType !== 'birthdate') || (systemFieldKey === 'birth' && existingField.systemFieldKey !== 'birth')) {
+      throw createHttpError(400, '생년월일은 회원가입에서 받습니다. 다른 날짜 질문은 날짜 유형을 사용하세요.', 'APPLICANT_MEMBER_FIELD_DUPLICATE');
     }
 
     if (inputType === "select" && options.length === 0 && allowCustomOption !== true) {
@@ -3677,9 +2111,11 @@ function createApplicantService({
 
     return {
       fieldKey,
+      formScope,
       questionText,
       questionDescription,
       inputType,
+      ...fileSettings,
       systemFieldKey,
       options,
       allowCustomOption,
@@ -3689,8 +2125,8 @@ function createApplicantService({
   }
 
   async function createApplicantFormField(payload = {}) {
-    const existingFields = await getApplicantFormFields();
     const normalizedPayload = normalizeApplicantFormFieldPayload(payload);
+    const existingFields = await getApplicantFormFields({ formScope: normalizedPayload.formScope });
     const nextSortOrder = existingFields.length === 0 ? 1 : Math.max(...existingFields.map((field) => field.sortOrder || 0)) + 1;
 
     await validateUniqueApplicantFieldKey(normalizedPayload.fieldKey);
@@ -3699,6 +2135,7 @@ function createApplicantService({
     await query(
       `
         INSERT INTO app_form (
+          form_scope,
           field_key,
           question_text,
           question_description,
@@ -3709,9 +2146,10 @@ function createApplicantService({
           sort_order,
           active
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
       `,
       [
+        normalizedPayload.formScope,
         normalizedPayload.fieldKey,
         normalizedPayload.questionText,
         normalizedPayload.questionDescription,
@@ -3721,6 +2159,8 @@ function createApplicantService({
           items: normalizedPayload.options,
           allowCustomOption: normalizedPayload.allowCustomOption === true,
           customOptionLabel: normalizedPayload.customOptionLabel,
+          fileNamePattern: normalizedPayload.fileNamePattern,
+          allowedExtensions: normalizedPayload.allowedExtensions,
         }),
         normalizedPayload.required ? 1 : 0,
         nextSortOrder,
@@ -3764,6 +2204,8 @@ function createApplicantService({
           items: normalizedPayload.options,
           allowCustomOption: normalizedPayload.allowCustomOption === true,
           customOptionLabel: normalizedPayload.customOptionLabel,
+          fileNamePattern: normalizedPayload.fileNamePattern,
+          allowedExtensions: normalizedPayload.allowedExtensions,
         }),
         normalizedPayload.required ? 1 : 0,
         existingField.id,
@@ -3788,7 +2230,7 @@ function createApplicantService({
 
     try {
       await connection.beginTransaction();
-      const fields = await getApplicantFormFields();
+      const fields = await getApplicantFormFields({ formScope: existingField.formScope });
       await resequenceApplicantFormFields(connection, fields);
       await connection.commit();
     } catch (error) {
@@ -3809,7 +2251,8 @@ function createApplicantService({
           }
         : moveOptions || {};
     const normalizedFieldId = Number(fieldId);
-    const fields = await getApplicantFormFields();
+    const sourceField = await getApplicantFormFieldById(normalizedFieldId);
+    const fields = await getApplicantFormFields({ formScope: sourceField.formScope });
     const fieldIndex = fields.findIndex((field) => field.id === normalizedFieldId);
 
     if (fieldIndex < 0) {
@@ -4283,11 +2726,12 @@ function createApplicantService({
       .map((row) => normalizeApplicantStoredAnswerRow(row, options))
       .filter(Boolean);
     const photoAnswerItem = answerItems.find((answerItem) => answerItem.inputType === "photo") || null;
-    const promotionOverride = normalizeApplicantPromotionOverride(firstRow.promotionOverrideJson);
+    const promotionOverride = normalizeStoredTicketOverrides(firstRow.promotionOverrideJson);
     const systemValues = buildApplicantSystemValueMap(answerItems);
 
     return {
       id: Number(firstRow.id || 0),
+      memberId: Number(firstRow.memberId || 0) || null,
       name: String(firstRow.applicantName || "").trim(),
       email: String(firstRow.email || "").trim(),
       hasPassword: Number(firstRow.hasPassword) === 1 || firstRow.hasPassword === true,
@@ -4364,6 +2808,7 @@ function createApplicantService({
           COALESCE(ff.input_type, 'text') AS inputType,
           COALESCE(ff.system_field_key, '') AS systemFieldKey,
           COALESCE(meta.promoted_examinee_no, '') AS promotedExamineeNo,
+          meta.member_id AS memberId,
           COALESCE(meta.promotion_override_json, '') AS promotionOverrideJson,
           COALESCE(DATE_FORMAT(summary.created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
           COALESCE(DATE_FORMAT(summary.updated_at, '%Y-%m-%d %H:%i:%s'), '') AS updatedAt,
@@ -4412,6 +2857,7 @@ function createApplicantService({
           COALESCE(ff.input_type, 'text') AS inputType,
           COALESCE(ff.system_field_key, '') AS systemFieldKey,
           COALESCE(meta.promoted_examinee_no, '') AS promotedExamineeNo,
+          meta.member_id AS memberId,
           COALESCE(meta.promotion_override_json, '') AS promotionOverrideJson,
           COALESCE(DATE_FORMAT(summary.created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
           COALESCE(DATE_FORMAT(summary.updated_at, '%Y-%m-%d %H:%i:%s'), '') AS updatedAt,
@@ -4554,6 +3000,7 @@ function createApplicantService({
           COALESCE(ff.input_type, 'text') AS inputType,
           COALESCE(ff.system_field_key, '') AS systemFieldKey,
           COALESCE(meta.promoted_examinee_no, '') AS promotedExamineeNo,
+          meta.member_id AS memberId,
           COALESCE(meta.promotion_override_json, '') AS promotionOverrideJson,
           COALESCE(DATE_FORMAT(summary.created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
           COALESCE(DATE_FORMAT(summary.updated_at, '%Y-%m-%d %H:%i:%s'), '') AS updatedAt,
@@ -4589,8 +3036,6 @@ function createApplicantService({
 
     const connection = await getPool().getConnection();
     let submission = null;
-    let promotedPhotoDeleteRows = [];
-    let deletedExamineeCount = 0;
 
     try {
       await connection.beginTransaction();
@@ -4605,32 +3050,17 @@ function createApplicantService({
       const normalizedPromotedExamineeNo = String(submission?.promotedExamineeNo || "").trim();
 
       if (normalizedPromotedExamineeNo) {
-        const [examineeRows] = await connection.query(
-          `
-            SELECT
-              examinee_no AS examineeNo,
-              photo_name AS photoName
-            FROM examinee
-            WHERE examinee_no = ?
-          `,
-          [normalizedPromotedExamineeNo],
-        );
-        const existingExamineeRows = Array.isArray(examineeRows) ? examineeRows : [];
-        const [deleteExamineeResult] = await connection.query(`DELETE FROM examinee WHERE examinee_no = ?`, [normalizedPromotedExamineeNo]);
-
-        promotedPhotoDeleteRows =
-          existingExamineeRows.length > 0 ? existingExamineeRows : [{ examineeNo: normalizedPromotedExamineeNo, photoName: "" }];
-        deletedExamineeCount = Number(deleteExamineeResult?.affectedRows || 0);
+        await connection.query(`DELETE FROM print_log WHERE examinee_no = ?`, [normalizedPromotedExamineeNo]);
       }
 
       await connection.query(`DELETE FROM app_meta WHERE id = ?`, [normalizedSubmissionId]);
       await connection.query(`DELETE FROM app_subm WHERE id = ?`, [normalizedSubmissionId]);
       await connection.commit();
-      await deleteApplicantSubmissionArtifacts(submission, promotedPhotoDeleteRows);
+      await deleteApplicantSubmissionArtifacts(submission);
 
       return {
         deletedSubmissionId: normalizedSubmissionId,
-        deletedExamineeCount,
+
       };
     } catch (error) {
       await connection.rollback();
@@ -4680,755 +3110,6 @@ function createApplicantService({
     return getApplicantSubmissionById(latestSubmissionId, { required: false });
   }
 
-  function normalizeApplicantPhotoPayload(photoPayload = {}) {
-    if (!photoPayload || typeof photoPayload !== "object") {
-      return null;
-    }
-
-    const base64 = String(photoPayload.base64 || "").trim();
-
-    if (!base64) {
-      return null;
-    }
-
-    const mimeType = String(photoPayload.mimeType || "").trim() || "application/octet-stream";
-    const fileName = String(photoPayload.fileName || "").trim() || `photo-${Date.now()}`;
-
-    return {
-      base64,
-      fileName,
-      mimeType,
-    };
-  }
-
-  function normalizeApplicantFilePayload(filePayload = {}) {
-    if (!filePayload || typeof filePayload !== "object") {
-      return null;
-    }
-
-    const base64 = String(filePayload.base64 || "").trim();
-
-    if (!base64) {
-      return null;
-    }
-
-    const mimeType = String(filePayload.mimeType || "").trim() || "application/octet-stream";
-    const fileName = String(filePayload.fileName || "").trim() || `file-${Date.now()}`;
-
-    return {
-      base64,
-      fileName,
-      mimeType,
-    };
-  }
-
-  function getApplicantStoredPhotoMimeType(extension = "") {
-    const normalizedExtension = String(extension || "").trim().toLowerCase();
-
-    if (normalizedExtension === ".png") {
-      return "image/png";
-    }
-
-    if (normalizedExtension === ".jpg" || normalizedExtension === ".jpeg") {
-      return "image/jpeg";
-    }
-
-    return "";
-  }
-
-  function sanitizeApplicantStoredFileNameSegment(value = "", fallbackValue = "file") {
-    const normalizedValue = String(value || "")
-      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .replace(/[. ]+$/g, "");
-
-    return normalizedValue || String(fallbackValue || "file").trim() || "file";
-  }
-
-  function resolveApplicantStoredPhotoExtension(photoValue = {}) {
-    const supportedExtensions = new Set([".jpg", ".jpeg", ".png"]);
-    const normalizedFileName = String(photoValue?.fileName || "").trim();
-    const normalizedMimeType = String(photoValue?.mimeType || "").trim().toLowerCase();
-    const fileExtension = path.extname(normalizedFileName).toLowerCase();
-
-    if (supportedExtensions.has(fileExtension)) {
-      return fileExtension;
-    }
-
-    if (normalizedMimeType === "image/png") {
-      return ".png";
-    }
-
-    if (normalizedMimeType === "image/jpeg" || normalizedMimeType === "image/jpg") {
-      return ".jpg";
-    }
-
-    throw createHttpError(400, "사진 파일 형식은 JPG, JPEG, PNG만 지원합니다.", "APPLICANT_PHOTO_MIME_INVALID");
-  }
-
-  function resolveApplicantStoredFileExtension(fileValue = {}) {
-    const normalizedFileName = path.basename(String(fileValue?.fileName || "").trim());
-    const fileExtension = path.extname(normalizedFileName);
-
-    if (fileExtension) {
-      return fileExtension;
-    }
-
-    const normalizedMimeType = String(fileValue?.mimeType || "").trim().toLowerCase();
-
-    if (normalizedMimeType === "application/pdf") {
-      return ".pdf";
-    }
-
-    if (normalizedMimeType === "application/zip") {
-      return ".zip";
-    }
-
-    if (normalizedMimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-      return ".docx";
-    }
-
-    if (normalizedMimeType === "application/msword") {
-      return ".doc";
-    }
-
-    if (normalizedMimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
-      return ".xlsx";
-    }
-
-    if (normalizedMimeType === "application/vnd.ms-excel") {
-      return ".xls";
-    }
-
-    if (normalizedMimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation") {
-      return ".pptx";
-    }
-
-    if (normalizedMimeType === "application/vnd.ms-powerpoint") {
-      return ".ppt";
-    }
-
-    if (normalizedMimeType === "text/plain") {
-      return ".txt";
-    }
-
-    if (normalizedMimeType === "image/png") {
-      return ".png";
-    }
-
-    if (normalizedMimeType === "image/jpeg" || normalizedMimeType === "image/jpg") {
-      return ".jpg";
-    }
-
-    return "";
-  }
-
-  function normalizeApplicantStoredPhotoValue(photoValue = {}) {
-    const normalizedHasPhoto =
-      photoValue?.hasPhoto === true || Number(photoValue?.hasPhoto) === 1 || Boolean(String(photoValue?.base64 || "").trim());
-
-    if (!normalizedHasPhoto) {
-      return {
-        fileName: "",
-        mimeType: "",
-        hasPhoto: false,
-      };
-    }
-
-    const extension = resolveApplicantStoredPhotoExtension(photoValue);
-    const normalizedFileName = path.basename(String(photoValue?.fileName || "").trim());
-    const baseFileName = path.basename(normalizedFileName, path.extname(normalizedFileName)).trim() || "photo";
-
-    return {
-      fileName: `${baseFileName}${extension}`,
-      mimeType: getApplicantStoredPhotoMimeType(extension) || String(photoValue?.mimeType || "").trim() || "image/jpeg",
-      hasPhoto: true,
-    };
-  }
-
-  function normalizeApplicantStoredFileValue(fileValue = {}) {
-    const normalizedHasFile =
-      fileValue?.hasFile === true || Number(fileValue?.hasFile) === 1 || Boolean(String(fileValue?.base64 || "").trim());
-
-    if (!normalizedHasFile) {
-      return {
-        fileName: "",
-        mimeType: "",
-        hasFile: false,
-      };
-    }
-
-    const normalizedFileName = path.basename(String(fileValue?.fileName || "").trim());
-    const resolvedExtension = resolveApplicantStoredFileExtension(fileValue);
-    const baseFileName = sanitizeApplicantStoredFileNameSegment(
-      path.basename(normalizedFileName, path.extname(normalizedFileName)).trim() || "file",
-      "file",
-    );
-    return {
-      fileName: `${baseFileName}${resolvedExtension}`,
-      mimeType: String(fileValue?.mimeType || "").trim() || "application/octet-stream",
-      hasFile: true,
-    };
-  }
-
-  function buildStoredApplicantPhotoAnswerData(storedPhotoRecord = null, fallbackPhotoValue = {}) {
-    const normalizedFallbackPhotoValue = normalizeApplicantStoredPhotoValue(fallbackPhotoValue);
-
-    if (!storedPhotoRecord) {
-      return normalizedFallbackPhotoValue;
-    }
-
-    return {
-      fileName: String(storedPhotoRecord.fileName || "").trim(),
-      mimeType: String(storedPhotoRecord.mimeType || "").trim() || normalizedFallbackPhotoValue.mimeType || "image/jpeg",
-      hasPhoto: true,
-    };
-  }
-
-  function buildStoredApplicantFileAnswerData(storedFileRecord = null, fallbackFileValue = {}) {
-    const normalizedFallbackFileValue = normalizeApplicantStoredFileValue(fallbackFileValue);
-
-    if (!storedFileRecord) {
-      return normalizedFallbackFileValue;
-    }
-
-    return {
-      fileName: String(storedFileRecord.fileName || "").trim(),
-      mimeType: String(storedFileRecord.mimeType || "").trim() || normalizedFallbackFileValue.mimeType || "application/octet-stream",
-      hasFile: true,
-    };
-  }
-
-  function getApplicantStoredPhotoCandidateFileNames(examineeNo = "", photoName = "") {
-    const normalizedExamineeNo = String(examineeNo || "").trim();
-    const normalizedPhotoName = path.basename(String(photoName || "").trim());
-    const photoExtension = path.extname(normalizedPhotoName).toLowerCase();
-
-    return Array.from(
-      new Set(
-        [
-          normalizedPhotoName,
-          normalizedExamineeNo && photoExtension ? `${normalizedExamineeNo}${photoExtension}` : "",
-          normalizedExamineeNo ? `${normalizedExamineeNo}.jpg` : "",
-          normalizedExamineeNo ? `${normalizedExamineeNo}.jpeg` : "",
-          normalizedExamineeNo ? `${normalizedExamineeNo}.png` : "",
-        ].filter(Boolean),
-      ),
-    );
-  }
-
-  function getLegacyApplicantStoredPhotoCandidateFileNames(photoName = "") {
-    const normalizedPhotoName = path.basename(String(photoName || "").trim());
-    const photoExtension = path.extname(normalizedPhotoName).toLowerCase();
-    const photoBaseName = path.basename(normalizedPhotoName, photoExtension).trim();
-
-    return Array.from(
-      new Set(
-        [
-          normalizedPhotoName,
-          photoBaseName ? `${photoBaseName}.jpg` : "",
-          photoBaseName ? `${photoBaseName}.jpeg` : "",
-          photoBaseName ? `${photoBaseName}.png` : "",
-        ].filter(Boolean),
-      ),
-    );
-  }
-
-  async function readStoredApplicantPhotoFile(submissionId, examineeNo = "", photoName = "", photoMime = "") {
-    const normalizedSubmissionId = Number(submissionId);
-    const candidateFileNames = getApplicantStoredPhotoCandidateFileNames(examineeNo, photoName);
-
-    for (const candidateFileName of candidateFileNames) {
-      const normalizedCandidateFileName = path.basename(String(candidateFileName || "").trim());
-      const candidateFilePath = path.join(applicantPhotoStorageDirectoryPath, normalizedCandidateFileName);
-
-      try {
-        const photoBlob = await fs.promises.readFile(candidateFilePath);
-
-        if (Buffer.isBuffer(photoBlob) && photoBlob.length > 0) {
-          const fileExtension = path.extname(normalizedCandidateFileName).toLowerCase();
-
-          return {
-            photoBlob,
-            photoMime: getApplicantStoredPhotoMimeType(fileExtension) || String(photoMime || "").trim() || "application/octet-stream",
-            photoName: normalizedCandidateFileName,
-          };
-        }
-      } catch (error) {
-        if (error?.code !== "ENOENT") {
-          throw error;
-        }
-      }
-    }
-
-    if (Number.isInteger(normalizedSubmissionId) && normalizedSubmissionId > 0) {
-      const legacyPhotoDirectoryPath = path.join(legacyApplicantPhotoStorageDirectoryPath, String(normalizedSubmissionId));
-
-      for (const candidateFileName of getLegacyApplicantStoredPhotoCandidateFileNames(photoName)) {
-        const normalizedCandidateFileName = path.basename(String(candidateFileName || "").trim());
-        const candidateFilePath = path.join(legacyPhotoDirectoryPath, normalizedCandidateFileName);
-
-        try {
-          const photoBlob = await fs.promises.readFile(candidateFilePath);
-
-          if (Buffer.isBuffer(photoBlob) && photoBlob.length > 0) {
-            const fileExtension = path.extname(normalizedCandidateFileName).toLowerCase();
-
-            return {
-              photoBlob,
-              photoMime: getApplicantStoredPhotoMimeType(fileExtension) || String(photoMime || "").trim() || "application/octet-stream",
-              photoName: normalizedCandidateFileName,
-            };
-          }
-        } catch (error) {
-          if (error?.code !== "ENOENT") {
-            throw error;
-          }
-        }
-      }
-    }
-
-    return null;
-  }
-
-  function getPromotedApplicantPhotoCandidateFileNames(examineeNo, photoName = "") {
-    const normalizedExamineeNo = String(examineeNo || "").trim();
-    const normalizedPhotoName = path.basename(String(photoName || "").trim());
-
-    return Array.from(
-      new Set(
-        [
-          normalizedPhotoName,
-          normalizedExamineeNo ? `${normalizedExamineeNo}.jpg` : "",
-          normalizedExamineeNo ? `${normalizedExamineeNo}.jpeg` : "",
-          normalizedExamineeNo ? `${normalizedExamineeNo}.png` : "",
-        ].filter(Boolean),
-      ),
-    );
-  }
-
-  async function readStoredPromotedPhotoFile(examineeNo, photoName = "") {
-    const candidateFileNames = getPromotedApplicantPhotoCandidateFileNames(examineeNo, photoName);
-
-    for (const candidateFileName of candidateFileNames) {
-      const normalizedCandidateFileName = path.basename(String(candidateFileName || "").trim());
-      const candidateFilePath = path.join(examineePhotoStorageDirectoryPath, normalizedCandidateFileName);
-
-      try {
-        const photoBlob = await fs.promises.readFile(candidateFilePath);
-
-        if (Buffer.isBuffer(photoBlob) && photoBlob.length > 0) {
-          const fileExtension = path.extname(normalizedCandidateFileName).toLowerCase();
-
-          return {
-            photoBlob,
-            photoMime: getApplicantStoredPhotoMimeType(fileExtension) || "application/octet-stream",
-            photoName: normalizedCandidateFileName,
-          };
-        }
-      } catch (error) {
-        if (error?.code !== "ENOENT") {
-          throw error;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  async function readStoredApplicantFile(fileName = "", fileMime = "") {
-    const normalizedFileName = path.basename(String(fileName || "").trim());
-
-    if (!normalizedFileName) {
-      return null;
-    }
-
-    const candidateFilePath = path.join(applicantFileStorageDirectoryPath, normalizedFileName);
-
-    try {
-      const fileBlob = await fs.promises.readFile(candidateFilePath);
-
-      if (Buffer.isBuffer(fileBlob) && fileBlob.length > 0) {
-        return {
-          fileBlob,
-          fileMime: String(fileMime || "").trim() || "application/octet-stream",
-          fileName: normalizedFileName,
-        };
-      }
-    } catch (error) {
-      if (error?.code !== "ENOENT") {
-        throw error;
-      }
-    }
-
-    return null;
-  }
-
-  async function deleteStoredFileIfExists(filePath = "") {
-    const normalizedFilePath = String(filePath || "").trim();
-
-    if (!normalizedFilePath) {
-      return 0;
-    }
-
-    try {
-      await fs.promises.unlink(normalizedFilePath);
-      return 1;
-    } catch (error) {
-      if (error?.code === "ENOENT") {
-        return 0;
-      }
-
-      return 0;
-    }
-  }
-
-  async function deleteApplicantStoredPhotoFiles(submissionId, examineeNo = "", photoName = "") {
-    const normalizedSubmissionId = Number(submissionId);
-    const candidateFileNames = Array.from(
-      new Set(
-        getApplicantStoredPhotoCandidateFileNames(examineeNo, photoName)
-          .map((fileName) => path.basename(String(fileName || "").trim()))
-          .filter(Boolean),
-      ),
-    );
-    const currentDeleteResults = await Promise.all(
-      candidateFileNames.map((fileName) => deleteStoredFileIfExists(path.join(applicantPhotoStorageDirectoryPath, fileName))),
-    );
-    let legacyDeleteResults = [];
-
-    if (Number.isInteger(normalizedSubmissionId) && normalizedSubmissionId > 0) {
-      const legacyPhotoDirectoryPath = path.join(legacyApplicantPhotoStorageDirectoryPath, String(normalizedSubmissionId));
-      const legacyCandidateFileNames = Array.from(
-        new Set(
-          getLegacyApplicantStoredPhotoCandidateFileNames(photoName)
-            .map((fileName) => path.basename(String(fileName || "").trim()))
-            .filter(Boolean),
-        ),
-      );
-
-      legacyDeleteResults = await Promise.all(
-        legacyCandidateFileNames.map((fileName) => deleteStoredFileIfExists(path.join(legacyPhotoDirectoryPath, fileName))),
-      );
-
-      const remainingLegacyEntries = await fs.promises.readdir(legacyPhotoDirectoryPath).catch((error) => {
-        if (error?.code === "ENOENT") {
-          return null;
-        }
-
-        return null;
-      });
-
-      if (Array.isArray(remainingLegacyEntries) && remainingLegacyEntries.length === 0) {
-        await fs.promises.rmdir(legacyPhotoDirectoryPath).catch(() => 0);
-      }
-    }
-
-    return [...currentDeleteResults, ...legacyDeleteResults].reduce((total, value) => total + Number(value || 0), 0);
-  }
-
-  async function deleteApplicantStoredFileVariants(fileName = "") {
-    const normalizedFileName = path.basename(String(fileName || "").trim());
-
-    if (!normalizedFileName) {
-      return 0;
-    }
-
-    const parsedFileName = path.parse(normalizedFileName);
-    const siblingEntries = await fs.promises.readdir(applicantFileStorageDirectoryPath, { withFileTypes: true }).catch((error) => {
-      if (error?.code === "ENOENT") {
-        return [];
-      }
-
-      return [];
-    });
-    const candidateFileNames = siblingEntries
-      .filter((entry) => entry.isFile() && path.parse(entry.name).name === parsedFileName.name)
-      .map((entry) => entry.name);
-
-    if (candidateFileNames.length === 0) {
-      candidateFileNames.push(normalizedFileName);
-    }
-
-    const deleteResults = await Promise.all(
-      Array.from(
-        new Set(
-          candidateFileNames
-            .map((candidateFileName) => path.basename(String(candidateFileName || "").trim()))
-            .filter(Boolean),
-        ),
-      ).map((candidateFileName) => deleteStoredFileIfExists(path.join(applicantFileStorageDirectoryPath, candidateFileName))),
-    );
-
-    return deleteResults.reduce((total, value) => total + Number(value || 0), 0);
-  }
-
-  function buildStoredApplicantPhotoRecord(examineeNo, photoValue = {}, options = {}) {
-    const normalizedExamineeNo = String(examineeNo || "").trim();
-    const normalizedPhotoValue = normalizeApplicantStoredPhotoValue(photoValue);
-    const bufferedPhoto = Buffer.isBuffer(options.photoBuffer) ? options.photoBuffer : null;
-
-    if (!normalizedExamineeNo || normalizedPhotoValue.hasPhoto !== true) {
-      return null;
-    }
-
-    const extension = resolveApplicantStoredPhotoExtension(normalizedPhotoValue);
-    const targetFileName = `${normalizedExamineeNo}${extension}`;
-    const targetFilePath = path.join(applicantPhotoStorageDirectoryPath, targetFileName);
-    const photoBuffer = bufferedPhoto || Buffer.from(String(photoValue.base64 || "").trim(), "base64");
-
-    if (!Buffer.isBuffer(photoBuffer) || photoBuffer.length === 0) {
-      throw createHttpError(400, "사진 파일 데이터가 없습니다.", "APPLICANT_PHOTO_BUFFER_EMPTY");
-    }
-
-    return {
-      examineeNo: normalizedExamineeNo,
-      fileName: targetFileName,
-      filePath: targetFilePath,
-      mimeType: getApplicantStoredPhotoMimeType(extension) || normalizedPhotoValue.mimeType || "image/jpeg",
-      photoBuffer,
-    };
-  }
-
-  async function persistApplicantPhotoFile(storedPhotoRecord = null) {
-    if (!storedPhotoRecord?.filePath || !Buffer.isBuffer(storedPhotoRecord.photoBuffer) || storedPhotoRecord.photoBuffer.length === 0) {
-      return null;
-    }
-
-    const normalizedFilePath = String(storedPhotoRecord.filePath || "").trim();
-    const parsedFilePath = path.parse(normalizedFilePath);
-
-    await fs.promises.mkdir(parsedFilePath.dir, { recursive: true });
-    await fs.promises.writeFile(normalizedFilePath, storedPhotoRecord.photoBuffer);
-
-    await Promise.all(
-      [".jpg", ".jpeg", ".png"]
-        .filter((candidateExtension) => candidateExtension !== parsedFilePath.ext)
-        .map(async (candidateExtension) => {
-          const candidatePath = path.join(parsedFilePath.dir, `${parsedFilePath.name}${candidateExtension}`);
-
-          try {
-            await fs.promises.unlink(candidatePath);
-          } catch (error) {
-            if (error?.code !== "ENOENT") {
-              throw error;
-            }
-          }
-        }),
-    );
-
-    return storedPhotoRecord;
-  }
-
-  function buildStoredApplicantFileRecord(examineeNo, questionText = "", fieldKey = "", fileValue = {}, options = {}) {
-    const normalizedExamineeNo = String(examineeNo || "").trim();
-    const normalizedFileValue = normalizeApplicantStoredFileValue(fileValue);
-    const bufferedFile = Buffer.isBuffer(options.fileBuffer) ? options.fileBuffer : null;
-
-    if (!normalizedExamineeNo || normalizedFileValue.hasFile !== true) {
-      return null;
-    }
-
-    const sanitizedQuestionTitle = sanitizeApplicantStoredFileNameSegment(questionText, fieldKey || "file");
-    const extension = resolveApplicantStoredFileExtension(normalizedFileValue);
-    const targetFileName = `${normalizedExamineeNo}_${sanitizedQuestionTitle}${extension}`;
-    const filePath = path.join(applicantFileStorageDirectoryPath, targetFileName);
-    const fileBuffer = bufferedFile || Buffer.from(String(fileValue?.base64 || "").trim(), "base64");
-
-    if (!Buffer.isBuffer(fileBuffer) || fileBuffer.length === 0) {
-      throw createHttpError(400, "첨부 파일 데이터가 없습니다.", "APPLICANT_FILE_BUFFER_EMPTY");
-    }
-
-    return {
-      fieldKey: String(fieldKey || "").trim(),
-      questionText: String(questionText || "").trim(),
-      fileName: targetFileName,
-      filePath,
-      mimeType: normalizedFileValue.mimeType || "application/octet-stream",
-      fileBuffer,
-    };
-  }
-
-  async function persistApplicantFile(storedFileRecord = null) {
-    if (!storedFileRecord?.filePath || !Buffer.isBuffer(storedFileRecord.fileBuffer) || storedFileRecord.fileBuffer.length === 0) {
-      return null;
-    }
-
-    const normalizedFilePath = String(storedFileRecord.filePath || "").trim();
-    const parsedFilePath = path.parse(normalizedFilePath);
-
-    await fs.promises.mkdir(parsedFilePath.dir, { recursive: true });
-    await fs.promises.writeFile(normalizedFilePath, storedFileRecord.fileBuffer);
-
-    const siblingEntries = await fs.promises.readdir(parsedFilePath.dir, { withFileTypes: true }).catch((error) => {
-      if (error?.code === "ENOENT") {
-        return [];
-      }
-
-      throw error;
-    });
-
-    await Promise.all(
-      siblingEntries
-        .filter((entry) => entry.isFile() && path.parse(entry.name).name === parsedFilePath.name && entry.name !== parsedFilePath.base)
-        .map(async (entry) => {
-          const candidatePath = path.join(parsedFilePath.dir, entry.name);
-
-          try {
-            await fs.promises.unlink(candidatePath);
-          } catch (error) {
-            if (error?.code !== "ENOENT") {
-              throw error;
-            }
-          }
-        }),
-    );
-
-    return storedFileRecord;
-  }
-
-  async function buildPromotedApplicantPhotoRecord(examineeNo, submissionId, photoValue = {}, options = {}) {
-    const normalizedExamineeNo = String(examineeNo || "").trim();
-    const normalizedPhotoValue = normalizeApplicantStoredPhotoValue(photoValue);
-    let photoBuffer = Buffer.isBuffer(options.photoBuffer) ? options.photoBuffer : null;
-
-    if (!normalizedExamineeNo || normalizedPhotoValue.hasPhoto !== true) {
-      return null;
-    }
-
-    if (!photoBuffer || photoBuffer.length === 0) {
-      const normalizedBase64 = String(photoValue?.base64 || "").trim();
-
-      if (normalizedBase64) {
-        photoBuffer = Buffer.from(normalizedBase64, "base64");
-      }
-    }
-
-    if (!photoBuffer || photoBuffer.length === 0) {
-      const storedApplicantPhoto = await readStoredApplicantPhotoFile(submissionId, normalizedExamineeNo, normalizedPhotoValue.fileName, normalizedPhotoValue.mimeType);
-      photoBuffer = storedApplicantPhoto?.photoBlob || null;
-    }
-
-    if (!Buffer.isBuffer(photoBuffer) || photoBuffer.length === 0) {
-      return null;
-    }
-
-    const extension = resolveApplicantStoredPhotoExtension(normalizedPhotoValue);
-    const targetFileName = `${normalizedExamineeNo}${extension}`;
-
-    return {
-      fileName: targetFileName,
-      filePath: path.join(examineePhotoStorageDirectoryPath, targetFileName),
-      mimeType: getApplicantStoredPhotoMimeType(extension) || normalizedPhotoValue.mimeType || "image/jpeg",
-      photoBuffer,
-    };
-  }
-
-  async function persistPromotedApplicantPhotoFile(storedPhotoRecord = null) {
-    if (!storedPhotoRecord?.filePath || !Buffer.isBuffer(storedPhotoRecord.photoBuffer) || storedPhotoRecord.photoBuffer.length === 0) {
-      return null;
-    }
-
-    const normalizedFilePath = String(storedPhotoRecord.filePath || "").trim();
-    const parsedFilePath = path.parse(normalizedFilePath);
-
-    await fs.promises.mkdir(parsedFilePath.dir, { recursive: true });
-    await fs.promises.writeFile(normalizedFilePath, storedPhotoRecord.photoBuffer);
-
-    await Promise.all(
-      [".jpg", ".jpeg", ".png"]
-        .filter((candidateExtension) => candidateExtension !== parsedFilePath.ext)
-        .map(async (candidateExtension) => {
-          const candidatePath = path.join(parsedFilePath.dir, `${parsedFilePath.name}${candidateExtension}`);
-
-          try {
-            await fs.promises.unlink(candidatePath);
-          } catch (error) {
-            if (error?.code !== "ENOENT") {
-              throw error;
-            }
-          }
-        }),
-    );
-
-    return storedPhotoRecord;
-  }
-
-  async function deleteApplicantPromotionPhotoFiles(examineeRows = []) {
-    const candidateFileNames = Array.from(
-      new Set(
-        (Array.isArray(examineeRows) ? examineeRows : [])
-          .flatMap((row) => {
-            const normalizedPhotoName = path.basename(String(row?.photoName || "").trim());
-            const normalizedExamineeNo = String(row?.examineeNo || "").trim();
-
-            return [
-              normalizedPhotoName,
-              normalizedExamineeNo ? `${normalizedExamineeNo}.jpg` : "",
-              normalizedExamineeNo ? `${normalizedExamineeNo}.jpeg` : "",
-              normalizedExamineeNo ? `${normalizedExamineeNo}.png` : "",
-            ].filter(Boolean);
-          }),
-      ),
-    );
-
-    const deleteResults = await Promise.all(
-      candidateFileNames.map(async (fileName) => {
-        try {
-          await fs.promises.unlink(path.join(examineePhotoStorageDirectoryPath, path.basename(String(fileName || "").trim())));
-          return 1;
-        } catch (error) {
-          if (error?.code === "ENOENT") {
-            return 0;
-          }
-
-          return 0;
-        }
-      }),
-    );
-
-    return deleteResults.reduce((total, value) => total + Number(value || 0), 0);
-  }
-
-  async function deleteApplicantSubmissionArtifacts(submission = null, promotedExamineeRows = []) {
-    const normalizedSubmission = submission && typeof submission === "object" ? submission : null;
-
-    if (!normalizedSubmission) {
-      return {
-        deletedApplicantPhotoCount: 0,
-        deletedApplicantFileCount: 0,
-        deletedPromotedPhotoCount: 0,
-      };
-    }
-
-    const answerItems = Array.isArray(normalizedSubmission.answerItems) ? normalizedSubmission.answerItems : [];
-    const photoAnswerItem = answerItems.find((answerItem) => answerItem?.inputType === "photo") || null;
-    const fileNames = Array.from(
-      new Set(
-        answerItems
-          .filter((answerItem) => answerItem?.inputType === "file")
-          .map((answerItem) => path.basename(String(answerItem?.value?.fileName || "").trim()))
-          .filter(Boolean),
-      ),
-    );
-    const deletedApplicantPhotoCount = await deleteApplicantStoredPhotoFiles(
-      normalizedSubmission.id,
-      normalizedSubmission.promotedExamineeNo,
-      photoAnswerItem?.value?.fileName || normalizedSubmission.internalPhotoValue?.fileName || "",
-    );
-    const deletedApplicantFileResults = await Promise.all(
-      fileNames.map((fileName) => deleteApplicantStoredFileVariants(fileName)),
-    );
-    const deletedPromotedPhotoCount = await deleteApplicantPromotionPhotoFiles(promotedExamineeRows);
-
-    return {
-      deletedApplicantPhotoCount,
-      deletedApplicantFileCount: deletedApplicantFileResults.reduce((total, value) => total + Number(value || 0), 0),
-      deletedPromotedPhotoCount,
-    };
-  }
-
   async function migrateApplicantPhotoStorage() {
     const photoRows = await query(`
       SELECT
@@ -5467,7 +3148,7 @@ function createApplicantService({
           normalizedStoredPhotoValue.fileName,
           normalizedStoredPhotoValue.mimeType,
         );
-        photoBuffer = storedApplicantPhoto?.photoBlob || null;
+        photoBuffer = storedApplicantPhoto?.photoBlob || (await readStoredPromotedPhotoFile(normalizedExamineeNo))?.photoBlob || null;
       }
 
       if (!Buffer.isBuffer(photoBuffer) || photoBuffer.length === 0) {
@@ -5527,6 +3208,11 @@ function createApplicantService({
   }
 
   function normalizeApplicantAnswerValue(field, rawValue, applicantIdentity, existingSubmission = null) {
+    try { return normalizeApplicantAnswerValueForField(field, rawValue, applicantIdentity, existingSubmission); }
+    catch (error) { error.fieldKey = field.fieldKey; throw error; }
+  }
+
+  function normalizeApplicantAnswerValueForField(field, rawValue, applicantIdentity, existingSubmission = null) {
     if (!field || !field.fieldKey) {
       return "";
     }
@@ -5570,6 +3256,9 @@ function createApplicantService({
       const nextFilePayload = normalizeApplicantFilePayload(rawValue);
 
       if (nextFilePayload) {
+        if (!isAllowedUploadExtension(nextFilePayload.fileName, field.allowedExtensions)) {
+          throw createHttpError(400, `${field.questionText}: ${field.allowedExtensions.join(", ")} 파일만 업로드할 수 있습니다.`, "APPLICANT_FILE_EXTENSION_INVALID");
+        }
         const normalizedStoredFileValue = normalizeApplicantStoredFileValue(nextFilePayload);
 
         return {
@@ -5733,6 +3422,8 @@ function createApplicantService({
           fileUploads.push({
             fieldKey: field.fieldKey,
             questionText: field.questionText,
+            fileNamePattern: field.fileNamePattern,
+            allowedExtensions: field.allowedExtensions,
             ...normalizedFileValue,
             base64: String(normalizedValue.base64 || "").trim(),
           });
@@ -5782,27 +3473,20 @@ function createApplicantService({
     };
   }
 
-  function buildPromotableApplicantRecord(submission = {}) {
+  function buildApplicantSystemRecord(submission = {}) {
     const systemValues = {
       name: submission.name || "",
       birth: "",
-      date: "",
-      time: "",
       nationality: "",
       track: "",
       admission: "",
       series: "",
       unit: "",
       major: "",
-      building: "",
-      room: "",
-      group: "",
       admissionCode: "",
       seriesCode: "",
       unitCode: "",
       majorCode: "",
-      buildingCode: "",
-      roomCode: "",
     };
 
     normalizeStoredAnswerItems(submission.answerItems).forEach((answerItem) => {
@@ -5814,10 +3498,12 @@ function createApplicantService({
         return;
       }
 
-      systemValues[answerItem.systemFieldKey] = String(answerItem.value || "").trim();
+      if (Object.hasOwn(systemValues, answerItem.systemFieldKey)) {
+        systemValues[answerItem.systemFieldKey] = String(answerItem.value || "").trim();
+      }
     });
 
-    const promotionOverride = normalizeApplicantPromotionOverride(
+    const promotionOverride = normalizeStoredTicketOverrides(
       submission?.promotionOverrideJson || submission?.promotionOverride || null,
     );
 
@@ -5828,12 +3514,12 @@ function createApplicantService({
     return systemValues;
   }
 
-  async function buildApplicantAdmitCardRecordFromSubmission(submission = {}) {
+  async function buildApplicantAdmitCardRecordFromSubmission(submission = {}, { includePhoto = true } = {}) {
     const normalizedSubmissionId = Number(submission?.id || 0);
-    const promotableRecord = buildPromotableApplicantRecord(submission);
+    const applicationRecord = buildApplicantSystemRecord(submission);
     let photoRecord = null;
 
-    if (normalizedSubmissionId > 0) {
+    if (includePhoto && normalizedSubmissionId > 0) {
       try {
         photoRecord = await getApplicantSubmissionPhoto(normalizedSubmissionId);
       } catch (error) {
@@ -5844,50 +3530,30 @@ function createApplicantService({
     }
 
     return {
-      date: String(promotableRecord.date || "").trim(),
-      group: String(promotableRecord.group || "").trim(),
-      time: String(promotableRecord.time || "").trim(),
-      track: String(promotableRecord.track || "").trim(),
-      admission: String(promotableRecord.admission || "").trim(),
-      series: String(promotableRecord.series || "").trim(),
-      unit: String(promotableRecord.unit || "").trim(),
-      major: String(promotableRecord.major || "").trim(),
-      building: String(promotableRecord.building || "").trim(),
-      room: String(promotableRecord.room || "").trim(),
+      ...applicationRecord,
+      submissionId: normalizedSubmissionId,
+      hasPhoto: submission.hasPhoto,
+      photoVersion: Date.parse(submission.updatedAt) || 0,
+      track: String(applicationRecord.track || "").trim(),
+      admission: String(applicationRecord.admission || "").trim(),
+      series: String(applicationRecord.series || "").trim(),
+      unit: String(applicationRecord.unit || "").trim(),
+      major: String(applicationRecord.major || "").trim(),
       examineeNo: String(submission?.promotedExamineeNo || "").trim(),
-      name: String(promotableRecord.name || submission?.name || "").trim(),
-      birth: String(promotableRecord.birth || "").trim(),
+      name: String(applicationRecord.name || submission?.name || "").trim(),
+      birth: String(applicationRecord.birth || "").trim(),
       photoBlob: photoRecord?.photoBlob || null,
       photoMime: String(photoRecord?.photoMime || "").trim(),
       photoName: String(photoRecord?.photoName || "").trim(),
     };
   }
 
-  function getApplicantPromotionMissingFields(promotableRecord = {}) {
-    return APPLICANT_PROMOTION_REQUIRED_FIELDS.filter((fieldKey) => !String(promotableRecord[fieldKey] || "").trim());
-  }
-
-  function resolveExamNoSourceDate(promotableRecord = {}) {
-    const sourceDate = String(promotableRecord.date || "").trim();
-
-    if (APPLICANT_DATE_PATTERN.test(sourceDate)) {
-      const [yearText, monthText, dayText] = sourceDate.split("-");
-      const candidateDate = new Date(Number(yearText), Number(monthText) - 1, Number(dayText));
-
-      if (!Number.isNaN(candidateDate.getTime())) {
-        return candidateDate;
-      }
-    }
-
-    return new Date();
-  }
-
-  function resolveApplicantRecruitmentUnit(recruitmentUnits = [], promotableRecord = {}) {
-    const normalizedTrackName = String(promotableRecord.track || "").trim();
-    const normalizedAdmissionName = String(promotableRecord.admission || "").trim();
-    const normalizedSeriesName = String(promotableRecord.series || "").trim();
-    const normalizedUnitName = String(promotableRecord.unit || "").trim();
-    const normalizedMajorName = String(promotableRecord.major || "").trim();
+  function resolveApplicantRecruitmentUnit(recruitmentUnits = [], applicationRecord = {}) {
+    const normalizedTrackName = String(applicationRecord.track || "").trim();
+    const normalizedAdmissionName = String(applicationRecord.admission || "").trim();
+    const normalizedSeriesName = String(applicationRecord.series || "").trim();
+    const normalizedUnitName = String(applicationRecord.unit || "").trim();
+    const normalizedMajorName = String(applicationRecord.major || "").trim();
     const candidateUnits = (Array.isArray(recruitmentUnits) ? recruitmentUnits : []).filter(
       (unit) =>
         unit.trackName === normalizedTrackName &&
@@ -5921,7 +3587,7 @@ function createApplicantService({
     return normalizedPattern;
   }
 
-  function resolveApplicantExamNoComponentValue(componentKey = "", promotableRecord = {}, recruitmentUnit = null) {
+  function resolveApplicantExamNoComponentValue(componentKey = "", applicationRecord = {}, recruitmentUnit = null) {
     const normalizedComponentKey = String(componentKey || "").trim();
 
     if (normalizedComponentKey === "admissionCode") {
@@ -5957,7 +3623,7 @@ function createApplicantService({
     if (normalizedComponentKey === "nationalityCode") {
       const nationalityOption =
         typeof findApplicantNationalityOption === "function"
-          ? findApplicantNationalityOption(String(promotableRecord.nationality || "").trim())
+          ? findApplicantNationalityOption(String(applicationRecord.nationality || "").trim())
           : null;
       const value = String(nationalityOption?.code || "").trim();
 
@@ -5971,7 +3637,7 @@ function createApplicantService({
     return "";
   }
 
-  function buildApplicantExamNoFromComponents(settings = {}, promotableRecord = {}, recruitmentUnit = null, sequence = 1) {
+  function buildApplicantExamNoFromComponents(settings = {}, applicationRecord = {}, recruitmentUnit = null, sequence = 1) {
     const components = normalizeApplicantExamNoComponents(settings.components ?? APPLICANT_DEFAULT_EXAM_NO_COMPONENTS);
     const digitCount = normalizeApplicantExamNoDigitCount(settings.digitCount ?? APPLICANT_DEFAULT_EXAM_NO_DIGIT_COUNT);
     const fixedValues = components.map((componentKey) => {
@@ -5979,7 +3645,7 @@ function createApplicantService({
         return "";
       }
 
-      return resolveApplicantExamNoComponentValue(componentKey, promotableRecord, recruitmentUnit);
+      return resolveApplicantExamNoComponentValue(componentKey, applicationRecord, recruitmentUnit);
     });
     const fixedLength = fixedValues.reduce((total, value) => total + value.length, 0);
 
@@ -6035,13 +3701,13 @@ function createApplicantService({
       .replace(/\{SEQ(?::\d{1,2})?\}/g, sequenceValue);
   }
 
-  async function generateApplicantExamineeNo(connection, settings = {}, promotableRecord = {}, options = {}) {
+  async function generateApplicantExamineeNo(connection, settings = {}, applicationRecord = {}, options = {}) {
     const recruitmentUnits = Array.isArray(options.recruitmentUnits)
       ? options.recruitmentUnits
       : await getApplicantRecruitmentUnits({
           queryable: connection.query.bind(connection),
         });
-    const matchedRecruitmentUnit = options.matchedRecruitmentUnit || resolveApplicantRecruitmentUnit(recruitmentUnits, promotableRecord);
+    const matchedRecruitmentUnit = options.matchedRecruitmentUnit || resolveApplicantRecruitmentUnit(recruitmentUnits, applicationRecord);
     const selectedComponents = Array.isArray(settings.components) ? settings.components.filter(Boolean) : [];
     const hasStructuredSettings = selectedComponents.length > 0;
     const pattern = resolveApplicantExamNoPattern(settings.examNoPattern || defaultApplicantExamNoPattern, matchedRecruitmentUnit);
@@ -6049,7 +3715,7 @@ function createApplicantService({
       selectedComponents.some((componentKey) => ["admissionCode", "seriesCode", "unitCode"].includes(componentKey)) ||
       APPLICANT_EXAM_NO_CODE_TOKEN_PATTERN.test(pattern);
     const sequenceStart = normalizeApplicantSequenceStart(settings.examNoSequenceStart || defaultApplicantExamNoSequenceStart);
-    const sourceDate = resolveExamNoSourceDate(promotableRecord);
+    const sourceDate = new Date();
 
     if (requiresRecruitmentUnit && !matchedRecruitmentUnit) {
       throw createHttpError(
@@ -6061,23 +3727,13 @@ function createApplicantService({
 
     for (let sequence = sequenceStart; sequence < sequenceStart + 500000; sequence += 1) {
       const candidateValue = hasStructuredSettings
-        ? buildApplicantExamNoFromComponents(settings, promotableRecord, matchedRecruitmentUnit, sequence)
+        ? buildApplicantExamNoFromComponents(settings, applicationRecord, matchedRecruitmentUnit, sequence)
         : buildApplicantExamNoCandidate(pattern, sourceDate, sequence, matchedRecruitmentUnit);
       const [rows] = await connection.query(
         `
-          SELECT assignedExamineeNo
-          FROM (
-            SELECT examinee_no AS assignedExamineeNo
-            FROM examinee
-            WHERE examinee_no = ?
-            UNION ALL
-            SELECT promoted_examinee_no AS assignedExamineeNo
-            FROM app_meta
-            WHERE promoted_examinee_no = ?
-          ) assigned_exam_no
-          LIMIT 1
+          SELECT promoted_examinee_no FROM app_meta WHERE promoted_examinee_no = ? LIMIT 1
         `,
-        [candidateValue, candidateValue],
+        [candidateValue],
       );
 
       if (rows.length === 0) {
@@ -6089,14 +3745,14 @@ function createApplicantService({
   }
 
   async function prepareApplicantSubmissionExamNo(connection, submission = {}, settings = {}, options = {}) {
-    const promotableRecord = buildPromotableApplicantRecord(submission);
+    const applicationRecord = buildApplicantSystemRecord(submission);
     const recruitmentUnits = await getApplicantRecruitmentUnits({
       queryable: connection.query.bind(connection),
     });
-    const recruitmentUnit = resolveApplicantRecruitmentUnit(recruitmentUnits, promotableRecord);
+    const recruitmentUnit = resolveApplicantRecruitmentUnit(recruitmentUnits, applicationRecord);
     const examineeNo =
       submission.promotedExamineeNo ||
-      (await generateApplicantExamineeNo(connection, settings, promotableRecord, {
+      (await generateApplicantExamineeNo(connection, settings, applicationRecord, {
         recruitmentUnits,
         matchedRecruitmentUnit: recruitmentUnit,
       }));
@@ -6104,11 +3760,9 @@ function createApplicantService({
     const uploadedFileUploads = Array.isArray(options.uploadedFileUploads) ? options.uploadedFileUploads : [];
     const resolvedPhotoValue = uploadedPhotoValue || submission?.internalPhotoValue || null;
     const applicantPhotoRecord = buildStoredApplicantPhotoRecord(examineeNo, resolvedPhotoValue);
-    const storedPhotoRecord = await buildPromotedApplicantPhotoRecord(examineeNo, submission?.id, resolvedPhotoValue, {
-      photoBuffer: applicantPhotoRecord?.photoBuffer || null,
-    });
+
     const applicantFileRecords = uploadedFileUploads
-      .map((fileUpload) => buildStoredApplicantFileRecord(examineeNo, fileUpload?.questionText, fileUpload?.fieldKey, fileUpload))
+      .map((fileUpload) => buildStoredApplicantFileRecord(examineeNo, fileUpload?.questionText, fileUpload?.fieldKey, fileUpload, fileUpload))
       .filter(Boolean);
     const applicantFileValuesByFieldKey = applicantFileRecords.reduce((fieldMap, storedFileRecord) => {
       fieldMap[String(storedFileRecord.fieldKey || "").trim()] = buildStoredApplicantFileAnswerData(storedFileRecord);
@@ -6116,7 +3770,7 @@ function createApplicantService({
     }, {});
 
     return {
-      promotableRecord,
+      applicationRecord,
       examineeNo,
       recruitmentUnit,
       applicantFileRecords,
@@ -6125,7 +3779,7 @@ function createApplicantService({
       applicantPhotoRecord,
       applicantPhotoValue:
         uploadedPhotoValue && applicantPhotoRecord ? buildStoredApplicantPhotoAnswerData(applicantPhotoRecord, uploadedPhotoValue) : null,
-      storedPhotoRecord,
+
     };
   }
 
@@ -6183,839 +3837,6 @@ function createApplicantService({
     }
 
     await Promise.all(updateTasks);
-  }
-
-  async function upsertApplicantSubmissionIntoExaminee(connection, submission = {}, settings = {}, preparedRecord = null) {
-    const resolvedPreparedRecord =
-      preparedRecord && typeof preparedRecord === "object"
-        ? preparedRecord
-        : await prepareApplicantSubmissionExamNo(connection, submission, settings);
-    const promotableRecord = resolvedPreparedRecord.promotableRecord || buildPromotableApplicantRecord(submission);
-    const recruitmentUnit =
-      resolvedPreparedRecord.recruitmentUnit ||
-      resolveApplicantRecruitmentUnit(
-        await getApplicantRecruitmentUnits({
-          queryable: connection.query.bind(connection),
-        }),
-        promotableRecord,
-      );
-    const missingFields = getApplicantPromotionMissingFields(promotableRecord);
-
-    if (missingFields.length > 0) {
-      throw createHttpError(
-        400,
-        `수험생 데이터에 필요한 항목이 비어 있습니다: ${missingFields.join(", ")}`,
-        "APPLICANT_PROMOTION_REQUIRED_FIELDS_MISSING",
-      );
-    }
-
-    const examineeNo = String(resolvedPreparedRecord.examineeNo || "").trim() || submission.promotedExamineeNo || (await generateApplicantExamineeNo(connection, settings, promotableRecord));
-    const [existingRows] = await connection.query(`SELECT examinee_no AS examineeNo FROM examinee WHERE examinee_no = ? LIMIT 1`, [examineeNo]);
-    const storedPhotoRecord =
-      resolvedPreparedRecord.storedPhotoRecord ??
-      (await buildPromotedApplicantPhotoRecord(examineeNo, submission?.id, submission?.internalPhotoValue || null, {
-        photoBuffer: resolvedPreparedRecord?.applicantPhotoRecord?.photoBuffer || null,
-      }));
-    const promotionCodes = buildApplicantPromotionCodeOverrides(recruitmentUnit);
-    const admissionCode = String(promotableRecord.admissionCode || promotionCodes.admissionCode || "").trim();
-    const seriesCode = String(promotableRecord.seriesCode || promotionCodes.seriesCode || "").trim();
-    const unitCode = String(promotableRecord.unitCode || promotionCodes.unitCode || "").trim();
-    const majorCode = String(promotableRecord.majorCode || promotionCodes.majorCode || "").trim();
-    const buildingCode = String(promotableRecord.buildingCode || "").trim();
-    const roomCode = String(promotableRecord.roomCode || "").trim();
-    const photoColumnsSql = storedPhotoRecord
-      ? `
-            photo_name = ?,
-            photo_mime = ?,
-      `
-      : "";
-    const photoParams = storedPhotoRecord
-      ? [storedPhotoRecord.fileName || null, storedPhotoRecord.mimeType || null]
-      : [];
-
-    if (existingRows.length > 0) {
-      await connection.query(
-        `
-          UPDATE examinee
-          SET
-            exam_date = ?,
-            \`time\` = ?,
-            track = ?,
-            admission = ?,
-            admission_code = ?,
-            series = ?,
-            series_code = ?,
-            unit = ?,
-            unit_code = ?,
-            major = ?,
-            major_code = ?,
-            building = ?,
-            building_code = ?,
-            room = ?,
-            room_code = ?,
-            \`group\` = ?,
-            name = ?,
-            birth_date = ?,
-            ${photoColumnsSql}
-            updated_at = CURRENT_TIMESTAMP
-          WHERE examinee_no = ?
-        `,
-        [
-          promotableRecord.date,
-          promotableRecord.time,
-          promotableRecord.track,
-          promotableRecord.admission,
-          admissionCode,
-          promotableRecord.series,
-          seriesCode,
-          promotableRecord.unit,
-          unitCode,
-          promotableRecord.major || "",
-          majorCode,
-          promotableRecord.building,
-          buildingCode,
-          promotableRecord.room,
-          roomCode,
-          promotableRecord.group || "",
-          promotableRecord.name,
-          promotableRecord.birth,
-          ...photoParams,
-          examineeNo,
-        ],
-      );
-
-      return {
-        examineeNo,
-        storedPhotoRecord,
-      };
-    }
-
-    await connection.query(
-      `
-        INSERT INTO examinee (
-          exam_date,
-          \`time\`,
-          track,
-          admission,
-          admission_code,
-          series,
-          series_code,
-          unit,
-          unit_code,
-          major,
-          major_code,
-          building,
-          building_code,
-          room,
-          room_code,
-          \`group\`,
-          examinee_no,
-          name,
-          birth_date,
-          photo_name,
-          photo_mime
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-        [
-          promotableRecord.date,
-          promotableRecord.time,
-          promotableRecord.track,
-          promotableRecord.admission,
-          admissionCode,
-          promotableRecord.series,
-          seriesCode,
-          promotableRecord.unit,
-          unitCode,
-          promotableRecord.major || "",
-          majorCode,
-          promotableRecord.building,
-          buildingCode,
-          promotableRecord.room,
-          roomCode,
-          promotableRecord.group || "",
-          examineeNo,
-          promotableRecord.name,
-          promotableRecord.birth,
-          storedPhotoRecord?.fileName || null,
-          storedPhotoRecord?.mimeType || null,
-        ],
-    );
-
-    return {
-      examineeNo,
-      storedPhotoRecord,
-    };
-  }
-
-  function buildApplicantPromotionCapacityShortageSummary(rows = [], breakField = DEFAULT_APPLICANT_PROMOTION_BREAK_FIELD) {
-    const normalizedBreakField = normalizeApplicantPromotionBreakField(breakField);
-    const shortageCounts = new Map();
-
-    (Array.isArray(rows) ? rows : []).forEach((row) => {
-      const errors = Array.isArray(row?.errors) ? row.errors : [];
-
-      if (!errors.includes(APPLICANT_PROMOTION_CAPACITY_ERROR_MESSAGE)) {
-        return;
-      }
-
-      const groupValue = String(row?.[normalizedBreakField] || "").trim() || "미지정";
-      shortageCounts.set(groupValue, Number(shortageCounts.get(groupValue) || 0) + 1);
-    });
-
-    const groups = [...shortageCounts.entries()]
-      .map(([value, count]) => ({
-        value,
-        count,
-      }))
-      .sort((leftGroup, rightGroup) => {
-        return rightGroup.count - leftGroup.count || compareApplicantPromotionText(leftGroup.value, rightGroup.value);
-      });
-
-    return {
-      fieldKey: normalizedBreakField,
-      fieldLabel: getApplicantPromotionFieldLabel(normalizedBreakField),
-      groupCount: groups.length,
-      applicantCount: groups.reduce((totalCount, group) => totalCount + Number(group.count || 0), 0),
-      groups,
-    };
-  }
-
-  function buildApplicantPromotionSummary(rows = [], options = {}) {
-    const normalizedRows = normalizeApplicantPromotionPreviewRows(rows);
-    const applicantRows = normalizedRows.filter((row) => Number(row.submissionId || 0) > 0);
-    const allowMissingPhoto = options.allowMissingPhoto === true;
-    const breakField = normalizeApplicantPromotionBreakField(options.breakField);
-    const errorCount = normalizedRows.filter((row) => row.status === "error").length;
-    const warningCount = applicantRows.filter((row) => row.status === "warning").length;
-    const readyCount = applicantRows.filter((row) => row.status === "ready").length;
-    const missingPhotoCount = applicantRows.filter((row) => !row.hasPhoto).length;
-    const capacityShortage = buildApplicantPromotionCapacityShortageSummary(applicantRows, breakField);
-
-    return {
-      totalCount: applicantRows.length,
-      readyCount,
-      warningCount,
-      errorCount,
-      missingPhotoCount,
-      breakField,
-      capacityShortageFieldLabel: capacityShortage.fieldLabel,
-      capacityShortageGroupCount: capacityShortage.groupCount,
-      capacityShortageApplicantCount: capacityShortage.applicantCount,
-      capacityShortageGroups: capacityShortage.groups,
-      canCommit: errorCount === 0 && (allowMissingPhoto || missingPhotoCount === 0),
-      allowMissingPhoto,
-    };
-  }
-
-  function buildApplicantPromotionCommitErrorMessage(summary = {}, rows = []) {
-    const messages = [];
-    const normalizedRows = normalizeApplicantPromotionPreviewRows(rows);
-    const sampleErrors = [];
-    const capacityShortageApplicantCount = Number(summary.capacityShortageApplicantCount || 0);
-    const capacityShortageGroups = Array.isArray(summary.capacityShortageGroups) ? summary.capacityShortageGroups : [];
-
-    if (Number(summary.errorCount || 0) > 0 && capacityShortageApplicantCount === 0) {
-      messages.push(`오류 ${summary.errorCount}건이 있습니다.`);
-    }
-
-    if (capacityShortageApplicantCount > 0) {
-      const fieldLabel = String(
-        summary.capacityShortageFieldLabel || getApplicantPromotionFieldLabel(summary.breakField || DEFAULT_APPLICANT_PROMOTION_BREAK_FIELD),
-      ).trim();
-      const groupCount = Number(summary.capacityShortageGroupCount || 0);
-      const groupSummary = capacityShortageGroups
-        .slice(0, 3)
-        .map((group) => `${String(group?.value || "미지정").trim() || "미지정"} ${Number(group?.count || 0)}명`)
-        .join(", ");
-      const extraGroupCount = Math.max(capacityShortageGroups.length - 3, 0);
-
-      messages.push(`${fieldLabel} ${groupCount}개에서 ${capacityShortageApplicantCount}명의 배정이 불가능합니다.`);
-
-      if (groupSummary) {
-        messages.push(groupSummary + (extraGroupCount > 0 ? ` 외 ${extraGroupCount}개 ${fieldLabel}` : ""));
-      }
-
-      messages.push("배정 데이터는 업데이트하지 않았습니다.");
-    }
-
-    if (summary.allowMissingPhoto !== true && Number(summary.missingPhotoCount || 0) > 0) {
-      messages.push(`사진 미등록 ${summary.missingPhotoCount}건이 있습니다.`);
-    }
-
-    normalizedRows.forEach((row) => {
-      row.errors.forEach((errorMessage) => {
-        if (
-          errorMessage === APPLICANT_PROMOTION_CAPACITY_ERROR_MESSAGE ||
-          (capacityShortageApplicantCount > 0 && errorMessage.startsWith("수험생 데이터에 필요한 항목이 비어 있습니다:")) ||
-          sampleErrors.includes(errorMessage) ||
-          sampleErrors.length >= 3
-        ) {
-          return;
-        }
-
-        sampleErrors.push(errorMessage);
-      });
-    });
-
-    if (sampleErrors.length > 0) {
-      messages.push(sampleErrors.join(" / "));
-    }
-
-    return messages.join(" ");
-  }
-
-  function buildApplicantPromotionPlanRow(entry = {}, options = {}) {
-    const promotionOverride = normalizeApplicantPromotionOverride(
-      options.promotionOverride != null ? options.promotionOverride : entry?.submission?.promotionOverride,
-    );
-    const promotableRecord =
-      options.promotableRecord && typeof options.promotableRecord === "object"
-        ? options.promotableRecord
-        : buildPromotableApplicantRecord({
-            ...entry.submission,
-            promotionOverride,
-          });
-    const recruitmentUnit = options.recruitmentUnit || null;
-
-    return {
-      submissionId: Number(entry.submissionId || 0),
-      submission: entry.submission,
-      promotionOverride,
-      promotionOverrideJson: stringifyApplicantPromotionOverride(promotionOverride),
-      preparedRecord: entry.preparedRecord
-        ? {
-            ...entry.preparedRecord,
-            promotableRecord,
-            recruitmentUnit,
-          }
-        : null,
-      examineeNo: String(entry.examineeNo || "").trim(),
-      name: String(promotableRecord?.name || "").trim(),
-      birth: String(promotableRecord?.birth || "").trim(),
-      track: String(promotableRecord?.track || "").trim(),
-      admission: String(promotableRecord?.admission || "").trim(),
-      series: String(promotableRecord?.series || "").trim(),
-      unit: String(promotableRecord?.unit || "").trim(),
-      major: String(promotableRecord?.major || "").trim(),
-      date: String(promotableRecord?.date || "").trim(),
-      time: String(promotableRecord?.time || "").trim(),
-      buildingCode: String(promotableRecord?.buildingCode || "").trim(),
-      building: String(promotableRecord?.building || "").trim(),
-      roomCode: String(promotableRecord?.roomCode || "").trim(),
-      room: String(promotableRecord?.room || "").trim(),
-      hasPhoto: entry.hasPhoto,
-      errors: Array.isArray(options.errors) ? [...options.errors] : [...(entry.errors || [])],
-    };
-  }
-
-  async function buildApplicantPromotionPlan(connection, submissionIds = [], assignmentRows = null, options = {}) {
-    const normalizedSubmissionIds = normalizeApplicantSubmissionIdList(submissionIds);
-    const promotionOptions = normalizeApplicantPromotionOptions(options);
-    const queryable = connection.query.bind(connection);
-    const submissions = await getApplicantSubmissionsByIds(normalizedSubmissionIds, {
-      queryable,
-      includeInternal: true,
-      forUpdate: options.forUpdate === true,
-    });
-    const submissionIdSet = new Set(submissions.map((submission) => Number(submission?.id || 0)));
-    const missingSubmissionIds = normalizedSubmissionIds.filter((submissionId) => !submissionIdSet.has(submissionId));
-
-    if (missingSubmissionIds.length > 0) {
-      throw createHttpError(404, "선택한 접수 이력 중 일부를 찾을 수 없습니다.", "APPLICANT_PROMOTION_SUBMISSION_NOT_FOUND");
-    }
-
-    const applicantSettings = options.settings || (await getApplicantSettings());
-    const recruitmentUnits = Array.isArray(options.recruitmentUnits)
-      ? options.recruitmentUnits
-      : await getApplicantRecruitmentUnits({ queryable });
-    const entriesByAssignmentBaseKey = new Map();
-    const reservedExamineeNoMap = new Map();
-
-    for (const submission of submissions) {
-      const submissionId = Number(submission?.id || 0);
-      const basePromotableRecord = buildPromotableApplicantRecord(submission);
-      const assignmentBaseKey = buildApplicantPromotionAssignmentBaseKey(basePromotableRecord);
-      const entry = {
-        submissionId,
-        submission,
-        basePromotableRecord,
-        assignmentBaseKey,
-        hasPhoto: getApplicantSubmissionHasPhoto(submission),
-        errors: [],
-        preparedRecord: null,
-        examineeNo: String(submission?.promotedExamineeNo || "").trim(),
-      };
-
-      if (String(submission?.status || "").trim() === "promoted") {
-        entry.errors.push("이미 수험생으로 이관된 접수 이력입니다.");
-      }
-
-      try {
-        entry.preparedRecord = await prepareApplicantSubmissionExamNo(connection, submission, applicantSettings);
-        entry.examineeNo = String(entry.preparedRecord?.examineeNo || entry.examineeNo || "").trim();
-      } catch (error) {
-        entry.errors.push(error?.message || "수험번호를 준비하지 못했습니다.");
-      }
-
-      if (entry.examineeNo) {
-        const existingSubmissionId = reservedExamineeNoMap.get(entry.examineeNo);
-
-        if (existingSubmissionId && existingSubmissionId !== submissionId) {
-          entry.errors.push(`선택한 접수 이력 사이에 중복 수험번호 '${entry.examineeNo}'가 있습니다.`);
-        } else {
-          reservedExamineeNoMap.set(entry.examineeNo, submissionId);
-        }
-      }
-
-      if (!entriesByAssignmentBaseKey.has(assignmentBaseKey)) {
-        entriesByAssignmentBaseKey.set(assignmentBaseKey, []);
-      }
-
-      entriesByAssignmentBaseKey.get(assignmentBaseKey).push(entry);
-    }
-
-    const assignmentSourceRows = Array.isArray(assignmentRows) ? assignmentRows : await getApplicantAssignments({ queryable });
-    const validatedAssignmentRows = validateApplicantAssignmentRows(assignmentSourceRows, { requireRows: false });
-
-    if (validatedAssignmentRows.length === 0) {
-      throw createHttpError(400, "배정표 관리에 등록된 배정표가 없습니다.", "APPLICANT_ASSIGNMENT_NOT_CONFIGURED");
-    }
-
-    const relevantAssignmentBaseKeys = new Set(entriesByAssignmentBaseKey.keys());
-    const assignmentRowsByAssignmentBaseKey = new Map();
-
-    validatedAssignmentRows
-      .filter((assignmentRow) => relevantAssignmentBaseKeys.has(buildApplicantPromotionAssignmentBaseKey(assignmentRow)))
-      .forEach((assignmentRow) => {
-        const assignmentBaseKey = buildApplicantPromotionAssignmentBaseKey(assignmentRow);
-
-        if (!assignmentRowsByAssignmentBaseKey.has(assignmentBaseKey)) {
-          assignmentRowsByAssignmentBaseKey.set(assignmentBaseKey, []);
-        }
-
-        assignmentRowsByAssignmentBaseKey.get(assignmentBaseKey).push(assignmentRow);
-      });
-
-    const planRows = [];
-    const normalizedSortFields = promotionOptions.sortFields.filter(Boolean);
-
-    relevantAssignmentBaseKeys.forEach((assignmentBaseKey) => {
-      const groupEntries = [...(entriesByAssignmentBaseKey.get(assignmentBaseKey) || [])];
-      const groupAssignments = [...(assignmentRowsByAssignmentBaseKey.get(assignmentBaseKey) || [])].sort((leftRow, rightRow) => {
-        return (
-          compareApplicantPromotionText(leftRow.date, rightRow.date) ||
-          compareApplicantPromotionText(leftRow.time, rightRow.time) ||
-          compareApplicantPromotionText(leftRow.buildingCode, rightRow.buildingCode) ||
-          compareApplicantPromotionText(leftRow.roomCode, rightRow.roomCode)
-        );
-      });
-      const sortEntries = (leftEntry, rightEntry) => {
-        for (const sortField of normalizedSortFields) {
-          const comparison = compareApplicantPromotionText(
-            getApplicantPromotionSortValue(leftEntry, sortField),
-            getApplicantPromotionSortValue(rightEntry, sortField),
-          );
-
-          if (comparison) {
-            return comparison;
-          }
-        }
-
-        return (
-          compareApplicantPromotionText(leftEntry.examineeNo, rightEntry.examineeNo) ||
-          Number(leftEntry.submissionId || 0) - Number(rightEntry.submissionId || 0)
-        );
-      };
-
-      groupEntries.sort(sortEntries);
-
-      if (groupAssignments.length === 0) {
-        groupEntries.forEach((entry) => {
-          const unassignedRecord = {
-            ...entry.basePromotableRecord,
-            date: "",
-            time: "",
-            buildingCode: "",
-            building: "",
-            roomCode: "",
-            room: "",
-          };
-          const recruitmentUnit =
-            entry.preparedRecord?.recruitmentUnit || resolveApplicantRecruitmentUnit(recruitmentUnits, entry.basePromotableRecord);
-          const errors = [...entry.errors, "배정표에 해당 모집시기/전형/계열/모집단위/전공이 없습니다."];
-
-          if (!recruitmentUnit) {
-            errors.push("전형 관리에서 일치하는 모집시기/전형/계열/모집단위/전공을 찾을 수 없습니다.");
-          }
-
-          const missingFields = getApplicantPromotionMissingFields(unassignedRecord);
-
-          if (missingFields.length > 0) {
-            errors.push(`수험생 데이터에 필요한 항목이 비어 있습니다: ${missingFields.join(", ")}`);
-          }
-
-          planRows.push(
-            buildApplicantPromotionPlanRow(entry, {
-              promotionOverride: normalizeApplicantPromotionOverride(entry.submission?.promotionOverride),
-              promotableRecord: unassignedRecord,
-              recruitmentUnit,
-              errors,
-            }),
-          );
-        });
-        return;
-      }
-
-      const remainingEntries = [...groupEntries];
-
-      groupAssignments.forEach((assignmentRow) => {
-        const roomCapacity = resolveApplicantPromotionRoomCapacity(assignmentRow, promotionOptions);
-        let roomAssignedCount = 0;
-        let roomBreakValue = "";
-
-        for (let entryIndex = 0; roomAssignedCount < roomCapacity && entryIndex < remainingEntries.length; entryIndex += 1) {
-          const entry = remainingEntries[entryIndex];
-
-          if (!doesApplicantAssignmentRowMatchPromotableRecord(assignmentRow, entry.basePromotableRecord)) {
-            continue;
-          }
-
-          const entryBreakValue = getApplicantPromotionSortValue(entry, promotionOptions.breakField);
-
-          if (roomAssignedCount > 0 && compareApplicantPromotionText(entryBreakValue, roomBreakValue) !== 0) {
-            break;
-          }
-
-          if (roomAssignedCount === 0) {
-            roomBreakValue = entryBreakValue;
-          }
-
-          remainingEntries.splice(entryIndex, 1);
-          entryIndex -= 1;
-          roomAssignedCount += 1;
-
-          const recruitmentUnit =
-            entry.preparedRecord?.recruitmentUnit || resolveApplicantRecruitmentUnit(recruitmentUnits, entry.basePromotableRecord);
-          const promotionOverride = {
-            ...normalizeApplicantPromotionOverride(entry.submission?.promotionOverride),
-            ...buildApplicantPromotionRoomOverrides(assignmentRow),
-            ...buildApplicantPromotionCodeOverrides(recruitmentUnit),
-          };
-          const promotableRecord = buildPromotableApplicantRecord({
-            ...entry.submission,
-            promotionOverride,
-          });
-          const errors = [...entry.errors];
-
-          if (!recruitmentUnit) {
-            errors.push("전형 관리에서 일치하는 모집시기/전형/계열/모집단위/전공을 찾을 수 없습니다.");
-          }
-
-          const missingFields = getApplicantPromotionMissingFields(promotableRecord);
-
-          if (missingFields.length > 0) {
-            errors.push(`수험생 데이터에 필요한 항목이 비어 있습니다: ${missingFields.join(", ")}`);
-          }
-
-          planRows.push(
-            buildApplicantPromotionPlanRow(entry, {
-              promotionOverride,
-              promotableRecord,
-              recruitmentUnit,
-              errors,
-            }),
-          );
-        }
-      });
-
-      remainingEntries.forEach((entry) => {
-        const recruitmentUnit =
-          entry.preparedRecord?.recruitmentUnit || resolveApplicantRecruitmentUnit(recruitmentUnits, entry.basePromotableRecord);
-        const unassignedRecord = {
-          ...entry.basePromotableRecord,
-          date: "",
-          time: "",
-          buildingCode: "",
-          building: "",
-          roomCode: "",
-          room: "",
-        };
-        const hasMatchingAssignmentRow = groupAssignments.some((assignmentRow) =>
-          doesApplicantAssignmentRowMatchPromotableRecord(assignmentRow, entry.basePromotableRecord),
-        );
-        const errors = [
-          ...entry.errors,
-          hasMatchingAssignmentRow ? APPLICANT_PROMOTION_CAPACITY_ERROR_MESSAGE : "배정표에 해당 모집시기/전형/계열/모집단위/전공이 없습니다.",
-        ];
-
-        if (!recruitmentUnit) {
-          errors.push("전형 관리에서 일치하는 모집시기/전형/계열/모집단위/전공을 찾을 수 없습니다.");
-        }
-
-        const missingFields = getApplicantPromotionMissingFields(unassignedRecord);
-
-        if (missingFields.length > 0) {
-          errors.push(`수험생 데이터에 필요한 항목이 비어 있습니다: ${missingFields.join(", ")}`);
-        }
-
-        planRows.push(
-          buildApplicantPromotionPlanRow(entry, {
-            promotionOverride: normalizeApplicantPromotionOverride(entry.submission?.promotionOverride),
-            promotableRecord: unassignedRecord,
-            recruitmentUnit,
-            errors,
-          }),
-        );
-      });
-    });
-
-    const orderedRows = [...planRows].sort((leftRow, rightRow) => {
-      const leftSubmissionId = Number(leftRow.submissionId || 0);
-
-      return (
-        compareApplicantPromotionText(leftRow.track, rightRow.track) ||
-        compareApplicantPromotionText(leftRow.admission, rightRow.admission) ||
-        compareApplicantPromotionText(leftRow.date, rightRow.date) ||
-        compareApplicantPromotionText(leftRow.time, rightRow.time) ||
-        compareApplicantPromotionText(leftRow.buildingCode, rightRow.buildingCode) ||
-        compareApplicantPromotionText(leftRow.roomCode, rightRow.roomCode) ||
-        compareApplicantPromotionText(leftRow.examineeNo, rightRow.examineeNo) ||
-        leftSubmissionId - Number(rightRow.submissionId || 0)
-      );
-    });
-    const summary = buildApplicantPromotionSummary(orderedRows, {
-      allowMissingPhoto: promotionOptions.allowMissingPhoto === true,
-      breakField: promotionOptions.breakField,
-    });
-
-    return {
-      rows: orderedRows,
-      summary,
-    };
-  }
-
-  async function previewApplicantSubmissionPromotions(payload = {}) {
-    const normalizedSubmissionIds = normalizeApplicantSubmissionIdList(payload.submissionIds);
-    await assertApplicantPromotionWindowClosed(normalizedSubmissionIds);
-    const connection = await getPool().getConnection();
-
-    try {
-      const plan = await buildApplicantPromotionPlan(connection, normalizedSubmissionIds, null, {
-        allowMissingPhoto: payload.allowMissingPhoto === true,
-        allowOverbooking: payload.allowOverbooking === true,
-        overbookingPercent: payload.overbookingPercent,
-        sortField1: payload.sortField1,
-        sortField2: payload.sortField2,
-        sortField3: payload.sortField3,
-        breakField: payload.breakField,
-      });
-
-      return {
-        rows: normalizeApplicantPromotionPreviewRows(plan.rows),
-        summary: plan.summary,
-      };
-    } finally {
-      connection.release();
-    }
-  }
-
-  async function commitApplicantSubmissionPromotions(payload = {}) {
-    const normalizedSubmissionIds = normalizeApplicantSubmissionIdList(payload.submissionIds);
-    await assertApplicantPromotionWindowClosed(normalizedSubmissionIds);
-    const connection = await getPool().getConnection();
-
-    try {
-      await connection.beginTransaction();
-      const applicantSettings = await getApplicantSettings();
-      const plan = await buildApplicantPromotionPlan(connection, normalizedSubmissionIds, null, {
-        allowMissingPhoto: payload.allowMissingPhoto === true,
-        allowOverbooking: payload.allowOverbooking === true,
-        overbookingPercent: payload.overbookingPercent,
-        sortField1: payload.sortField1,
-        sortField2: payload.sortField2,
-        sortField3: payload.sortField3,
-        breakField: payload.breakField,
-        forUpdate: true,
-        settings: applicantSettings,
-      });
-
-      if (!plan.summary.canCommit) {
-        throw createHttpError(
-          409,
-          buildApplicantPromotionCommitErrorMessage(plan.summary, plan.rows),
-          "APPLICANT_PROMOTION_COMMIT_BLOCKED",
-        );
-      }
-
-      const storedPhotoRecords = [];
-
-      for (const planRow of plan.rows) {
-        const normalizedSubmissionId = Number(planRow.submissionId || 0);
-
-        if (!Number.isInteger(normalizedSubmissionId) || normalizedSubmissionId <= 0) {
-          continue;
-        }
-
-        await connection.query(
-          `
-            INSERT INTO app_meta (
-              id,
-              promoted_examinee_no,
-              promotion_override_json,
-              promoted_at
-            )
-            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-            ON DUPLICATE KEY UPDATE
-              promoted_examinee_no = VALUES(promoted_examinee_no),
-              promotion_override_json = VALUES(promotion_override_json),
-              promoted_at = CURRENT_TIMESTAMP
-          `,
-          [normalizedSubmissionId, planRow.examineeNo, planRow.promotionOverrideJson],
-        );
-
-        const upsertResult = await upsertApplicantSubmissionIntoExaminee(
-          connection,
-          {
-            ...planRow.submission,
-            promotionOverride: planRow.promotionOverride,
-          },
-          applicantSettings,
-          planRow.preparedRecord,
-        );
-
-        await connection.query(
-          `
-            UPDATE app_subm
-            SET
-              status = 'promoted',
-              updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-          `,
-          [normalizedSubmissionId],
-        );
-
-        if (upsertResult?.storedPhotoRecord) {
-          storedPhotoRecords.push(upsertResult.storedPhotoRecord);
-        }
-      }
-
-      await connection.commit();
-      await Promise.all(storedPhotoRecords.map((storedPhotoRecord) => persistPromotedApplicantPhotoFile(storedPhotoRecord)));
-
-      return {
-        processedCount: normalizedSubmissionIds.length,
-        rows: normalizeApplicantPromotionPreviewRows(plan.rows),
-        summary: plan.summary,
-      };
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-  }
-
-  async function resetApplicantSubmissionPromotions(payload = {}) {
-    const normalizedSubmissionIds = normalizeApplicantSubmissionIdList(payload.submissionIds);
-    const connection = await getPool().getConnection();
-    let promotedExamineeRows = [];
-
-    try {
-      await connection.beginTransaction();
-
-      const submissions = await getApplicantSubmissionsByIds(normalizedSubmissionIds, {
-        queryable: connection.query.bind(connection),
-        forUpdate: true,
-        includeInternal: true,
-      });
-      const foundSubmissionIds = new Set(
-        submissions
-          .map((submission) => Number(submission?.id || 0))
-          .filter((submissionId) => Number.isInteger(submissionId) && submissionId > 0),
-      );
-      const missingSubmissionIds = normalizedSubmissionIds.filter((submissionId) => !foundSubmissionIds.has(submissionId));
-
-      if (missingSubmissionIds.length > 0) {
-        throw createHttpError(404, "일부 접수 이력을 찾을 수 없습니다.", "APPLICANT_SUBMISSION_NOT_FOUND");
-      }
-
-      const resettableSubmissions = submissions.filter((submission) => {
-        const status = String(submission?.status || "").trim();
-        const promotedExamineeNo = String(submission?.promotedExamineeNo || "").trim();
-        const promotionOverrideJson = String(submission?.promotionOverrideJson || "").trim();
-        const promotedAt = String(submission?.promotedAt || "").trim();
-
-        return status === "promoted" || Boolean(promotedExamineeNo || promotionOverrideJson || promotedAt);
-      });
-      const promotedExamineeNos = Array.from(
-        new Set(
-          resettableSubmissions
-            .map((submission) => String(submission?.promotedExamineeNo || "").trim())
-            .filter(Boolean),
-        ),
-      );
-      const submissionPlaceholders = normalizedSubmissionIds.map(() => "?").join(", ");
-
-      if (promotedExamineeNos.length > 0) {
-        const examineePlaceholders = promotedExamineeNos.map(() => "?").join(", ");
-        const [examineeRows] = await connection.query(
-          `
-            SELECT
-              examinee_no AS examineeNo,
-              photo_name AS photoName
-            FROM examinee
-            WHERE examinee_no IN (${examineePlaceholders})
-          `,
-          promotedExamineeNos,
-        );
-        promotedExamineeRows = Array.isArray(examineeRows) ? examineeRows : [];
-
-        await connection.query(
-          `
-            DELETE FROM examinee
-            WHERE examinee_no IN (${examineePlaceholders})
-          `,
-          promotedExamineeNos,
-        );
-      }
-
-      await connection.query(
-        `
-          UPDATE app_subm
-          SET
-            status = 'submitted',
-            updated_at = CURRENT_TIMESTAMP
-          WHERE id IN (${submissionPlaceholders})
-        `,
-        normalizedSubmissionIds,
-      );
-
-      await connection.query(
-        `
-          UPDATE app_meta
-          SET
-            promotion_override_json = NULL,
-            promoted_at = NULL
-          WHERE id IN (${submissionPlaceholders})
-        `,
-        normalizedSubmissionIds,
-      );
-
-      await connection.commit();
-      await deleteApplicantPromotionPhotoFiles(promotedExamineeRows);
-
-      return {
-        processedCount: normalizedSubmissionIds.length,
-        resetCount: resettableSubmissions.length,
-        deletedExamineeCount: promotedExamineeRows.length,
-      };
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
   }
 
   async function sendApplicantVerificationCode(payload = {}) {
@@ -7089,7 +3910,7 @@ function createApplicantService({
         ok: true,
         expiresInSeconds: Math.round(emailVerificationTtlMs / 1000),
         deliveryMode,
-        debugCode: String(sendResult?.debugCode || ""),
+        ...(sendResult?.debugCode ? { debugCode: String(sendResult.debugCode) } : {}),
       };
     } catch (error) {
       const normalizedError =
@@ -7153,7 +3974,7 @@ function createApplicantService({
     const latestVerification = rows[0];
 
     if (!latestVerification) {
-      throw createHttpError(404, "발송된 인증 코드를 찾을 수 없습니다. 인증 코드를 다시 요청하세요.", "APPLICANT_VERIFICATION_NOT_FOUND");
+      throw createHttpError(404, "생성된 인증 코드를 찾을 수 없습니다. 인증 코드를 다시 생성하세요.", "APPLICANT_VERIFICATION_NOT_FOUND");
     }
 
     if (latestVerification.verifiedAt) {
@@ -7232,10 +4053,13 @@ function createApplicantService({
       APPLICANT_PUBLIC_ACCESS_TYPES.lookup,
       APPLICANT_PUBLIC_ACCESS_TYPES.verified,
     ]);
+    if (accessRecord.memberId && accessRecord.submissionId) {
+      throw createHttpError(409, "이미 접수가 완료된 계정입니다. 접수는 계정당 한 번만 가능합니다.", "APPLICANT_ALREADY_SUBMITTED");
+    }
     const applicantName = normalizeApplicantText(accessRecord.name, "이름", { maxLength: 100 });
     const email = normalizeApplicantEmail(accessRecord.email);
     const [formFields, recruitmentUnits] = await Promise.all([
-      getApplicantFormFields({ activeOnly: true }),
+      getApplicantFormFields({ activeOnly: true, formScope: 'application' }),
       getApplicantRecruitmentUnits(),
     ]);
 
@@ -7252,7 +4076,7 @@ function createApplicantService({
       if (existingSubmission.name !== applicantName || existingSubmission.email !== email) {
         throw createHttpError(403, "해당 접수 이력에 접근할 수 없습니다.", "APPLICANT_SUBMISSION_FORBIDDEN");
       }
-    } else {
+    } else if (!accessRecord.memberId) {
       const latestSubmission = await getLatestApplicantSubmissionByApplicant(applicantName, email);
       existingSubmission = latestSubmission.id ? await getApplicantSubmissionById(latestSubmission.id, { includeInternal: true }) : null;
     }
@@ -7261,7 +4085,10 @@ function createApplicantService({
     await assertApplicantSubmissionEntryIsOpen(normalizedRecruitmentSelection.selection);
     const submissionArtifacts = buildApplicantSubmissionArtifacts(
       formFields,
-      payload.answers,
+      accessRecord.memberId && accessRecord.birthDate ? {
+        ...payload.answers,
+        ...Object.fromEntries(formFields.filter(field => field.systemFieldKey === 'birth' || field.inputType === 'birthdate').map(field => [field.fieldKey, accessRecord.birthDate])),
+      } : payload.answers,
       { name: applicantName, email },
       existingSubmission,
       {
@@ -7269,13 +4096,23 @@ function createApplicantService({
         recruitmentUnits,
       },
     );
-    const passwordPayload = normalizeApplicantSubmissionPassword(payload.password, existingSubmission);
+    const passwordPayload = accessRecord.memberId
+      ? { shouldUpdate: !existingSubmission?.passwordHash, value: existingSubmission?.passwordHash || hashPassword(randomUUID()) }
+      : normalizeApplicantSubmissionPassword(payload.password, existingSubmission);
     const connection = await getPool().getConnection();
 
     try {
       await connection.beginTransaction();
 
       let submissionId = existingSubmission?.id || 0;
+      if (accessRecord.memberId) {
+        const [members] = await connection.query("SELECT id FROM applicant_members WHERE id = ? FOR UPDATE", [accessRecord.memberId]);
+        if (!members.length) throw createHttpError(401, "다시 로그인해 주세요.");
+        const [owned] = await connection.query("SELECT id FROM app_meta WHERE member_id = ? FOR UPDATE", [accessRecord.memberId]);
+        if (owned.length) {
+          throw createHttpError(409, "이미 접수가 완료된 계정입니다. 접수는 계정당 한 번만 가능합니다.", "APPLICANT_ALREADY_SUBMITTED");
+        }
+      }
       const queryable = connection.query.bind(connection);
       const createdAtValue = normalizeApplicantDateTimeValue(existingSubmission?.createdAt || new Date());
       const updatedAtValue = normalizeApplicantDateTimeValue(new Date());
@@ -7286,7 +4123,7 @@ function createApplicantService({
 
       if (submissionId > 0) {
         await connection.query(`INSERT INTO app_meta (id) VALUES (?) ON DUPLICATE KEY UPDATE id = VALUES(id)`, [submissionId]);
-        await connection.query(`DELETE FROM app_subm WHERE id = ?`, [submissionId]);
+        await connection.query(`DELETE FROM app_subm WHERE id = ? AND field_key NOT IN (SELECT field_key FROM app_form WHERE form_scope = 'documents')`, [submissionId]);
       } else {
         const [insertResult] = await connection.query(`INSERT INTO app_meta () VALUES ()`);
         submissionId = Number(insertResult?.insertId || 0);
@@ -7294,6 +4131,9 @@ function createApplicantService({
 
       if (!Number.isInteger(submissionId) || submissionId <= 0) {
         throw createHttpError(500, "접수 정보를 저장하지 못했습니다.", "APPLICANT_SUBMISSION_SAVE_FAILED");
+      }
+      if (accessRecord.memberId) {
+        await connection.query("UPDATE app_meta SET member_id = ? WHERE id = ?", [accessRecord.memberId, submissionId]);
       }
 
       for (const answerRow of submissionArtifacts.answerRows) {
@@ -7340,27 +4180,9 @@ function createApplicantService({
         uploadedFileUploads: submissionArtifacts.fileUploads,
         uploadedPhotoValue: submissionArtifacts.photoUpload,
       });
-      const shouldSyncExaminee = String(savedSubmission.status || "").trim() === "promoted";
 
       await applyPreparedApplicantUploadAnswerRows(connection, submissionId, preparedSubmissionRecord);
 
-      if (shouldSyncExaminee) {
-        await upsertApplicantSubmissionIntoExaminee(connection, savedSubmission, applicantSettings, preparedSubmissionRecord);
-        await connection.query(
-          `
-            INSERT INTO app_meta (
-              id,
-              promoted_examinee_no,
-              promoted_at
-            )
-            VALUES (?, ?, CURRENT_TIMESTAMP)
-            ON DUPLICATE KEY UPDATE
-              promoted_examinee_no = VALUES(promoted_examinee_no),
-              promoted_at = CURRENT_TIMESTAMP
-          `,
-          [submissionId, preparedSubmissionRecord.examineeNo],
-        );
-      } else {
         await connection.query(
           `
             INSERT INTO app_meta (
@@ -7373,7 +4195,6 @@ function createApplicantService({
           `,
           [submissionId, preparedSubmissionRecord.examineeNo],
         );
-      }
 
       await connection.commit();
       const persistTasks = [];
@@ -7384,10 +4205,6 @@ function createApplicantService({
 
       if (Array.isArray(preparedSubmissionRecord.applicantFileRecords) && preparedSubmissionRecord.applicantFileRecords.length > 0) {
         persistTasks.push(...preparedSubmissionRecord.applicantFileRecords.map((storedFileRecord) => persistApplicantFile(storedFileRecord)));
-      }
-
-      if (shouldSyncExaminee && preparedSubmissionRecord.storedPhotoRecord) {
-        persistTasks.push(persistPromotedApplicantPhotoFile(preparedSubmissionRecord.storedPhotoRecord));
       }
 
       await Promise.all(persistTasks);
@@ -7452,7 +4269,6 @@ function createApplicantService({
           ...normalizedPhotoPayload,
         },
       });
-      const shouldSyncExaminee = String(savedSubmission.status || "").trim() === "promoted";
 
       await applyPreparedApplicantUploadAnswerRows(connection, normalizedSubmissionId, preparedSubmissionRecord);
 
@@ -7469,19 +4285,11 @@ function createApplicantService({
         [normalizedSubmissionId, preparedSubmissionRecord.examineeNo],
       );
 
-      if (shouldSyncExaminee) {
-        await upsertApplicantSubmissionIntoExaminee(connection, savedSubmission, applicantSettings, preparedSubmissionRecord);
-      }
-
       await connection.commit();
       const persistTasks = [];
 
       if (preparedSubmissionRecord.applicantPhotoRecord) {
         persistTasks.push(persistApplicantPhotoFile(preparedSubmissionRecord.applicantPhotoRecord));
-      }
-
-      if (shouldSyncExaminee && preparedSubmissionRecord.storedPhotoRecord) {
-        persistTasks.push(persistPromotedApplicantPhotoFile(preparedSubmissionRecord.storedPhotoRecord));
       }
 
       await Promise.all(persistTasks);
@@ -7522,36 +4330,80 @@ function createApplicantService({
       throw createHttpError(403, "해당 접수 이력에 접근할 수 없습니다.", "APPLICANT_SUBMISSION_FORBIDDEN");
     }
 
-    if (options.requirePromoted === true && (submission.status !== "promoted" || !submission.promotedExamineeNo)) {
-      throw createHttpError(409, "아직 수험표가 발급되지 않았습니다.", "APPLICANT_ADMIT_CARD_NOT_READY");
-    }
-
     return submission;
   }
 
   async function buildApplicantAdmitCardPdfForAccessToken(accessToken, submissionId) {
-    const systemSettings = await getApplicantPublicSystemSettings();
-    const admitCardDataSource = normalizeApplicantAdmitCardDataSource(systemSettings.admitCardDataSource);
-    const submission = await getApplicantSubmissionForAccessToken(accessToken, submissionId, {
-      requireTicketLookupTarget: true,
-      requirePromoted: admitCardDataSource === APPLICANT_ADMIT_CARD_DATA_SOURCES.examinee,
-    });
+    const submission = await getApplicantSubmissionForAccessToken(accessToken, submissionId, {requireTicketLookupTarget: true});
     await assertApplicantAdmitCardLookupIsOpen(submission);
+    const record = await buildApplicantAdmitCardRecordFromSubmission(submission);
+    return {pdfBuffer: await buildSubmissionAdmitCardPdfBuffer(record, {title: `${record.name || "수험표"} 수험표`}), fileNameBase: String(submission.promotedExamineeNo || submission.id)};
+  }
 
-    if (admitCardDataSource === APPLICANT_ADMIT_CARD_DATA_SOURCES.submission) {
-      const admitCardRecord = await buildApplicantAdmitCardRecordFromSubmission(submission);
-      return {
-        pdfBuffer: await buildSubmissionAdmitCardPdfBuffer(admitCardRecord, {
-          title: `${admitCardRecord.name || submission.name || "수험표"} 수험표`,
-        }),
-        fileNameBase: String(submission.promotedExamineeNo || submission.id || "admit-card").trim() || "admit-card",
-      };
+  async function getMemberApplicationContext(member) {
+    const [row] = await query("SELECT id FROM app_meta WHERE member_id = ?", [member.id]);
+    const submission = row ? await getApplicantSubmissionById(row.id) : null;
+    const accessToken = createPublicAccessToken({
+      type: APPLICANT_PUBLIC_ACCESS_TYPES.lookup,
+      lookupTarget: APPLICANT_PUBLIC_LOOKUP_TARGETS.ticket,
+      memberId: member.id, name: member.name, email: member.email, birthDate: member.birthDate || member.profile?.birth || '',
+      submissionId: submission?.id || 0,
+    });
+    const schedule = submission ? findApplicantScheduleRecord(await getApplicantSchedules(), buildApplicantSystemRecord(submission)) : null;
+    const window = (start, end) => ({
+      startAt: Number.isFinite(getApplicantScheduleTimestamp(start)) ? getApplicantScheduleTimestamp(start) : null,
+      endAt: Number.isFinite(getApplicantScheduleTimestamp(end, { inclusiveEndMinute: true })) ? getApplicantScheduleTimestamp(end, { inclusiveEndMinute: true }) : null,
+    });
+    return { accessToken, submission, serverTime: Date.now(), menuWindows: {
+      ticket: window(schedule?.admitCardLookupScheduleStartAt, schedule?.admitCardLookupScheduleEndAt),
+      documents: window(schedule?.documentSubmissionScheduleStartAt, schedule?.documentSubmissionScheduleEndAt),
+    } };
+  }
+
+  async function saveMemberDocuments(member, payload = {}) {
+    const { submission } = await getMemberApplicationContext(member);
+    if (!submission?.id) throw createHttpError(409, "접수를 완료한 후 서류를 제출하세요.");
+    const fields = await getApplicantFormFields({ activeOnly: true, formScope: 'documents' });
+    const selection = buildApplicantSystemRecord(submission);
+    const schedule = findApplicantScheduleRecord(await getApplicantSchedules(), selection);
+    const scheduleState = getApplicantDocumentSubmissionScheduleState(schedule);
+    if (!scheduleState.isOpen) {
+      const message = scheduleState.reason === "not_configured" ? "서류 제출 기간이 아직 설정되지 않았습니다."
+        : scheduleState.reason === "before_start" ? "아직 서류 제출 기간이 아닙니다."
+        : scheduleState.reason === "after_end" ? "서류 제출 기간이 종료되었습니다."
+        : "현재는 서류를 제출할 수 없습니다.";
+      throw createHttpError(409, message, "DOCUMENT_SUBMISSION_SCHEDULE_CLOSED");
     }
-
-    return {
-      pdfBuffer: await buildExamineeAdmitCardPdfBuffer(submission.promotedExamineeNo),
-      fileNameBase: String(submission.promotedExamineeNo || submission.id || "admit-card").trim() || "admit-card",
-    };
+    if (!fields.length) throw createHttpError(400, '등록된 서류제출 질문이 없습니다.');
+    const answers = payload.answers;
+    if (!answers || typeof answers !== 'object' || Array.isArray(answers)) throw createHttpError(400, '서류제출 답변을 확인하세요.');
+    const allowedKeys = new Set(fields.map(field => field.fieldKey));
+    if (Object.keys(answers).some(key => !allowedKeys.has(key))) {
+      throw createHttpError(400, '서류제출에 등록된 질문만 저장할 수 있습니다.', 'DOCUMENT_ANSWER_SCOPE_INVALID');
+    }
+    const existingAnswers = Object.fromEntries((submission.answerItems || []).map(item => [item.fieldKey, item.value]));
+      const artifacts = buildApplicantSubmissionArtifacts(fields, { ...existingAnswers, ...answers }, { name: submission.name, email: submission.email }, submission);
+      const records = artifacts.fileUploads.map(upload => buildStoredApplicantFileRecord(
+        submission.promotedExamineeNo || `submission-${submission.id}`, upload.questionText, upload.fieldKey, upload,
+        { ...upload, fileNamePattern: upload.fileNamePattern || '{수험번호}_{질문제목}' },
+      ));
+    const storedFiles = new Map(records.map(record => [record.fieldKey, JSON.stringify(buildStoredApplicantFileAnswerData(record))]));
+    const connection = await getPool().getConnection();
+    try {
+      await connection.beginTransaction();
+      const [owned] = await connection.query("SELECT id FROM app_meta WHERE id = ? AND member_id = ? FOR UPDATE", [submission.id, member.id]);
+      if (!owned.length) throw createHttpError(403, "접수 정보를 찾을 수 없습니다.");
+      const [answerRows] = await connection.query("SELECT applicant_name, email, password_hash, status, created_at FROM app_subm WHERE id = ? LIMIT 1", [submission.id]);
+      const original = answerRows[0];
+      if (!original) throw createHttpError(404, "접수 정보를 찾을 수 없습니다.");
+      for (const record of records) await persistApplicantFile(record);
+      for (const answer of artifacts.answerRows) {
+        await connection.query("INSERT INTO app_subm (id,applicant_name,email,password_hash,status,field_key,answer_data,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,NOW()) ON DUPLICATE KEY UPDATE answer_data = VALUES(answer_data), updated_at = NOW()", [submission.id, original.applicant_name, original.email, original.password_hash, original.status, answer.fieldKey, storedFiles.get(answer.fieldKey) ?? answer.answerData, original.created_at]);
+      }
+      await connection.commit();
+      return getApplicantSubmissionById(submission.id);
+    } catch (error) { await connection.rollback(); throw error; }
+    finally { connection.release(); }
   }
 
   async function getApplicantPublicForm() {
@@ -7565,7 +4417,8 @@ function createApplicantService({
     ]);
 
     return {
-      fields,
+      fields: fields.filter(field => field.formScope === 'application'),
+      documentFields: fields.filter(field => field.formScope === 'documents'),
       settings,
       systemSettings,
       noticeHtml,
@@ -7611,50 +4464,52 @@ function createApplicantService({
   }
 
   return Object.freeze({
-    buildApplicantAssignmentExportBuffer,
-    buildApplicantAssignmentTemplateBuffer,
+    buildApplicantAdmitCardRecordFromSubmission,
+    getApplicantSubmissionsByIds,
+    getMemberApplicationContext,
+    saveMemberDocuments,
+
     buildApplicantAdmitCardPdfForAccessToken,
-    buildApplicantPromotionAssignmentTemplateBuffer,
-    buildApplicantPromotionPreviewExportBuffer,
+
     buildApplicantSubmissionPhotoArchiveBuffer,
     buildApplicantSubmissionExportBuffer,
     buildApplicantRecruitmentUnitExportBuffer,
     buildApplicantRecruitmentUnitTemplateBuffer,
-    commitApplicantSubmissionPromotions,
-    resetApplicantSubmissionPromotions,
-    createApplicantAssignment,
+
     createApplicantRecruitmentUnit,
     createApplicantFormField,
-    deleteApplicantAssignment,
+
     deleteApplicantSubmission,
     deleteApplicantRecruitmentUnit,
     deleteApplicantFormField,
-    getApplicantAssignments,
+
     getApplicantFormFields,
     getApplicantPublicForm,
     getApplicantRecruitmentUnits,
     getApplicantSchedules,
     getApplicantSettings,
+    attachmentArchiveJobs,
     getApplicantSubmissionFile,
     getApplicantSubmissionById,
     getApplicantSubmissionPhoto,
     getApplicantSubmissionForAccessToken,
     getApplicantSubmissions,
-    importApplicantAssignments,
+
     importApplicantRecruitmentUnits,
     lookupApplicantSubmission,
     migrateApplicantFileAnswerData,
     migrateApplicantPhotoStorage,
       moveApplicantFormField,
-      previewApplicantAssignmentsImport,
+
       previewApplicantRecruitmentUnitImport,
-      previewApplicantSubmissionPromotions,
+
       saveApplicantSchedule,
+      saveApplicantSchedules,
       saveApplicantSubmission,
     seedApplicantFormFields,
     sendApplicantVerificationCode,
     updateApplicantSubmissionPhoto,
-    updateApplicantAssignment,
+
     updateApplicantRecruitmentUnit,
     updateApplicantFormField,
     updateApplicantSettings,

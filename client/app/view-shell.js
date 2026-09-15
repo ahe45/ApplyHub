@@ -21,14 +21,13 @@
       state,
       syncCurrentViewFromLocation,
       syncApplicantSubmissionDetailModal,
-      syncExamineeDetailModal,
+
       syncGridSelectionIndicators,
       syncHeaderSelectOptions,
       syncLoginFormAutofocus,
       syncOpenGridFilterMenuPosition,
       syncPdfGenerationOverlay,
       syncSystemAuditLogModal,
-      syncUploadOverlay,
       titles,
       updateAuthChrome,
       updateMetricBadges,
@@ -88,7 +87,7 @@
         pageTitle.textContent = activeTitle;
       }
 
-      document.title = `${activeTitle} | Admit Card System`;
+      document.title = `${activeTitle} | 원서접수시스템`;
 
       if (isLoginPage()) {
         navItems.forEach((item) => {
@@ -98,10 +97,9 @@
         viewRoot.innerHTML = renderLoginScreen();
         syncGridSelectionIndicators();
         syncPdfGenerationOverlay();
-        syncUploadOverlay();
         syncApplicantSubmissionDetailModal();
         syncSystemAuditLogModal?.();
-        syncExamineeDetailModal();
+
         syncLoginFormAutofocus();
         return;
       }
@@ -114,10 +112,9 @@
         viewRoot.innerHTML = renderPageLoading(activeTitle);
         syncGridSelectionIndicators();
         syncPdfGenerationOverlay();
-        syncUploadOverlay();
         syncApplicantSubmissionDetailModal();
         syncSystemAuditLogModal?.();
-        syncExamineeDetailModal();
+
         return;
       }
 
@@ -129,10 +126,9 @@
         viewRoot.innerHTML = renderPageLoading("로그인 페이지로 이동 중입니다.");
         syncGridSelectionIndicators();
         syncPdfGenerationOverlay();
-        syncUploadOverlay();
         syncApplicantSubmissionDetailModal();
         syncSystemAuditLogModal?.();
-        syncExamineeDetailModal();
+
         return;
       }
 
@@ -148,10 +144,9 @@
       syncGridSelectionIndicators();
       syncOpenGridFilterMenuPosition?.();
       syncPdfGenerationOverlay();
-      syncUploadOverlay();
       syncApplicantSubmissionDetailModal();
       syncSystemAuditLogModal?.();
-      syncExamineeDetailModal();
+
     }
 
     function refreshAdmitCardLookupView({ preserveScroll = true } = {}) {

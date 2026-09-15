@@ -1,0 +1,94 @@
+/* Quiet Glass — the single visual palette for ApplyHub.
+   Values follow the approved quiet-glass sample; document content is not themed. */
+:root {
+  --glass-color-scheme: dark;
+  color-scheme: var(--glass-color-scheme);
+  --glass-page: #181818;
+  --glass-bg: #0f1f2e;
+  --glass-surface: #203446;
+  --glass-ink: #ebf6ff;
+  --glass-muted: #b7cede;
+  --glass-line: #456477;
+  --glass-primary: #25546f;
+  --glass-primary-hover: #346d8f;
+  --glass-tint: #2c465e;
+  --glass-tint-ink: #c7e8ff;
+  --glass-white: #58798f;
+  --glass-frame-line: #4d6779;
+  --glass-link: #c7e8ff;
+  --glass-error: #ffb4ab;
+  --glass-error-bg: #422d34;
+  --glass-error-line: #9e626a;
+  --glass-success: #8fddba;
+  --glass-success-bg: #1b3c36;
+  --glass-warning: #efd095;
+  --glass-warning-bg: #403a2b;
+  --glass-shadow-rgb: 7, 16, 25;
+  --glass-primary-rgb: 37, 84, 111;
+  --glass-ink-rgb: 235, 246, 255;
+  --glass-muted-rgb: 183, 206, 222;
+  --glass-line-rgb: 69, 100, 119;
+  --glass-surface-rgb: 32, 52, 70;
+  --glass-tint-rgb: 44, 70, 94;
+  --glass-bg-rgb: 15, 31, 46;
+  --glass-backdrop: radial-gradient(ellipse at 95% 15%, #274b65, transparent 52%), radial-gradient(ellipse at 5% 80%, #293255, transparent 50%), #0f1f2e;
+  --glass-button: linear-gradient(125deg, #326bc4, #285aad);
+  --glass-shadow: inset 0 1px 0 #58798f, 0 6px 16px #00000016;
+  --glass-frame-shadow: inset 0 1px 0 #7b97af, 0 14px 40px #00000030;
+  --glass-button-shadow: 0 6px 14px #28567725;
+  --glass-dialog-shadow: inset 0 1px 0 #58798f, 0 20px 60px #00000066;
+  --glass-focus: 0 0 0 3px #c7e8ff40;
+  --glass-selected: #326bc4;
+  --glass-selected-line: #94bfff;
+  --glass-selected-soft: #26456d;
+  --glass-selected-shadow: 0 3px 10px #07101955;
+  --glass-disabled-bg: #293746;
+  --glass-disabled-ink: #97a7b8;
+}
+
+/* Clear light Quiet Glass: white surfaces, navy text, focused blue accents.
+   Geometry/materials stay shared; the dark palette above is unchanged. */
+:root:not([data-theme="dark"]) {
+  --glass-color-scheme: light;
+  --glass-page: #ffffff;
+  --glass-bg: #f4f8ff;
+  --glass-surface: #ffffff;
+  --glass-ink: #172b4d;
+  --glass-muted: #506581;
+  --glass-line: #d8e4f3;
+  --glass-primary: #2563eb;
+  --glass-primary-hover: #1d4ed8;
+  --glass-tint: #eaf2ff;
+  --glass-tint-ink: #2454a0;
+  --glass-white: #ffffff;
+  --glass-frame-line: #e1ebf7;
+  --glass-link: #1d4ed8;
+  --glass-error: #b42336;
+  --glass-error-bg: #fff0f1;
+  --glass-error-line: #dfadb4;
+  --glass-success: #24684e;
+  --glass-success-bg: #e8f5ef;
+  --glass-warning: #846019;
+  --glass-warning-bg: #fff5dc;
+  --glass-shadow-rgb: 25, 59, 107;
+  --glass-primary-rgb: 37, 99, 235;
+  --glass-ink-rgb: 23, 43, 77;
+  --glass-muted-rgb: 80, 101, 129;
+  --glass-line-rgb: 216, 228, 243;
+  --glass-surface-rgb: 255, 255, 255;
+  --glass-tint-rgb: 234, 242, 255;
+  --glass-bg-rgb: 244, 248, 255;
+  --glass-backdrop: radial-gradient(ellipse at 95% 15%, #e6f1ff, transparent 52%), radial-gradient(ellipse at 5% 80%, #f1efff, transparent 50%), #fafcff;
+  --glass-button: linear-gradient(125deg, #2563eb, #1d4ed8);
+  --glass-shadow: inset 0 1px 0 #ffffff, 0 6px 16px #193b6b0b;
+  --glass-frame-shadow: inset 0 1px 0 #ffffff, 0 14px 40px #193b6b12;
+  --glass-button-shadow: 0 6px 14px #2563eb25;
+  --glass-dialog-shadow: inset 0 1px 0 #ffffff, 0 20px 60px #193b6b30;
+  --glass-focus: 0 0 0 3px #2563eb30;
+  --glass-selected: #2563eb;
+  --glass-selected-line: #1d4ed8;
+  --glass-selected-soft: #dce9ff;
+  --glass-selected-shadow: 0 3px 10px #2563eb30;
+  --glass-disabled-bg: #e9edf2;
+  --glass-disabled-ink: #68788b;
+}

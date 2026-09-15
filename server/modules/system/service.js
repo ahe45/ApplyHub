@@ -7,6 +7,7 @@ const { createSystemSettingsService } = require("./service/settings");
 const { createSystemSummaryService } = require("./service/summary");
 
 function createSystemService({
+  emailSettingsService,
   applicantFileStorageDirName,
   applicantPhotoStorageDirName,
   buildRoleMenuVisibilityFromSuperAdminSettings,
@@ -20,7 +21,7 @@ function createSystemService({
   getDefaultApplicantNoticeHtml,
   formatDateAsYmd,
   getAccounts,
-  getApplicantAssignments,
+
   getApplicantFormFields,
   getApplicantRecruitmentUnits,
   getApplicantSchedules,
@@ -128,7 +129,7 @@ function createSystemService({
   const summaryService = createSystemSummaryService({
     formatDateAsYmd,
     getAccounts,
-    getApplicantAssignments,
+
     getApplicantFormFields,
     getApplicantRecruitmentUnits,
     getApplicantSchedules,
@@ -147,6 +148,7 @@ function createSystemService({
   const { getBootstrapPayload } = summaryService;
 
   return Object.freeze({
+    ...emailSettingsService,
     buildSystemBackupArchive,
     deleteSystemData,
     getBootstrapPayload,

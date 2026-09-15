@@ -41,7 +41,6 @@ function createSystemSettingsSchemaBootstrap({
           ('autoLogoutMinutes', ?),
           ('applicantNoticeHtml', ''),
           ('admissionHomepageUrl', ''),
-          ('admitCardDataSource', 'examinee'),
           ('applicantExamNoDigitCount', '10'),
           ('applicantExamNoComponentsJson', '["admissionCode","seriesCode","unitCode","sequence",""]'),
           ('superAdminSettingsJson', '{"schoolName":"","logoImageUrl":"","backgroundImageUrl":"","recruitmentEnabled":true}')

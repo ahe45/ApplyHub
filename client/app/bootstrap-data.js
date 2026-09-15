@@ -6,35 +6,26 @@
 
   globalScope.AdmitCardBootstrapData = factory();
 })(typeof globalThis !== "undefined" ? globalThis : this, () => {
+  const DASHBOARD_FILTER_STORAGE_KEY = "applyhub.dashboardFilters";
   function loadStoredHeaderFilters({ HEADER_FILTER_STORAGE_KEY, createHeaderFilters }) {
-    const defaultFilters = createHeaderFilters();
-
+    const filters = createHeaderFilters();
     try {
-      const storedValue = window.localStorage.getItem(HEADER_FILTER_STORAGE_KEY);
-
-      if (!storedValue) {
-        return defaultFilters;
+      // Retire the removed topbar filters without leaving invisible restrictions.
+      window.localStorage.removeItem(HEADER_FILTER_STORAGE_KEY);
+      // Dashboard preferences must not silently restrict other administrator pages.
+      if (window.location.pathname === "/dashboard") {
+        const saved = JSON.parse(window.localStorage.getItem(DASHBOARD_FILTER_STORAGE_KEY) || "{}");
+        for (const key of Object.keys(filters)) filters[key] = typeof saved?.[key] === "string" ? saved[key] : "";
       }
-
-      const parsedValue = JSON.parse(storedValue);
-      const nextFilters = Object.keys(defaultFilters).reduce((filters, key) => {
-        filters[key] = parsedValue?.[key] ?? defaultFilters[key];
-        return filters;
-      }, {});
-
-      if (!nextFilters.admission && parsedValue?.exam) {
-        nextFilters.admission = parsedValue.exam;
-      }
-
-      return nextFilters;
     } catch (error) {
-      return defaultFilters;
+      // Storage may be unavailable; defaults must still apply.
     }
+    return filters;
   }
 
   function createBootstrapDataController(deps) {
     const {
-      EXAMINEE_DETAIL_FIELD_KEYS,
+
       HEADER_FILTER_STORAGE_KEY,
       applyLoginNoticePayload,
       applySystemBackupAutomationPayload,
@@ -44,7 +35,7 @@
       clearAutoLogoutTimer,
       createAccountEditorState,
       createApplicantManagementState,
-      createExamineeDetailState,
+
       createHeaderFilters,
       createPdfGenerationState,
       createSuperAdminState,
@@ -76,13 +67,10 @@
 
     function persistHeaderFilters() {
       try {
-        const headerFilterKeys = Object.keys(createHeaderFilters());
-        const persistedFilters = headerFilterKeys.reduce((filters, key) => {
-          filters[key] = state.headerFilters[key] || "";
-          return filters;
-        }, {});
-
-        window.localStorage.setItem(HEADER_FILTER_STORAGE_KEY, JSON.stringify(persistedFilters));
+        window.localStorage.removeItem(HEADER_FILTER_STORAGE_KEY);
+        if (state.currentView === "dashboard") {
+          window.localStorage.setItem(DASHBOARD_FILTER_STORAGE_KEY, JSON.stringify(state.headerFilters));
+        }
       } catch (error) {
         // Ignore storage failures and keep the in-memory state.
       }
@@ -117,82 +105,22 @@
     }
 
     function normalizeExamineeRecord(record = {}) {
-      const time = String(record.time ?? record.session ?? "");
       const track = String(record.track ?? "");
       const admission = String(record.admission ?? record.exam ?? "");
       const series = String(record.series ?? "");
       const unit = String(record.unit ?? "");
-      const group = String(record.group ?? "");
       const examineeNo = String(record.examineeNo ?? "");
 
       return {
         ...record,
-        time,
-        session: time,
         track,
         admission,
         exam: admission,
         series,
         unit,
-        group,
         examineeNo,
         hasPhoto: record.hasPhoto === true || record.hasPhoto === "true" || Number(record.hasPhoto) === 1,
         photoVersion: Number(record.photoVersion || 0),
-      };
-    }
-
-    function buildExamineeDetailDraft(record = {}) {
-      const normalizedRecord = normalizeExamineeRecord(record);
-
-      return EXAMINEE_DETAIL_FIELD_KEYS.reduce((draft, fieldKey) => {
-        draft[fieldKey] = String(normalizedRecord?.[fieldKey] ?? "");
-        return draft;
-      }, {});
-    }
-
-    function areExamineeDetailDraftsEqual(leftRecord = null, rightRecord = null) {
-      if (!leftRecord || !rightRecord) {
-        return false;
-      }
-
-      return EXAMINEE_DETAIL_FIELD_KEYS.every(
-        (fieldKey) => String(leftRecord[fieldKey] ?? "") === String(rightRecord[fieldKey] ?? ""),
-      );
-    }
-
-    function reconcileExamineeDetailState() {
-      const selectedExamineeNo = String(
-        state.examineeDetail?.selectedExamineeNo || state.examineeDetail?.originalExamineeNo || "",
-      ).trim();
-
-      if (!selectedExamineeNo) {
-        state.examineeDetail = createExamineeDetailState();
-        return;
-      }
-
-      const examineeGridRows = getExamineeGridRows();
-      const matchedRow =
-        examineeGridRows.find((row) => row.examineeNo === selectedExamineeNo) ||
-        examineeGridRows.find((row) => row.examineeNo === state.examineeDetail.originalExamineeNo) ||
-        null;
-
-      if (!matchedRow) {
-        state.examineeDetail = createExamineeDetailState();
-        return;
-      }
-
-      const nextBaseRecord = buildExamineeDetailDraft(matchedRow);
-      const hasUnsavedChanges =
-        state.examineeDetail.draftRecord &&
-        state.examineeDetail.baseRecord &&
-        !areExamineeDetailDraftsEqual(state.examineeDetail.draftRecord, state.examineeDetail.baseRecord);
-
-      state.examineeDetail = {
-        ...state.examineeDetail,
-        selectedExamineeNo: matchedRow.examineeNo,
-        originalExamineeNo: matchedRow.examineeNo,
-        baseRecord: nextBaseRecord,
-        draftRecord: hasUnsavedChanges ? state.examineeDetail.draftRecord : nextBaseRecord,
       };
     }
 
@@ -216,7 +144,8 @@
       state.bootstrap.error = "";
       state.bootstrap.isLoading = false;
       state.bootstrap.serverDate = "";
-      state.examineeDetail = createExamineeDetailState();
+      state.bootstrap.serverTimeOffsetMs = 0;
+
       state.accountEditor = createAccountEditorState();
       state.templatePreview = createTemplatePreviewState();
       updateMetricBadges();
@@ -254,18 +183,17 @@
         fields: Array.isArray(payload.applicantManager?.fields) ? payload.applicantManager.fields : [],
         recruitmentUnits: Array.isArray(payload.applicantManager?.recruitmentUnits) ? payload.applicantManager.recruitmentUnits : [],
         schedules: Array.isArray(payload.applicantManager?.schedules) ? payload.applicantManager.schedules : [],
-        assignments: Array.isArray(payload.applicantManager?.assignments) ? payload.applicantManager.assignments : [],
+
         submissions: Array.isArray(payload.applicantManager?.submissions) ? payload.applicantManager.submissions : [],
         settings: payload.applicantManager?.settings || createApplicantManagementState().settings,
       };
       state.bootstrap.serverDate = String(payload.serverDate || "").trim();
+      state.bootstrap.serverTimeOffsetMs = Number(payload.serverTime || Date.now()) - Date.now();
       state.metrics = {
         registeredExaminees: Number(payload.summary?.registeredExaminees || nextExamineeRows.length),
         todayPrints: Number(payload.summary?.todayPrints || 0),
         totalPrints: Number(payload.summary?.totalPrints || nextPrintHistoryRows.length),
       };
-
-      reconcileExamineeDetailState();
 
       if (state.accountEditor.editingId && !getAccountGridRows().some((row) => row.id === state.accountEditor.editingId)) {
         cancelAccountEdit();
@@ -295,14 +223,13 @@
 
     return Object.freeze({
       applyBootstrapPayload,
-      areExamineeDetailDraftsEqual,
-      buildExamineeDetailDraft,
+
       clearHeaderFilters,
       getCurrentUserRole,
       normalizeAccountRecord,
       normalizeExamineeRecord,
       persistHeaderFilters,
-      reconcileExamineeDetailState,
+
       resetBootstrapData,
       resetGridPages,
       updateMetricBadges,

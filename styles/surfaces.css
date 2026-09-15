@@ -18,9 +18,9 @@
   padding: 14px 16px;
   border-radius: 18px;
   border: 1px solid rgba(95, 221, 189, 0.32);
-  background: linear-gradient(135deg, rgba(18, 86, 74, 0.96), rgba(12, 43, 38, 0.98));
-  color: #f8fafc;
-  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.22);
+  background: var(--glass-success-bg);
+  color: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
   font-size: 0.9rem;
   font-weight: 700;
   line-height: 1.45;
@@ -44,6 +44,11 @@
   gap: 22px;
   min-height: 0;
   align-content: start;
+}
+
+.dashboard-view > .section-header,
+.dashboard-view .dashboard-chart-card .section-header {
+  margin-bottom: 0;
 }
 
 .lookup-view-stack {
@@ -84,10 +89,10 @@
 .timeline-card,
 .template-card,
 .account-card {
-  border: 1px solid rgba(203, 213, 225, 0.44);
+  border: 1px solid rgba(var(--glass-line-rgb), 0.44);
   background: var(--panel);
   backdrop-filter: blur(14px);
-  box-shadow: var(--shadow);
+  box-shadow: var(--glass-shadow);
 }
 
 .hero-card,
@@ -110,9 +115,7 @@
   position: relative;
   overflow: hidden;
   padding: 28px;
-  background:
-    radial-gradient(circle at top right, rgba(45, 99, 245, 0.24), transparent 32%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(245, 247, 251, 0.88));
+  background: var(--glass-surface);
 }
 
 .hero-card::after {
@@ -122,7 +125,7 @@
   width: 240px;
   height: 240px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(45, 99, 245, 0.18), rgba(95, 221, 189, 0.12));
+  background: var(--glass-surface);
 }
 
 .hero-card > * {
@@ -159,8 +162,8 @@
 .hero-tag {
   padding: 10px 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(203, 213, 225, 0.6);
+  background: rgba(var(--glass-surface-rgb), 0.88);
+  border: 1px solid rgba(var(--glass-line-rgb), 0.6);
   color: var(--text-dim);
 }
 
@@ -193,7 +196,7 @@
   border-radius: 999px;
   font-size: 0.82rem;
   color: var(--accent-strong);
-  background: rgba(45, 99, 245, 0.1);
+  background: rgba(var(--glass-primary-rgb), 0.1);
 }
 
 .dashboard-chart-grid {
@@ -235,7 +238,7 @@
 .dashboard-bar-head span {
   color: var(--text-dim);
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -243,7 +246,7 @@
   position: relative;
   height: 10px;
   border-radius: 999px;
-  background: rgba(203, 213, 225, 0.42);
+  background: rgba(var(--glass-tint-rgb), 0.42);
   overflow: hidden;
 }
 
@@ -255,15 +258,15 @@
 }
 
 .dashboard-bar-fill.blue {
-  background: linear-gradient(90deg, #2d63f5, #7aa2ff);
+  background: var(--glass-surface);
 }
 
 .dashboard-bar-fill.green {
-  background: linear-gradient(90deg, #1f9d6b, #59c79a);
+  background: var(--glass-button);
 }
 
 .dashboard-bar-fill.orange {
-  background: linear-gradient(90deg, #f59e0b, #f7bf59);
+  background: var(--glass-button);
 }
 
 .dashboard-chart-empty {
@@ -272,7 +275,7 @@
   padding: 18px;
   border-radius: 18px;
   background: var(--panel-muted);
-  border: 1px solid rgba(223, 229, 240, 0.9);
+  border: 1px solid rgba(var(--glass-line-rgb), 0.9);
 }
 
 .dashboard-chart-empty strong {
@@ -304,8 +307,8 @@
   overflow: hidden;
   border: 1px solid var(--grid-line);
   border-radius: 18px;
-  background: #ffffff;
-  box-shadow: var(--shadow);
+  background: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
 }
 
 .result-grid-card {

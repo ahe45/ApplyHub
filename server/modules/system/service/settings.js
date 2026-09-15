@@ -16,7 +16,6 @@ function createSystemSettingsService({
   const maxApplicantExamNoDigitCount = 30;
   const defaultApplicantExamNoComponents = Object.freeze(["admissionCode", "seriesCode", "unitCode", "sequence", ""]);
   const allowedApplicantExamNoComponents = new Set(["", "admissionCode", "seriesCode", "unitCode", "nationalityCode", "sequence"]);
-  const defaultAdmitCardDataSource = "examinee";
   const allowedAdmitCardDataSources = new Set(["submission", "examinee"]);
   const applicantScheduleDateTimePattern = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
   const superAdminAssetPathPrefix = "/uploads/img/";
@@ -326,11 +325,6 @@ function createSystemSettingsService({
     return normalizedValues.some(Boolean) ? normalizedValues : [...defaultApplicantExamNoComponents];
   }
 
-  function parseAdmitCardDataSource(value) {
-    const normalizedValue = String(value ?? "").trim();
-    return allowedAdmitCardDataSources.has(normalizedValue) ? normalizedValue : defaultAdmitCardDataSource;
-  }
-
   function parseSuperAdminSettings(value) {
     let parsedValue = {};
 
@@ -394,11 +388,13 @@ function createSystemSettingsService({
       (Array.isArray(rows) ? rows : []).map((row) => [String(row.settingKey || ""), String(row.settingValue || "")]),
     );
 
+    const branding = parseSuperAdminSettings(rowsByKey.get('superAdminSettingsJson'));
     return {
+      schoolName: branding.schoolName,
+      schoolLogoImageUrl: branding.logoImageUrl,
       initialPassword: parseSystemInitialPassword(rowsByKey.get("initialPassword")),
       autoLogoutMinutes: parseAutoLogoutMinutes(rowsByKey.get("autoLogoutMinutes")),
       admissionHomepageUrl: parseAdmissionHomepageUrl(rowsByKey.get("admissionHomepageUrl")),
-      admitCardDataSource: parseAdmitCardDataSource(rowsByKey.get("admitCardDataSource")),
       applicantExamNoDigitCount: parseApplicantExamNoDigitCount(rowsByKey.get("applicantExamNoDigitCount")),
       applicantExamNoComponents: parseApplicantExamNoComponents(rowsByKey.get("applicantExamNoComponentsJson")),
     };
@@ -408,7 +404,6 @@ function createSystemSettingsService({
     const initialPassword = String(payload.initialPassword ?? "").trim();
     const autoLogoutMinutes = Math.round(Number(payload.autoLogoutMinutes));
     const admissionHomepageUrl = parseAdmissionHomepageUrl(payload.admissionHomepageUrl);
-    const admitCardDataSource = parseAdmitCardDataSource(payload.admitCardDataSource);
 
     if (!initialPassword) {
       throw createHttpError(400, "초기 비밀번호를 입력하세요.", "INITIAL_PASSWORD_REQUIRED");
@@ -462,7 +457,6 @@ function createSystemSettingsService({
       initialPassword,
       autoLogoutMinutes,
       admissionHomepageUrl,
-      admitCardDataSource,
       applicantExamNoDigitCount,
       applicantExamNoComponents,
     };
@@ -479,9 +473,9 @@ function createSystemSettingsService({
           'initialPassword',
           'autoLogoutMinutes',
           'admissionHomepageUrl',
-          'admitCardDataSource',
           'applicantExamNoDigitCount',
-          'applicantExamNoComponentsJson'
+          'applicantExamNoComponentsJson',
+          'superAdminSettingsJson'
         )
       `,
     );
@@ -516,6 +510,21 @@ function createSystemSettingsService({
 
   async function updateSystemSettings(payload) {
     const nextSettings = normalizeSystemSettingsPayload(payload);
+    const hasBranding = Object.hasOwn(payload, 'schoolName') || Object.hasOwn(payload, 'schoolLogoImageUrl');
+    let branding;
+    if (hasBranding) {
+      const current = await getSuperAdminSettings();
+      branding = validateSuperAdminSettings({ ...current,
+        schoolName: payload.schoolName ?? current.schoolName,
+        logoImageUrl: payload.schoolLogoImageUrl ?? current.logoImageUrl,
+      });
+      if (branding.logoImageUrl !== current.logoImageUrl && branding.logoImageUrl.startsWith('data:')) {
+        const match = branding.logoImageUrl.match(/^data:image\/(png|jpeg|webp);base64,([a-z0-9+/=\s]+)$/i);
+        if (!match || Buffer.from(match[2], 'base64').length > 2 * 1024 * 1024) {
+          throw createHttpError(400, '학교 로고는 PNG·JPG·WEBP 이미지(2MB 이하)여야 합니다.', 'SCHOOL_LOGO_INVALID');
+        }
+      }
+    }
 
     await query(
       `
@@ -524,7 +533,6 @@ function createSystemSettingsService({
           ('initialPassword', ?),
           ('autoLogoutMinutes', ?),
           ('admissionHomepageUrl', ?),
-          ('admitCardDataSource', ?),
           ('applicantExamNoDigitCount', ?),
           ('applicantExamNoComponentsJson', ?)
         ON DUPLICATE KEY UPDATE
@@ -534,12 +542,17 @@ function createSystemSettingsService({
         nextSettings.initialPassword,
         String(nextSettings.autoLogoutMinutes),
         nextSettings.admissionHomepageUrl,
-        nextSettings.admitCardDataSource,
         String(nextSettings.applicantExamNoDigitCount),
         JSON.stringify(nextSettings.applicantExamNoComponents),
       ],
     );
 
+    if (branding) {
+      // Patch only school identity: ordinary admins cannot change super-admin options.
+      await query(`INSERT INTO system_set (setting_key, setting_value) VALUES ('superAdminSettingsJson', ?)
+        ON DUPLICATE KEY UPDATE setting_value = JSON_SET(setting_value, '$.schoolName', ?, '$.logoImageUrl', ?)`,
+        [JSON.stringify(branding), branding.schoolName, branding.logoImageUrl]);
+    }
     return getSystemSettings();
   }
 

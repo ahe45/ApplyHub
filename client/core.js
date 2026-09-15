@@ -22,7 +22,7 @@ const authUiStateModule = globalThis.AdmitCardAuthUiState;
 const authSessionModule = globalThis.AdmitCardAuthSession;
 const admitCardWorkflowModule = globalThis.AdmitCardWorkflow;
 const examineeFileTransfer = globalThis.AdmitCardExamineeFileTransfer;
-const uploadWorkflowModule = globalThis.AdmitCardExamineeUploadWorkflow;
+
 const accountCreateModule = globalThis.AdmitCardAccountCreate;
 const systemSettingsModule = globalThis.AdmitCardSystemSettings;
 
@@ -31,7 +31,7 @@ if (!appConfig) {
 }
 
 if (!clientExamineeConfig) {
-  throw new Error("client/features/examinees/config.js must be loaded before client/core.js.");
+  throw new Error("client/features/admit-cards/config.js must be loaded before client/core.js.");
 }
 
 if (!stateFactories) {
@@ -99,11 +99,7 @@ if (!admitCardWorkflowModule?.createAdmitCardWorkflowController) {
 }
 
 if (!examineeFileTransfer) {
-  throw new Error("client/features/examinees/file-transfer.js must be loaded before client/core.js.");
-}
-
-if (!uploadWorkflowModule?.createExamineeUploadWorkflowController) {
-  throw new Error("client/features/examinees/upload-workflow.js must be loaded before client/core.js.");
+  throw new Error("client/features/admit-cards/file-transfer.js must be loaded before client/core.js.");
 }
 
 if (!accountCreateModule?.createAccountCreateController) {
@@ -138,37 +134,27 @@ const {
   lookupSelectFields,
   lookupSelectKeys,
   lookupTextFields,
-  resultGridColumns,
   admitCardLookupGridColumns,
-  examineeRegistrationGridColumns,
+
   printHistoryGridColumns,
-  examineeDetailFields: EXAMINEE_DETAIL_FIELDS,
-  examineeDetailFieldKeys: EXAMINEE_DETAIL_FIELD_KEYS,
-  examineePhotoColumn,
 } = clientExamineeConfig;
 const SYSTEM_DATA_DELETE_CONFIG = Object.freeze({
   all: Object.freeze({
     confirmMessage:
-      "전체 데이터를 삭제하시겠습니까?\n\n수험생 데이터, 사진 데이터, 전형 관리 데이터, 배정표 데이터, 수험표 출력 이력, 접수 이력 데이터가 모두 삭제되며 복구할 수 없습니다.",
+      "전체 데이터를 삭제하시겠습니까?\n\n회원가입 정보·첨부파일·약관 동의, 접수 사진·서류, 전형 관리, 출력 이력, 접수 이력이 모두 삭제됩니다. 백업이 없으면 복구할 수 없습니다.",
   }),
   "applicant-settings": Object.freeze({
     confirmMessage: "전형 관리 데이터를 삭제하시겠습니까?\n\n전형 관리 데이터가 모두 삭제되며 복구할 수 없습니다.",
   }),
-  "applicant-assignments": Object.freeze({
-    confirmMessage: "배정표 데이터를 삭제하시겠습니까?\n\n배정표 데이터가 모두 삭제되며 복구할 수 없습니다.",
-  }),
-  examinees: Object.freeze({
-    confirmMessage:
-      "수험생 데이터를 삭제하시겠습니까?\n\n수험생 데이터와 사진 파일이 모두 삭제되며, 연관된 수험표 출력 이력도 함께 정리됩니다. 복구할 수 없습니다.",
-  }),
-  photos: Object.freeze({
-    confirmMessage: "사진 데이터를 삭제하시겠습니까?\n\n업로드된 사진 파일과 사진 데이터가 모두 삭제되며 복구할 수 없습니다.",
-  }),
+
   "print-history": Object.freeze({
     confirmMessage: "수험표 출력 이력을 삭제하시겠습니까?\n\n출력 이력 데이터가 모두 삭제되며 복구할 수 없습니다.",
   }),
   "applicant-history": Object.freeze({
     confirmMessage: "접수 이력 데이터를 삭제하시겠습니까?\n\n접수 이력 데이터가 모두 삭제되며 복구할 수 없습니다.",
+  }),
+  "applicant-members": Object.freeze({
+    confirmMessage: "전체 회원가입 데이터를 삭제하시겠습니까?\n\n회원 계정, 가입 답변·첨부파일, 약관 동의, 로그인·인증 정보가 삭제됩니다. 기존 접수 이력은 보존하고 회원 연결만 해제합니다. 관리자 계정과 가입 양식은 유지합니다. 백업이 없으면 복구할 수 없습니다.",
   }),
 });
 const AVAILABLE_VIEWS = new Set(availableViews);
@@ -180,7 +166,7 @@ const {
   createApplicantManagementState,
   createAuthState,
   createBatchPrintState,
-  createExamineeDetailState,
+
   createPdfGenerationState,
   createSuperAdminState: createSuperAdminStateBase,
   createSystemAuditLogState,
@@ -190,7 +176,6 @@ const {
   createTemplateEditorState,
   createTemplatePreviewState,
   createToastState,
-  createUploadState,
 } = stateFactories;
 const createHeaderFilters = () => stateFactories.createHeaderFilters(headerFilterFields);
 const createLookupFilters = () => stateFactories.createLookupFilters(lookupSelectFields, lookupTextFields);
@@ -242,16 +227,13 @@ const { createAuthUiController } = authUiStateModule;
 const { createAuthSessionController } = authSessionModule;
 const { createAdmitCardWorkflowController } = admitCardWorkflowModule;
 const { createAccountCreateController } = accountCreateModule;
-const { createExamineeUploadWorkflowController } = uploadWorkflowModule;
+
 const { createSystemSettingsController } = systemSettingsModule;
 const {
   arrayBufferToBase64,
-  buildUploadSummaryMessage,
-  clearSelectedUploadFiles,
-  downloadExamineeGridWorkbook,
-  downloadExamineeTemplate,
+
   downloadPrintHistoryGridWorkbook,
-  mergeUploadResult,
+
   readFileAsArrayBuffer,
   wait,
   waitForNextFrame,
@@ -284,7 +266,7 @@ const appStateController = createAppStateController({
   createApplicantManagementState,
   createAuthState,
   createBatchPrintState,
-  createExamineeDetailState,
+
   createHeaderFilters,
   createApplicantNoticeState,
   createLoginNoticeState,
@@ -299,7 +281,6 @@ const appStateController = createAppStateController({
   createTemplateEditorState,
   createTemplatePreviewState,
   createToastState,
-  createUploadState,
   getViewFromPathname,
   isLoginRoutePath,
   loadStoredHeaderFilters,
@@ -324,13 +305,9 @@ const {
   accountCreateModal,
   accountCreateName,
   accountCreateRole,
-  applicantAssignmentModal,
-  applicantAssignmentUploadFileInput,
-  applicantAssignmentUploadFileName,
-  applicantAssignmentUploadPreviewMount,
-  applicantAssignmentUploadModal,
+
   applicantScheduleModal,
-  applicantPromotionModal,
+
   applicantSubmissionDownloadModal,
   batchPrintDownloadForm,
   batchPrintDownloadModal,
@@ -352,12 +329,7 @@ const {
   brandHome,
   currentUserId,
   currentUserRole,
-  examineeDetailBody,
-  examineeDetailCloseConfirmMessage,
-  examineeDetailCloseConfirmModal,
-  examineeDetailCloseConfirmSummary,
-  examineeDetailModal,
-  examineeDetailSaveButton,
+
   logoutButton,
   menuToggle,
   pageShell,
@@ -394,21 +366,7 @@ const {
   todayPrintCount,
   topbar,
   totalPrintCount,
-  uploadFileInput,
-  uploadFileName,
-  uploadModal,
-  uploadTypeModal,
-  uploadOverlay,
-  uploadOverlayMessage,
-  uploadOverlayProgress,
-  uploadOverlayProgressBar,
-  uploadOverlayProgressFill,
-  uploadOverlayProgressLabel,
-  uploadOverlayProgressValue,
-  uploadOverlayTitle,
-  uploadPreviewMount,
-  uploadPhotoArchiveInput,
-  uploadPhotoArchiveName,
+
   viewRoot,
 } = domElementRegistry;
 let templateEditorBlockType = null;
@@ -469,7 +427,6 @@ function refreshTemplateEditorToolbarElements() {
 
 refreshTemplateEditorToolbarElements();
 let templateEditorImageOverlay = null;
-const MIN_UPLOAD_OVERLAY_DISPLAY_MS = 1000;
 const BATCH_PRINT_STATUS_POLL_INTERVAL_MS = 400;
 const BATCH_PRINT_JOB_TIMEOUT_MS = 1000 * 60 * 30;
 const titles = pageTitles;
@@ -600,7 +557,7 @@ const {
 } = autoLogoutController;
 
 const bootstrapDataController = createBootstrapDataController({
-  EXAMINEE_DETAIL_FIELD_KEYS,
+
   HEADER_FILTER_STORAGE_KEY,
   applyLoginNoticePayload,
   applySystemBackupAutomationPayload: (...args) => applySystemBackupAutomationPayload(...args),
@@ -616,7 +573,7 @@ const bootstrapDataController = createBootstrapDataController({
   clearAutoLogoutTimer,
   createAccountEditorState,
   createApplicantManagementState,
-  createExamineeDetailState,
+
   createHeaderFilters,
   createPdfGenerationState,
   createSuperAdminState,
@@ -669,14 +626,13 @@ const bootstrapDataController = createBootstrapDataController({
 });
 const {
   applyBootstrapPayload,
-  areExamineeDetailDraftsEqual,
-  buildExamineeDetailDraft,
+
   clearHeaderFilters,
   getCurrentUserRole,
   normalizeAccountRecord,
   normalizeExamineeRecord,
   persistHeaderFilters,
-  reconcileExamineeDetailState,
+
   resetBootstrapData,
   resetGridPages,
   updateMetricBadges,
@@ -730,7 +686,7 @@ const authSessionController = createAuthSessionController({
   getDefaultAccessibleView,
   hideToast,
   isLoginPage,
-  isRouteNavigating: () => isRouteNavigating,
+  isRouteNavigating,
   isUserAuthenticated,
   loadBootstrapData,
   loadLoginNoticeData,
@@ -879,14 +835,12 @@ Object.assign(globalThis, {
 const workflowRuntimeController = createWorkflowRuntimeController({
   BATCH_PRINT_JOB_TIMEOUT_MS,
   BATCH_PRINT_STATUS_POLL_INTERVAL_MS,
-  MIN_UPLOAD_OVERLAY_DISPLAY_MS,
   apiRequest,
   apiRequestForBlobWithProgress,
   apiRequestWithUploadProgress,
   arrayBufferToBase64,
   buildApiUrl,
-  buildUploadSummaryMessage,
-  clearSelectedUploadFiles,
+
   closeModal: (modalId) => {
     if (typeof globalThis.closeModal === "function") {
       return globalThis.closeModal(modalId);
@@ -896,9 +850,8 @@ const workflowRuntimeController = createWorkflowRuntimeController({
   },
   createAdmitCardWorkflowController,
   createBusyOverlayController,
-  createExamineeUploadWorkflowController,
+
   createPdfGenerationState,
-  createUploadState,
   getBatchPrintDownloadElements: () => ({
     formElement: batchPrintDownloadForm,
     modal: batchPrintDownloadModal,
@@ -922,34 +875,15 @@ const workflowRuntimeController = createWorkflowRuntimeController({
     progressBarElement: pdfGenerationProgressBar,
     progressFillElement: pdfGenerationProgressFill,
   }),
-  getUploadFileInput: () => uploadFileInput,
-  getUploadOverlayElements: () => ({
-    overlay: uploadOverlay,
-    titleElement: uploadOverlayTitle,
-    messageElement: uploadOverlayMessage,
-    progressElement: uploadOverlayProgress,
-    progressLabelElement: uploadOverlayProgressLabel,
-    progressValueElement: uploadOverlayProgressValue,
-    progressBarElement: uploadOverlayProgressBar,
-    progressFillElement: uploadOverlayProgressFill,
-  }),
-  getUploadPreviewMount: () => uploadPreviewMount,
-  getUploadPhotoArchiveInput: () => uploadPhotoArchiveInput,
+
   handleAuthenticationFailure,
   hideToast,
   loadBootstrapData,
-  mergeUploadResult,
+
   readFileAsArrayBuffer,
   renderView: (...args) => {
     if (typeof globalThis.renderView === "function") {
       return globalThis.renderView(...args);
-    }
-
-    return undefined;
-  },
-  setUploadOverlayStateFallback: (...args) => {
-    if (typeof setUploadOverlayState === "function") {
-      return setUploadOverlayState(...args);
     }
 
     return undefined;
@@ -963,41 +897,30 @@ const {
   batchPrintSelectedExaminees,
   buildBusyOverlayMessage,
   buildPdfGenerationMessage,
-  buildUploadOverlayMessage,
-  closeUploadOverlayWithAlert,
-  closeUploadOverlayWithToast,
-  clearExamineeUploadPreview,
+
   fetchExamineeAdmitCardPdfUrl,
   getSelectedAdmitCardExamineeCount,
   getSelectedAdmitCardExaminees,
   isBusyOverlayActive,
   isPdfGenerationActive,
-  isUploadActive,
   normalizeExamineeNoList,
   normalizeProgressValue,
   openPdfWindow,
   cancelBatchPrintJob,
-  previewSelectedExamineeImportFile,
-  previewSelectedExamineePhotoArchiveFile,
+
   prepareBatchPrintDownloadModal,
   printExamineeAdmitCard,
   printPdfUrl,
-  readUploadFileAsBase64,
+
   recordExamineePrint,
   resetPdfGenerationState,
-  resetUploadState,
   runWithPdfGenerationLock,
-  setExamineeUploadMode,
+
   setPdfGenerationState,
-  setUploadOverlayState,
-  showUploadFailureAlert,
   submitBatchPrintDownloadSelection,
   syncAppBusyState,
   syncPdfGenerationOverlay,
-  syncUploadOverlay,
   updateBatchPrintOutputMode,
-  updateExamineeImportExistingDataPolicy,
-  uploadPhotoArchiveFile,
-  uploadSelectedExamineeFile,
+
 } = workflowRuntimeController;
 

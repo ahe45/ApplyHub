@@ -82,13 +82,6 @@
 }
 
 @media (max-width: 980px) {
-  .examinee-detail-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .examinee-detail-photo-panel {
-    max-width: 288px;
-  }
 }
 
 .empty-state {
@@ -97,7 +90,7 @@
   min-height: 280px;
   padding: 22px;
   border-radius: 26px;
-  border: 1px dashed rgba(203, 213, 225, 0.9);
+  border: 1px dashed rgba(var(--glass-line-rgb), 0.9);
   color: var(--text-dim);
   text-align: center;
 }
@@ -238,19 +231,6 @@
   .modal-toolbar,
   .page-indicator {
     flex-wrap: wrap;
-  }
-
-  .examinee-detail-field-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .examinee-detail-field-row {
-    grid-template-columns: 1fr;
-  }
-
-  .examinee-detail-photo-panel {
-    max-width: none;
-    height: auto;
   }
 }
 

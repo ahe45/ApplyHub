@@ -62,12 +62,12 @@ function createAuthSessionStore({
   }
 
   function clearSessionCookie(response) {
-    response.setHeader("Set-Cookie", `${sessionCookieName}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+    response.setHeader("Set-Cookie", [...[].concat(response.getHeader("Set-Cookie") || []), `${sessionCookieName}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`]);
   }
 
   function attachSessionCookie(response, sessionId, stage = "authenticated") {
     const maxAgeMs = stage === "password_setup" ? passwordSetupSessionTtlMs : authenticatedSessionTtlMs;
-    response.setHeader("Set-Cookie", buildSessionCookieValue(sessionId, maxAgeMs));
+    response.setHeader("Set-Cookie", [...[].concat(response.getHeader("Set-Cookie") || []), buildSessionCookieValue(sessionId, maxAgeMs)]);
   }
 
   function getSessionContext(request) {

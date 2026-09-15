@@ -9,20 +9,18 @@
   function createModalController({
     TEMPLATE_EDITOR_DEFAULT_FONT_FAMILY,
     TEMPLATE_EDITOR_DEFAULT_FONT_SIZE,
-    clearApplicantAssignmentUploadFiles,
+
     clearApplicantRecruitmentUnitUploadFiles,
-    clearSelectedUploadFiles,
+
     clearTemplateEditorActiveCell,
     clearTemplateEditorImageSelection,
     clearTemplateEditorTableHoverState,
     clearTemplateEditorTableSelection,
-    closeExamineeDetailCloseConfirmModal,
+
     createTemplateEditorState,
     createTemplatePreviewState,
     getAccountCreateModal,
-    getApplicantAssignmentModal,
-    getApplicantAssignmentUploadModal,
-    getApplicantPromotionModal,
+
     getApplicantScheduleModal,
     getApplicantSubmissionDownloadModal,
     getApplicantSubmissionDetailModal,
@@ -30,8 +28,7 @@
     getApplicantUnitUploadModal,
     getBatchPrintDownloadModal,
     getSystemAuditLogModal,
-    getExamineeDetailCloseConfirmModal,
-    getExamineeDetailModal,
+
     getTemplateEditorDescription,
     getTemplateEditorFontFamily,
     getTemplateEditorFontSize,
@@ -41,21 +38,17 @@
     getTemplateEditorTableRows,
     getTemplatePreviewModal,
     getTemplatePreviewStage,
-    getUploadModal,
-    getUploadTypeModal,
-    isExamineeDetailDirty,
+
     prepareAccountCreateModal,
-    resetApplicantAssignmentEditor,
-    promptExamineeDetailCloseAction,
+
     releaseTemplateEditorTableResizeSession,
     releaseTemplateEditorTableSelectionSession,
     resetAccountCreateFormState,
-    resetApplicantPromotionWorkflow,
+
     resetApplicantScheduleEditor,
     resetApplicantRecruitmentUnitEditor,
     resetApplicantSubmissionDetail,
-    resetUploadState,
-    saveExamineeDetail,
+
     setTemplateEditorTableInsertPanelVisibility,
     state,
     syncEditorToolbarFontSizeControls,
@@ -80,33 +73,6 @@
 
       if (!normalizedModalId) {
         return false;
-      }
-
-      if (normalizedModalId === "examineeDetailCloseConfirmModal") {
-        closeExamineeDetailCloseConfirmModal("cancel");
-        return true;
-      }
-
-      if (normalizedModalId === "examineeDetailModal") {
-        if (state.examineeDetail.isSaving || state.examineeDetail.isPhotoUploading) {
-          return false;
-        }
-
-        if (isExamineeDetailDirty()) {
-          const closeAction = await promptExamineeDetailCloseAction();
-
-          if (closeAction === "cancel") {
-            return false;
-          }
-
-          if (closeAction === "save") {
-            await saveExamineeDetail();
-
-            if (isExamineeDetailDirty() || state.examineeDetail.isSaving) {
-              return false;
-            }
-          }
-        }
       }
 
       closeModal(normalizedModalId);
@@ -176,26 +142,12 @@
         }
       }
 
-      if (modalId === "uploadModal") {
-        resetUploadState();
-        clearSelectedUploadFiles();
-      }
-
       if (modalId === "applicantUnitUploadModal") {
         clearApplicantRecruitmentUnitUploadFiles?.();
       }
 
-      if (modalId === "applicantAssignmentUploadModal") {
-        clearApplicantAssignmentUploadFiles?.();
-      }
-
       if (modalId === "accountCreateModal") {
         resetAccountCreateFormState();
-      }
-
-      if (modalId === "examineeDetailCloseConfirmModal") {
-        closeExamineeDetailCloseConfirmModal("cancel");
-        return;
       }
 
       modal.classList.add("hidden");
@@ -203,10 +155,6 @@
 
       if (modalId === "applicantSubmissionDetailModal") {
         resetApplicantSubmissionDetail?.({ render: true });
-      }
-
-      if (modalId === "applicantPromotionModal") {
-        resetApplicantPromotionWorkflow?.({ render: true });
       }
 
       if (modalId === "applicantScheduleModal") {
@@ -217,28 +165,20 @@
         resetApplicantRecruitmentUnitEditor?.({ render: true });
       }
 
-      if (modalId === "applicantAssignmentModal") {
-        resetApplicantAssignmentEditor?.({ render: true });
-      }
     }
 
     function closeAllModals() {
       [
-        getApplicantAssignmentModal(),
-        getApplicantAssignmentUploadModal(),
+
         getApplicantScheduleModal(),
         getApplicantSubmissionDownloadModal(),
         getApplicantSubmissionDetailModal(),
-        getApplicantPromotionModal(),
+
         getApplicantRecruitmentUnitModal(),
         getApplicantUnitUploadModal(),
         getBatchPrintDownloadModal?.(),
         getSystemAuditLogModal?.(),
-        getUploadModal(),
-        getUploadTypeModal?.(),
         getAccountCreateModal(),
-        getExamineeDetailModal(),
-        getExamineeDetailCloseConfirmModal(),
         getTemplatePreviewModal(),
         getTemplateEditorModal(),
       ].forEach((modal) => {
@@ -252,20 +192,16 @@
 
     async function requestCloseAllModals() {
       const modalList = [
-        getApplicantAssignmentModal(),
-        getApplicantAssignmentUploadModal(),
+
         getApplicantScheduleModal(),
         getApplicantSubmissionDownloadModal(),
         getApplicantSubmissionDetailModal(),
-        getApplicantPromotionModal(),
+
         getApplicantRecruitmentUnitModal(),
         getApplicantUnitUploadModal(),
         getBatchPrintDownloadModal?.(),
         getSystemAuditLogModal?.(),
-        getUploadModal(),
-        getUploadTypeModal?.(),
         getAccountCreateModal(),
-        getExamineeDetailModal(),
         getTemplatePreviewModal(),
         getTemplateEditorModal(),
       ];

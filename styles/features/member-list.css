@@ -1,0 +1,16 @@
+.member-list-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-block: 20px; }
+.member-list-filters .field { flex: 1 1 180px; max-width: 360px; }
+.member-list-filters select, .member-list-filters input { width: 100%; }
+.member-list-table-wrap { overflow-x: auto; }
+.member-list-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.member-list-table th, .member-list-table td { padding: 14px 12px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.member-list-table th { color: var(--text-dim); background: var(--glass-surface); }
+.member-list-status { display: inline-flex; padding: 5px 10px; border-radius: 999px; background: var(--glass-bg); color: var(--glass-muted); font-size: 12px; font-weight: 700; }
+.member-list-status.is-submitted { color: var(--glass-link); background: var(--glass-bg); }
+.member-list-pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 20px; }
+.member-list-error { color: var(--glass-error); }
+.member-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+.member-detail-field dt { color: var(--text-dim); font-size: 13px; margin-bottom: 8px; }
+.member-detail-field dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.member-term { margin-block: 12px; padding: 12px; background: var(--glass-surface); border-radius: 12px; }
+.member-term p { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow-y: auto; }

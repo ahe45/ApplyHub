@@ -1,0 +1,24 @@
+:is(.applicant-public-body, .common-login-stage) .applicant-public-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 6px 12px;
+  margin-left: 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: -.01em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+:is(.applicant-public-body, .common-login-stage) .applicant-public-badge.is-required { background: var(--glass-error-bg); color: var(--glass-error); }
+:is(.applicant-public-body, .common-login-stage) .applicant-public-badge.is-optional { background: rgba(var(--glass-primary-rgb), 0.14); color: var(--glass-link); }
+:is(.applicant-public-body, .common-login-stage) .applicant-public-field-feedback { display: block; font-size: 13px; line-height: 1.6; font-weight: 500; overflow-wrap: anywhere; }
+:is(.applicant-public-body, .common-login-stage) .applicant-public-field-feedback.is-error { color: var(--glass-error); }
+:is(.applicant-public-body, .common-login-stage) .applicant-public-field-feedback.is-success { color: var(--glass-success); }
+:is(.applicant-public-body, .common-login-stage) .applicant-public-field-feedback[hidden] { display: none; }
+:is(.applicant-public-body, .common-login-stage) [aria-invalid="true"] { border-color: var(--glass-error); }
+.applicant-member-signup [data-member-message]:empty { display: none; }
+.applicant-member-signup [data-member-code-preview] { margin: 0; }

@@ -326,7 +326,7 @@
       }
 
       try {
-        await apiRequest(`/api/examinees/admit-card-jobs/${encodeURIComponent(normalizedJobId)}`, {
+        await apiRequest(`/api/admit-cards/jobs/${encodeURIComponent(normalizedJobId)}`, {
           method: "DELETE",
         });
         return true;
@@ -348,7 +348,7 @@
       }
 
       while (true) {
-        const jobPayload = await apiRequest(`/api/examinees/admit-card-jobs/${encodeURIComponent(normalizedJobId)}`);
+        const jobPayload = await apiRequest(`/api/admit-cards/jobs/${encodeURIComponent(normalizedJobId)}`);
 
         syncBatchPrintOverlayFromJob(jobPayload);
 
@@ -482,7 +482,7 @@
         preparationMessage,
         async () => {
           try {
-            const batchJob = await apiRequest("/api/examinees/admit-card-jobs", {
+            const batchJob = await apiRequest("/api/admit-cards/jobs", {
               method: "POST",
               body: JSON.stringify({ examineeNos, outputMode: normalizedOutputMode }),
             });
@@ -516,7 +516,7 @@
             isBatchPrintDownloadActive = true;
 
             const { blob } = await apiRequestForBlobWithProgress(
-              `/api/examinees/admit-card-jobs/${encodeURIComponent(activeBatchPrintJobId)}/file`,
+              `/api/admit-cards/jobs/${encodeURIComponent(activeBatchPrintJobId)}/file`,
               {
                 credentials: "same-origin",
               },

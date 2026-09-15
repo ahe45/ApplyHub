@@ -858,6 +858,14 @@
       }
 
       if (colorTableAction) {
+        if (colorTableAction === "apply-cell-border" && colorInputId === toolbarIds.borderColor) {
+          if (colorInputElement?.dataset) {
+            colorInputElement.dataset.editorBorderUserValue = "true";
+          }
+
+          return;
+        }
+
         handleTemplateTableAction(colorTableAction, { colorValue });
       }
     }

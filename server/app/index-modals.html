@@ -1,0 +1,576 @@
+
+
+
+
+    <div class="modal hidden" id="applicantUnitUploadModal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+      <section class="modal-sheet upload-modal-sheet" role="dialog" aria-modal="true" aria-labelledby="applicantUnitUploadTitle">
+        <div class="modal-header">
+          <div>
+            <h3 id="applicantUnitUploadTitle">전형 관리 데이터 업로드</h3>
+          </div>
+          <button class="icon-button" data-close-modal="true" type="button" aria-label="닫기">×</button>
+        </div>
+
+          <div class="modal-body upload-modal-body">
+            <div class="upload-grid">
+              <article class="upload-card">
+                <h4>전형 관리 데이터 업로드</h4>
+                <p>전형 관리 업로드 전용 XLSX 양식을 내려받아 코드와 명칭 체계를 맞춘 뒤 업로드합니다.</p>
+                <div class="upload-card-actions">
+                  <button class="ghost-button upload-template-button" data-applicant-recruitment-download-template="true" type="button">양식 다운로드</button>
+                </div>
+                <div class="upload-dropzone" data-upload-dropzone="applicantUnitUploadFileInput">
+                  <input class="upload-file-input" id="applicantUnitUploadFileInput" type="file" accept=".xlsx" />
+                <label class="secondary-button upload-select-button" for="applicantUnitUploadFileInput">파일 선택</label>
+                <strong id="applicantUnitUploadFileName">선택된 데이터 파일이 없습니다.</strong>
+                <span class="upload-dropzone-hint">XLSX 파일을 이 영역으로 끌어다 놓아도 됩니다.</span>
+              </div>
+              <div class="upload-policy-mount" id="applicantUnitUploadPolicyMount"></div>
+            </article>
+          </div>
+
+          <section class="upload-preview-panel" id="applicantUnitUploadPreviewMount" aria-live="polite">
+            <div class="upload-preview-empty">
+              <strong>업로드 미리보기</strong>
+              <p>XLSX 파일을 선택하면 실제 저장 전에 예상 신규/수정 건수를 전체 파일 기준으로 확인할 수 있습니다.</p>
+            </div>
+          </section>
+
+          <div class="upload-panel-footer">
+              <div class="upload-actions">
+                <button class="ghost-button" data-close-modal="true" type="button">닫기</button>
+                <button class="primary-button" data-upload-applicant-recruitment="true" id="applicantUnitUploadExecuteButton" type="button">업로드 실행</button>
+              </div>
+            </div>
+        </div>
+      </section>
+    </div>
+
+
+
+    <div class="modal hidden" id="applicantRecruitmentUnitModal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+      <section
+        class="modal-sheet applicant-recruitment-modal-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="applicantRecruitmentUnitModalTitle"
+      >
+        <div class="modal-header">
+          <div>
+            <h3 id="applicantRecruitmentUnitModalTitle">전형 관리 상세정보</h3>
+            <p class="template-modal-meta">선택한 전형 관리 항목의 모집시기, 전형, 계열, 모집단위, 전공 정보를 수정합니다.</p>
+          </div>
+          <div class="toolbar-actions">
+            <button
+              class="outline-button danger-button"
+              id="applicantRecruitmentUnitModalDeleteButton"
+              data-applicant-recruitment-delete=""
+              type="button"
+              disabled
+            >
+              삭제
+            </button>
+            <button class="primary-button" id="applicantRecruitmentUnitModalSaveButton" form="applicantRecruitmentUnitForm" type="submit" disabled>
+              저장
+            </button>
+            <button class="icon-button" data-close-modal="true" type="button" aria-label="닫기">×</button>
+          </div>
+        </div>
+
+        <div class="modal-body applicant-recruitment-modal-body">
+          <form class="applicant-recruitment-modal-form" id="applicantRecruitmentUnitForm" data-applicant-recruitment-form="true">
+            <div class="applicant-recruitment-modal-grid">
+              <label class="field" for="applicantRecruitmentTrackName">
+                <span>모집시기</span>
+                <input
+                  id="applicantRecruitmentTrackName"
+                  data-applicant-recruitment-input="trackName"
+                  type="text"
+                  placeholder="예: 수시"
+                  autocomplete="off"
+                />
+              </label>
+
+              <label class="field" for="applicantRecruitmentAdmissionCode">
+                <span>전형코드</span>
+                <input
+                  id="applicantRecruitmentAdmissionCode"
+                  data-applicant-recruitment-input="admissionCode"
+                  type="text"
+                  placeholder="예: SU"
+                  autocomplete="off"
+                />
+              </label>
+
+              <label class="field" for="applicantRecruitmentAdmissionName">
+                <span>전형</span>
+                <input
+                  id="applicantRecruitmentAdmissionName"
+                  data-applicant-recruitment-input="admissionName"
+                  type="text"
+                  placeholder="예: 수시"
+                  autocomplete="off"
+                />
+              </label>
+
+              <label class="field" for="applicantRecruitmentSeriesCode">
+                <span>계열코드</span>
+                <input
+                  id="applicantRecruitmentSeriesCode"
+                  data-applicant-recruitment-input="seriesCode"
+                  type="text"
+                  placeholder="예: EN"
+                  autocomplete="off"
+                />
+              </label>
+
+              <label class="field" for="applicantRecruitmentSeriesName">
+                <span>계열</span>
+                <input
+                  id="applicantRecruitmentSeriesName"
+                  data-applicant-recruitment-input="seriesName"
+                  type="text"
+                  placeholder="예: 공학계열"
+                  autocomplete="off"
+                />
+              </label>
+
+              <label class="field" for="applicantRecruitmentUnitCode">
+                <span>모집단위코드</span>
+                <input
+                  id="applicantRecruitmentUnitCode"
+                  data-applicant-recruitment-input="unitCode"
+                  type="text"
+                  placeholder="예: CSE"
+                  autocomplete="off"
+                />
+              </label>
+
+              <label class="field" for="applicantRecruitmentUnitName">
+                <span>모집단위</span>
+                <input
+                  id="applicantRecruitmentUnitName"
+                  data-applicant-recruitment-input="unitName"
+                  type="text"
+                  placeholder="예: 컴퓨터공학부"
+                  autocomplete="off"
+                />
+              </label>
+
+              <label class="field" for="applicantRecruitmentMajorCode">
+                <span>전공코드</span>
+                <input
+                  id="applicantRecruitmentMajorCode"
+                  data-applicant-recruitment-input="majorCode"
+                  type="text"
+                  placeholder="예: SE"
+                  autocomplete="off"
+                />
+              </label>
+
+              <label class="field" for="applicantRecruitmentMajorName">
+                <span>전공</span>
+                <input
+                  id="applicantRecruitmentMajorName"
+                  data-applicant-recruitment-input="majorName"
+                  type="text"
+                  placeholder="예: 소프트웨어전공"
+                  autocomplete="off"
+                />
+              </label>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+
+
+    <div class="modal hidden" id="applicantScheduleModal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+      <section
+        class="modal-sheet applicant-recruitment-modal-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="applicantScheduleModalTitle"
+      >
+        <div class="modal-header">
+          <div>
+            <h3 id="applicantScheduleModalTitle">일정 상세정보</h3>
+            <p class="template-modal-meta" id="applicantScheduleModalDescription">모집시기와 전형별 접수, 서류 제출, 수험표 조회 기간을 설정합니다.</p>
+          </div>
+          <div class="toolbar-actions">
+            <button class="primary-button" id="applicantScheduleModalSaveButton" form="applicantScheduleForm" type="submit" disabled>
+              저장
+            </button>
+            <button class="icon-button" data-close-modal="true" type="button" aria-label="닫기">×</button>
+          </div>
+        </div>
+
+        <div class="modal-body applicant-recruitment-modal-body">
+          <form class="applicant-recruitment-modal-form" id="applicantScheduleForm" data-applicant-schedule-form="true">
+            <div class="applicant-schedule-bulk-summary hidden" id="applicantScheduleBulkSummary" aria-hidden="true">
+              <strong id="applicantScheduleBulkSummaryCount">선택한 0개 전형</strong>
+              <p id="applicantScheduleBulkSummaryTargets"></p>
+              <p class="applicant-schedule-bulk-warning">입력한 일정으로 선택 항목을 모두 덮어씁니다. 비워 둔 기간은 일정이 해제됩니다.</p>
+            </div>
+            <div class="applicant-recruitment-modal-grid">
+              <label class="field" for="applicantScheduleStartAt">
+                <span>접수 시작</span>
+                <input id="applicantScheduleStartAt" data-applicant-schedule-input="applicantScheduleStartAt" type="datetime-local" />
+              </label>
+              <label class="field" for="applicantScheduleEndAt">
+                <span>접수 종료</span>
+                <input id="applicantScheduleEndAt" data-applicant-schedule-input="applicantScheduleEndAt" type="datetime-local" />
+              </label>
+              <label class="field" for="documentSubmissionScheduleStartAt">
+                <span>서류 제출 시작</span>
+                <input id="documentSubmissionScheduleStartAt" data-applicant-schedule-input="documentSubmissionScheduleStartAt" type="datetime-local" />
+              </label>
+              <label class="field" for="documentSubmissionScheduleEndAt">
+                <span>서류 제출 종료</span>
+                <input id="documentSubmissionScheduleEndAt" data-applicant-schedule-input="documentSubmissionScheduleEndAt" type="datetime-local" />
+              </label>
+              <label class="field" for="applicantScheduleLookupStartAt">
+                <span>수험표 조회 시작</span>
+                <input id="applicantScheduleLookupStartAt" data-applicant-schedule-input="admitCardLookupScheduleStartAt" type="datetime-local" />
+              </label>
+              <label class="field" for="applicantScheduleLookupEndAt">
+                <span>수험표 조회 종료</span>
+                <input id="applicantScheduleLookupEndAt" data-applicant-schedule-input="admitCardLookupScheduleEndAt" type="datetime-local" />
+              </label>
+            </div>
+            <p class="template-modal-meta">서류 제출 기간은 접수 기간과 별도로 적용됩니다. 비워 두면 서류를 제출할 수 없습니다.</p>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal hidden" id="passwordSetupModal" aria-hidden="true">
+      <div class="modal-backdrop" data-password-setup-close="true"></div>
+      <section class="modal-sheet password-setup-modal-sheet" role="dialog" aria-modal="true" aria-labelledby="passwordSetupTitle">
+        <div class="modal-header">
+          <div>
+            <p class="modal-kicker">최초 로그인</p>
+            <h3 id="passwordSetupTitle">비밀번호 설정</h3>
+            <p class="template-modal-meta" id="passwordSetupDescription">초기 비밀번호를 변경해야 관리자 페이지를 사용할 수 있습니다.</p>
+          </div>
+          <button class="icon-button" data-password-setup-close="true" type="button" aria-label="닫기">×</button>
+        </div>
+
+        <div class="modal-body password-setup-modal-body">
+          <form class="password-setup-form" id="passwordSetupForm">
+            <label class="template-editor-field" for="passwordSetupNext">
+              <span>새 비밀번호</span>
+              <input class="template-editor-input" id="passwordSetupNext" type="password" autocomplete="new-password" />
+            </label>
+            <label class="template-editor-field" for="passwordSetupConfirm">
+              <span>비밀번호 확인</span>
+              <input class="template-editor-input" id="passwordSetupConfirm" type="password" autocomplete="new-password" />
+            </label>
+            <p class="password-setup-error hidden" id="passwordSetupError"></p>
+            <div class="form-actions">
+              <button class="ghost-button" data-password-setup-close="true" type="button">취소</button>
+              <button class="primary-button" data-password-setup-submit="true" type="submit">비밀번호 설정</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal hidden" id="accountCreateModal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+      <section class="modal-sheet account-create-modal-sheet" role="dialog" aria-modal="true" aria-labelledby="accountCreateTitle">
+        <div class="modal-header">
+          <div>
+            <p class="modal-kicker">계정 관리</p>
+            <h3 id="accountCreateTitle">계정 등록</h3>
+            <p class="template-modal-meta" id="accountCreateDescription">새 계정을 추가하면 초기 비밀번호는 1111로 설정됩니다.</p>
+          </div>
+          <button class="icon-button" data-close-modal="true" type="button" aria-label="닫기">×</button>
+        </div>
+
+        <div class="modal-body account-create-modal-body">
+          <form class="account-create-form" id="accountCreateForm">
+            <label class="field" for="accountCreateId">
+              <span>계정 ID</span>
+              <input id="accountCreateId" type="text" maxlength="100" placeholder="예: admin002" autocomplete="off" />
+            </label>
+
+            <label class="field" for="accountCreateName">
+              <span>이름</span>
+              <input id="accountCreateName" type="text" maxlength="100" placeholder="표시할 계정 이름을 입력하세요" autocomplete="off" />
+            </label>
+
+            <label class="field select-field" for="accountCreateRole">
+              <span>권한</span>
+              <select id="accountCreateRole"></select>
+            </label>
+
+            <p class="account-create-error hidden" id="accountCreateError"></p>
+
+            <div class="form-actions">
+              <button class="ghost-button" data-close-modal="true" type="button">취소</button>
+              <button class="primary-button" data-account-create-submit="true" type="submit">등록</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal hidden" id="systemAuditLogModal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+      <section class="modal-sheet system-audit-log-modal-sheet" role="dialog" aria-modal="true" aria-labelledby="systemAuditLogModalTitle">
+        <div class="modal-header">
+          <div>
+            <p class="modal-kicker">백업 및 복구</p>
+            <h3 id="systemAuditLogModalTitle">감사 로그</h3>
+            <p class="template-modal-meta">백업 다운로드, 복원, 데이터 삭제 같은 운영 위험 작업의 실행 이력을 확인합니다.</p>
+          </div>
+          <button class="icon-button" data-close-modal="true" type="button" aria-label="닫기">×</button>
+        </div>
+
+        <div class="modal-body system-audit-log-modal-body" id="systemAuditLogModalBody"></div>
+      </section>
+    </div>
+
+    <div class="modal hidden" id="batchPrintDownloadModal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+      <section class="modal-sheet batch-print-download-modal-sheet" role="dialog" aria-modal="true" aria-labelledby="batchPrintDownloadTitle">
+        <div class="modal-header">
+          <div>
+            <h3 id="batchPrintDownloadTitle">일괄 다운로드 방식 선택</h3>
+            <p class="template-modal-meta" id="batchPrintDownloadSelectionMeta">선택된 수험생이 없습니다.</p>
+          </div>
+          <button class="icon-button" data-close-modal="true" type="button" aria-label="닫기">×</button>
+        </div>
+        <div class="modal-body batch-print-download-modal-body">
+          <form class="batch-print-download-form" id="batchPrintDownloadForm">
+            <div class="batch-print-download-options">
+              <label class="batch-print-download-option" for="batchPrintDownloadModeCombinedPdf">
+                <input
+                  id="batchPrintDownloadModeCombinedPdf"
+                  name="batchPrintOutputMode"
+                  type="radio"
+                  value="combined-pdf"
+                  data-batch-print-output-mode="combined-pdf"
+                  checked
+                />
+                <span class="batch-print-download-option-content">
+                  <strong>통합 PDF 다운로드</strong>
+                  <span>선택한 수험생의 수험표를 하나의 PDF 파일로 병합하여 다운로드합니다.</span>
+                </span>
+              </label>
+              <label class="batch-print-download-option" for="batchPrintDownloadModeZip">
+                <input
+                  id="batchPrintDownloadModeZip"
+                  name="batchPrintOutputMode"
+                  type="radio"
+                  value="pdf-zip"
+                  data-batch-print-output-mode="pdf-zip"
+                />
+                <span class="batch-print-download-option-content">
+                  <strong>개별 PDF 다운로드</strong>
+                  <span>선택한 수험생의 수험표를 각각의 PDF파일로 생성하여 다운로드합니다.</span>
+                </span>
+              </label>
+            </div>
+            <div class="upload-actions">
+              <button class="ghost-button" data-close-modal="true" type="button">취소</button>
+              <button class="primary-button" id="batchPrintDownloadSubmit" type="submit">파일 다운로드</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+
+
+
+
+    <div class="modal hidden" id="applicantSubmissionDownloadModal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+      <section
+        class="modal-sheet applicant-submission-download-modal-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="applicantSubmissionDownloadTitle"
+      >
+        <div class="modal-header">
+          <div>
+            <h3 id="applicantSubmissionDownloadTitle">접수 이력 다운로드</h3>
+          </div>
+          <div class="toolbar-actions">
+            <button class="icon-button" data-close-modal="true" type="button" aria-label="닫기">×</button>
+          </div>
+        </div>
+
+        <div class="modal-body applicant-submission-download-modal-body">
+          <p class="muted">현재 필터링된 접수 이력 기준으로 다운로드합니다.</p>
+          <div class="applicant-submission-download-actions">
+            <button class="outline-button applicant-submission-download-button" data-download-applicant-submission-data="true" type="button">
+              <span>접수 이력 데이터</span>
+            </button>
+            <button class="outline-button applicant-submission-download-button" data-applicant-archive-kind="photos" type="button">
+              <span>수험생 사진</span>
+            </button>
+            <button class="outline-button applicant-submission-download-button" data-applicant-archive-kind="documents" type="button">
+              <span>제출 서류</span>
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal hidden" id="applicantSubmissionDetailModal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+      <section
+        class="modal-sheet examinee-detail-modal-sheet applicant-submission-detail-modal-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="applicantSubmissionDetailTitle"
+      >
+        <div class="modal-header">
+          <div class="applicant-submission-detail-header">
+            <h3 id="applicantSubmissionDetailTitle">답변 상세</h3>
+            <p class="applicant-submission-detail-header-meta" id="applicantSubmissionDetailMeta"></p>
+          </div>
+          <div class="toolbar-actions">
+            <button class="icon-button" data-close-modal="true" type="button" aria-label="닫기">×</button>
+          </div>
+        </div>
+
+        <div class="modal-body examinee-detail-modal-body applicant-submission-detail-modal-body" id="applicantSubmissionDetailBody"></div>
+      </section>
+    </div>
+
+
+
+    <div class="modal hidden" id="templatePreviewModal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+      <section
+        class="modal-sheet template-preview-modal-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="templatePreviewTitle"
+      >
+        <div class="modal-header">
+          <div>
+            <p class="modal-kicker">양식 미리보기</p>
+            <h3 id="templatePreviewTitle">수험표 양식</h3>
+            <p class="template-modal-meta" id="templatePreviewMeta">샘플 접수 정보 적용</p>
+          </div>
+          <div class="toolbar-actions">
+            <button class="ghost-button" data-print-template-preview="true" type="button">인쇄</button>
+            <button class="icon-button" data-close-modal="true" type="button" aria-label="닫기">×</button>
+          </div>
+        </div>
+
+        <div class="modal-body template-preview-modal-body">
+          <div class="template-preview-stage" id="templatePreviewStage"></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal hidden" id="templateEditorModal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+      <section
+        class="modal-sheet template-editor-modal-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="templateEditorTitle"
+      >
+        <div class="modal-header">
+          <div>
+            <h3 id="templateEditorTitle">수험표 양식 편집기</h3>
+          </div>
+          <button class="icon-button" data-close-modal="true" type="button" aria-label="닫기">×</button>
+        </div>
+
+        <div class="modal-body template-editor-modal-body">
+          <div class="editor-toolbar-column template-editor-toolbar-column">
+            <div class="editor-toolbar" id="templateEditorToolbarHost" role="toolbar" aria-label="양식 편집 도구"></div>
+            <div class="editor-toolbar-footer template-editor-toolbar-footer">
+              <div class="toolbar-actions">
+                <button class="primary-button" data-save-template-editor="true" type="button">저장</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="template-tag-panel">
+            <p class="template-tag-caption">수험표 데이터 태그</p>
+            <div class="template-tag-strip" id="templateTagStrip"></div>
+          </div>
+
+          <div class="template-editor-page">
+            <div class="template-editor-surface" id="templateEditorSurface" contenteditable="true"></div>
+          </div>
+
+          <aside class="template-page-properties-panel" id="templatePagePropertiesPanel" aria-label="페이지 속성">
+            <p class="template-page-properties-title">페이지 속성</p>
+            <label class="template-page-property-field" for="templateEditorPageSize">
+              <span>용지 크기</span>
+              <select class="template-page-property-control" id="templateEditorPageSize" data-template-page-setting="size">
+                <option value="A3">A3</option>
+                <option value="A4" selected>A4</option>
+                <option value="A5">A5</option>
+                <option value="B5">B5</option>
+                <option value="LETTER">Letter</option>
+                <option value="LEGAL">Legal</option>
+              </select>
+            </label>
+            <fieldset class="template-page-property-field template-page-property-fieldset">
+              <legend>방향</legend>
+              <div class="template-page-orientation-options">
+                <label for="templateEditorPageOrientationPortrait">
+                  <input
+                    class="sr-only"
+                    id="templateEditorPageOrientationPortrait"
+                    name="templateEditorPageOrientation"
+                    data-template-page-setting="orientation"
+                    type="radio"
+                    value="portrait"
+                    checked
+                  />
+                  <span>세로</span>
+                </label>
+                <label for="templateEditorPageOrientationLandscape">
+                  <input
+                    class="sr-only"
+                    id="templateEditorPageOrientationLandscape"
+                    name="templateEditorPageOrientation"
+                    data-template-page-setting="orientation"
+                    type="radio"
+                    value="landscape"
+                  />
+                  <span>가로</span>
+                </label>
+              </div>
+            </fieldset>
+            <div class="template-page-property-field">
+              <span>여백 mm</span>
+              <div class="template-page-margin-grid">
+                <label for="templateEditorPageMarginTop">
+                  <span>위</span>
+                  <input class="template-page-property-control" id="templateEditorPageMarginTop" data-template-page-setting="marginTop" type="number" min="0" max="80" step="1" value="12" />
+                </label>
+                <label for="templateEditorPageMarginRight">
+                  <span>오른쪽</span>
+                  <input class="template-page-property-control" id="templateEditorPageMarginRight" data-template-page-setting="marginRight" type="number" min="0" max="80" step="1" value="12" />
+                </label>
+                <label for="templateEditorPageMarginBottom">
+                  <span>아래</span>
+                  <input class="template-page-property-control" id="templateEditorPageMarginBottom" data-template-page-setting="marginBottom" type="number" min="0" max="80" step="1" value="12" />
+                </label>
+                <label for="templateEditorPageMarginLeft">
+                  <span>왼쪽</span>
+                  <input class="template-page-property-control" id="templateEditorPageMarginLeft" data-template-page-setting="marginLeft" type="number" min="0" max="80" step="1" value="12" />
+                </label>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </div>

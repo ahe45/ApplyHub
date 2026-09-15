@@ -93,6 +93,7 @@ function createSystemRoutes(deps) {
 
   function getSystemDataDeleteScopeLabel(scope = "") {
     const normalizedScope = String(scope || "").trim();
+    if (normalizedScope === 'applicant-members') return '회원가입 데이터';
 
     if (normalizedScope === "all") {
       return "전체 데이터";
@@ -102,21 +103,15 @@ function createSystemRoutes(deps) {
       return "전형 관리 데이터";
     }
 
-    if (normalizedScope === "applicant-assignments") {
-      return "배정표 데이터";
-    }
+
 
     if (normalizedScope === "applicant-history") {
       return "접수 이력 데이터";
     }
 
-    if (normalizedScope === "examinees") {
-      return "수험생 데이터";
-    }
 
-    if (normalizedScope === "photos") {
-      return "사진 데이터";
-    }
+
+
 
     if (normalizedScope === "print-history") {
       return "수험표 출력 이력";
@@ -126,6 +121,26 @@ function createSystemRoutes(deps) {
   }
 
   return [
+    exactRoute('GET', '/api/system-settings/email', async ({response, authenticatedAccount}) => {
+      requireSystemManager(authenticatedAccount);
+      return deps.sendJson(response, 200, await deps.getEmailSettings(), {'Cache-Control': 'no-store'});
+    }),
+    exactRoute('PUT', '/api/system-settings/email', async ({request, response, authenticatedAccount}) => {
+      requireSystemManager(authenticatedAccount);
+      const settings = await deps.updateEmailSettings(await deps.readJsonBody(request));
+      await recordSystemAuditLogSafely(request, authenticatedAccount, {
+        actionType: 'system_email_settings_update', targetScope: 'system-settings', summaryText: '이메일 발송 설정을 저장했습니다.',
+      });
+      return deps.sendJson(response, 200, settings);
+    }),
+    exactRoute('POST', '/api/system-settings/email/check', async ({request, response, authenticatedAccount}) => {
+      requireSystemManager(authenticatedAccount);
+      return deps.sendJson(response, 200, await deps.checkEmailSettings(await deps.readJsonBody(request)));
+    }),
+    exactRoute('GET', '/api/public/school-branding', async ({ response }) => {
+      const settings = await deps.getSuperAdminSettings();
+      return deps.sendJson(response, 200, { schoolName: settings.schoolName, logoImageUrl: settings.logoImageUrl });
+    }, { auth: false }),
     exactRoute("GET", "/api/bootstrap", async ({ response }) => deps.sendJson(response, 200, await deps.getBootstrapPayload())),
     exactRoute("GET", "/api/system-settings", async ({ response, authenticatedAccount }) => {
       requireSystemManager(authenticatedAccount);
@@ -278,6 +293,7 @@ function createSystemRoutes(deps) {
             restoredDatabase: restoreResult?.restoredDatabase === true,
             restoredTableCount: Number(restoreResult?.restoredTableCount || 0),
             restoredRowCount: Number(restoreResult?.restoredRowCount || 0),
+            restoredMembers: Number(restoreResult?.restoredMembers || 0),
             restoredFileCount: Number(restoreResult?.restoredFileCount || 0),
             restoredAssetKeys: Array.isArray(restoreResult?.restoredAssetKeys) ? restoreResult.restoredAssetKeys : [],
           },
@@ -335,13 +351,13 @@ function createSystemRoutes(deps) {
     }),
     regexRoute(
       "DELETE",
-      /^\/api\/system-data\/(?<scope>all|applicant-settings|applicant-assignments|applicant-history|examinees|photos|print-history)$/,
+      /^\/api\/system-data\/(?<scope>all|applicant-members|applicant-settings|applicant-history|print-history)$/,
       async ({ request, response, params, authenticatedAccount }) => {
         requireSystemManager(authenticatedAccount);
         const body = await deps.readJsonBody(request);
 
         try {
-          if (String(params.scope || "") === "all") {
+          if (['all', 'applicant-members'].includes(String(params.scope || ''))) {
             await deps.verifySystemDataDeletionPassword(authenticatedAccount?.id, body?.currentPassword);
           }
 

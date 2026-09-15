@@ -42,11 +42,13 @@
   }) {
     function updateAuthChrome() {
       const isAuthenticated = isUserAuthenticated();
+      // Authentication can finish before the browser leaves the login document.
+      const showAdminChrome = isAuthenticated && !isLoginPage();
 
-      appShell?.classList.toggle("auth-locked", !isAuthenticated);
-      pageShell?.classList.toggle("auth-only", !isAuthenticated);
-      sidebar?.classList.toggle("hidden", !isAuthenticated);
-      topbar?.classList.toggle("hidden", !isAuthenticated);
+      appShell?.classList.toggle("auth-locked", !showAdminChrome);
+      pageShell?.classList.toggle("auth-only", !showAdminChrome);
+      sidebar?.classList.toggle("hidden", !showAdminChrome);
+      topbar?.classList.toggle("hidden", !showAdminChrome);
 
       if (logoutButton) {
         logoutButton.disabled = !isAuthenticated;
@@ -207,21 +209,26 @@
         }
       } finally {
         await loginNoticePromise;
-        updateAuthChrome();
-        renderView();
 
         if (!didNavigate && !isRouteNavigating()) {
+          updateAuthChrome();
+          renderView();
           consumeFlashToast();
         }
       }
     }
 
     async function submitLogin() {
+      if (state.auth.isSubmittingLogin || isRouteNavigating()) {
+        return;
+      }
+
+      let didNavigate = false;
       const accountId = String(state.auth.loginForm.id || "").trim();
       const password = String(state.auth.loginForm.password || "");
 
       if (!accountId || !password) {
-        state.auth.error = "계정 ID와 비밀번호를 모두 입력하세요.";
+        state.auth.error = "이메일 또는 관리자 ID와 비밀번호를 입력하세요.";
         renderView();
         return;
       }
@@ -239,12 +246,19 @@
           }),
         });
 
+        if (payload.accountType === "applicant" && payload.member) {
+          state.auth.loginForm.password = "";
+          window.location.replace("/applicant");
+          didNavigate = true;
+          return;
+        }
+
         applyAuthPayload(payload);
         state.auth.loginForm.password = "";
         state.auth.passwordSetup.error = "";
 
         if (state.auth.status === "authenticated") {
-          navigateToView(getDefaultAccessibleView(state.auth.currentUser?.role), { replace: true });
+          didNavigate = navigateToView(getDefaultAccessibleView(state.auth.currentUser?.role), { replace: true });
           return;
         }
 
@@ -256,9 +270,13 @@
 
         state.auth.error = error.message;
       } finally {
-        state.auth.isSubmittingLogin = false;
-        updateAuthChrome();
-        renderView();
+        // Keep the existing, disabled login panel until the new document loads.
+        // Re-rendering here used to reset the form and briefly expose admin chrome.
+        if (!didNavigate) {
+          state.auth.isSubmittingLogin = false;
+          updateAuthChrome();
+          renderView();
+        }
       }
     }
 
@@ -288,6 +306,11 @@
     }
 
     async function submitPasswordSetup() {
+      if (state.auth.isSubmittingPasswordSetup || isRouteNavigating()) {
+        return;
+      }
+
+      let didNavigate = false;
       const nextPassword = String(state.auth.passwordSetup.password || "");
       const passwordConfirm = String(state.auth.passwordSetup.passwordConfirm || "");
 
@@ -312,13 +335,13 @@
         });
 
         applyAuthPayload(payload);
-        resetAuthFormState();
 
         if (state.auth.status === "authenticated") {
           queueFlashToast("변경된 비밀번호로 로그인에 성공했습니다.");
-          navigateToView(getDefaultAccessibleView(state.auth.currentUser?.role), { replace: true });
+          didNavigate = navigateToView(getDefaultAccessibleView(state.auth.currentUser?.role), { replace: true });
           return;
         }
+        resetAuthFormState();
       } catch (error) {
         if (handleAuthenticationFailure(error)) {
           return;
@@ -326,9 +349,11 @@
 
         state.auth.passwordSetup.error = error.message;
       } finally {
-        state.auth.isSubmittingPasswordSetup = false;
-        updateAuthChrome();
-        renderView();
+        if (!didNavigate) {
+          state.auth.isSubmittingPasswordSetup = false;
+          updateAuthChrome();
+          renderView();
+        }
       }
     }
 

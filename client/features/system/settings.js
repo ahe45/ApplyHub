@@ -25,8 +25,8 @@
   }) {
     const SYSTEM_BACKUP_DATABASE_ITEM_KEY = "database";
     const SYSTEM_BACKUP_ASSET_ITEMS = Object.freeze([
-      Object.freeze({ assetKey: "examinee-photos", title: "수험생 사진" }),
-      Object.freeze({ assetKey: "applicant-photos", title: "접수 사진" }),
+
+      Object.freeze({ assetKey: "applicant-photos", title: "수험생 사진" }),
       Object.freeze({ assetKey: "applicant-files", title: "접수 첨부파일" }),
     ]);
     const SYSTEM_BACKUP_ASSET_KEYS = Object.freeze(SYSTEM_BACKUP_ASSET_ITEMS.map((item) => item.assetKey));
@@ -39,8 +39,8 @@
     );
     const SYSTEM_BACKUP_RESTORE_ITEMS = Object.freeze([
       Object.freeze({ itemKey: SYSTEM_BACKUP_DATABASE_ITEM_KEY, title: "데이터베이스" }),
-      Object.freeze({ itemKey: "examinee-photos", title: "수험생 사진" }),
-      Object.freeze({ itemKey: "applicant-photos", title: "접수 사진" }),
+
+      Object.freeze({ itemKey: "applicant-photos", title: "수험생 사진" }),
       Object.freeze({ itemKey: "applicant-files", title: "접수 첨부파일" }),
     ]);
     const SYSTEM_BACKUP_RESTORE_ITEM_KEYS = Object.freeze(SYSTEM_BACKUP_RESTORE_ITEMS.map((item) => item.itemKey));
@@ -573,6 +573,8 @@
         databaseIncluded: summary.databaseIncluded !== false,
         tableCount: Number(summary.tableCount || 0),
         totalRowCount: Number(summary.totalRowCount || 0),
+        memberCount: Number(summary.memberCount || 0),
+        currentMemberCount: Number(summary.currentMemberCount || 0),
         assets: assets.map((asset) => ({
           assetKey: String(asset?.assetKey || "").trim(),
           title: SYSTEM_BACKUP_ASSET_LABELS[String(asset?.assetKey || "").trim()] || String(asset?.assetKey || "").trim(),
@@ -899,11 +901,6 @@
       };
     }
 
-    function normalizeAdmitCardDataSource(value) {
-      const normalizedValue = String(value ?? "").trim();
-      return ["submission", "examinee"].includes(normalizedValue) ? normalizedValue : "examinee";
-    }
-
     function normalizeSystemSettingsTextSnapshotValue(value = "") {
       return String(value ?? "").trim();
     }
@@ -926,10 +923,11 @@
 
     function cloneSystemSettingsSnapshot(snapshot = {}) {
       return {
+        schoolName: normalizeSystemSettingsTextSnapshotValue(snapshot.schoolName),
+        schoolLogoImageUrl: normalizeSystemSettingsTextSnapshotValue(snapshot.schoolLogoImageUrl),
         initialPassword: normalizeSystemSettingsTextSnapshotValue(snapshot.initialPassword),
         autoLogoutMinutes: normalizeSystemSettingsNumericSnapshotValue(snapshot.autoLogoutMinutes, { emptyValue: "0" }),
         admissionHomepageUrl: normalizeSystemSettingsTextSnapshotValue(snapshot.admissionHomepageUrl),
-        admitCardDataSource: normalizeAdmitCardDataSource(snapshot.admitCardDataSource),
         applicantExamNoDigitCount: normalizeSystemSettingsNumericSnapshotValue(snapshot.applicantExamNoDigitCount),
         applicantExamNoComponents: Array.isArray(snapshot.applicantExamNoComponents)
           ? snapshot.applicantExamNoComponents.map((value) => String(value || "").trim())
@@ -968,10 +966,11 @@
       const systemSettingsSource = source && typeof source === "object" ? source : {};
 
       return cloneSystemSettingsSnapshot({
+        schoolName: String(systemSettingsSource.schoolName || '').trim(),
+        schoolLogoImageUrl: String(systemSettingsSource.schoolLogoImageUrl || '').trim(),
         initialPassword: String(systemSettingsSource.initialPassword ?? "").trim(),
         autoLogoutMinutes: String(systemSettingsSource.autoLogoutMinutes ?? "").trim(),
         admissionHomepageUrl: String(systemSettingsSource.admissionHomepageUrl ?? "").trim(),
-        admitCardDataSource: normalizeAdmitCardDataSource(systemSettingsSource.admitCardDataSource),
         applicantExamNoDigitCount: String(systemSettingsSource.applicantExamNoDigitCount ?? "").trim(),
         applicantExamNoComponents: Array.isArray(systemSettingsSource.applicantExamNoComponents)
           ? systemSettingsSource.applicantExamNoComponents.map((value) => String(value || "").trim())
@@ -984,10 +983,11 @@
       const right = cloneSystemSettingsSnapshot(rightSnapshot);
 
       return (
+        left.schoolName === right.schoolName &&
+        left.schoolLogoImageUrl === right.schoolLogoImageUrl &&
         left.initialPassword === right.initialPassword &&
         left.autoLogoutMinutes === right.autoLogoutMinutes &&
         left.admissionHomepageUrl === right.admissionHomepageUrl &&
-        left.admitCardDataSource === right.admitCardDataSource &&
         left.applicantExamNoDigitCount === right.applicantExamNoDigitCount &&
         left.applicantExamNoComponents.length === right.applicantExamNoComponents.length &&
         left.applicantExamNoComponents.every((value, index) => value === right.applicantExamNoComponents[index])
@@ -1096,6 +1096,8 @@
 
     function formatSystemSettingsSummaryValue(summaryKey, snapshot = {}) {
       const normalizedSnapshot = cloneSystemSettingsSnapshot(snapshot);
+      if (summaryKey === 'schoolName') return normalizedSnapshot.schoolName || '미설정';
+      if (summaryKey === 'schoolLogoImageUrl') return normalizedSnapshot.schoolLogoImageUrl ? '사용자 지정 로고' : '기본 로고';
 
       if (summaryKey === "initialPassword") {
         return normalizedSnapshot.initialPassword || "미설정";
@@ -1107,10 +1109,6 @@
 
       if (summaryKey === "admissionHomepageUrl") {
         return normalizedSnapshot.admissionHomepageUrl || "미설정";
-      }
-
-      if (summaryKey === "admitCardDataSource") {
-        return normalizedSnapshot.admitCardDataSource === "submission" ? "접수 데이터 기준" : "수험생 데이터 기준";
       }
 
       if (summaryKey === "applicantExamNoDigitCount") {
@@ -1132,10 +1130,11 @@
       const savedSnapshot = cloneSystemSettingsSnapshot(state.systemSettings.savedSnapshot || {});
       const draftSnapshot = buildSystemSettingsSnapshot();
       const summaryDefinitions = [
+        { key: 'schoolName', label: '학교명' },
+        { key: 'schoolLogoImageUrl', label: '학교 로고' },
         { key: "initialPassword", label: "초기 비밀번호" },
         { key: "autoLogoutMinutes", label: "자동 로그아웃 시간" },
         { key: "admissionHomepageUrl", label: "입학처 홈페이지 링크" },
-        { key: "admitCardDataSource", label: "수험표 생성 데이터" },
         { key: "applicantExamNoDigitCount", label: "수험번호 자리수" },
         { key: "applicantExamNoComponents", label: "수험번호 자동 생성 조합" },
       ];
@@ -1145,7 +1144,7 @@
           const beforeValue = formatSystemSettingsSummaryValue(definition.key, savedSnapshot);
           const afterValue = formatSystemSettingsSummaryValue(definition.key, draftSnapshot);
 
-          if (beforeValue === afterValue) {
+          if (beforeValue === afterValue && (definition.key !== 'schoolLogoImageUrl' || savedSnapshot.schoolLogoImageUrl === draftSnapshot.schoolLogoImageUrl)) {
             return null;
           }
 
@@ -1168,6 +1167,7 @@
         saveButtonElement.disabled =
           !hasUnsavedChanges ||
           state.systemSettings.isSaving ||
+          state.systemSettings.isUploadingLogo ||
           state.systemDataDeletion.isDeleting ||
           state.systemDataDeletion.isBackingUp ||
           state.systemDataDeletion.isRestoring;
@@ -1221,6 +1221,7 @@
     }
 
     async function confirmSystemSettingsNavigation() {
+      if (window.AdmitCardEmailSettings && !(await window.AdmitCardEmailSettings.confirmNavigation())) return false;
       const currentView = String(state.currentView || "").trim();
       const automationState = getSystemBackupAutomationState();
 
@@ -1302,7 +1303,7 @@
     }
 
     function hasUnsavedSystemSettingsChanges() {
-      return syncSystemSettingsDirtyState() || syncSuperAdminDirtyState() || syncSystemBackupAutomationDirtyState();
+      return Boolean(window.AdmitCardEmailSettings?.hasUnsavedChanges()) || syncSystemSettingsDirtyState() || syncSuperAdminDirtyState() || syncSystemBackupAutomationDirtyState();
     }
 
     function getApplicantScheduleTimestamp(value) {
@@ -1359,11 +1360,15 @@
 
     function applySystemSettingsPayload(payload = {}, options = {}) {
       const nextSettings = normalizeSystemSettingsPayload(payload);
+      state.systemSettings.schoolName = nextSettings.schoolName;
+      state.systemSettings.schoolLogoImageUrl = nextSettings.schoolLogoImageUrl;
+      if (state.superAdmin && !state.superAdmin.hasUnsavedChanges) {
+        applySuperAdminPayload({ ...state.superAdmin, schoolName: nextSettings.schoolName, logoImageUrl: nextSettings.schoolLogoImageUrl }, { preserveStatus: true });
+      }
 
       state.systemSettings.initialPassword = nextSettings.initialPassword;
       state.systemSettings.autoLogoutMinutes = nextSettings.autoLogoutMinutes;
       state.systemSettings.admissionHomepageUrl = nextSettings.admissionHomepageUrl;
-      state.systemSettings.admitCardDataSource = normalizeAdmitCardDataSource(nextSettings.admitCardDataSource);
       state.systemSettings.applicantExamNoDigitCount = nextSettings.applicantExamNoDigitCount;
       state.systemSettings.applicantExamNoComponents = [...nextSettings.applicantExamNoComponents];
       state.systemSettings.savedSnapshot = buildSystemSettingsSnapshot(nextSettings);
@@ -1407,10 +1412,13 @@
     }
 
     function getValidatedSystemSettingsPayload() {
+      const schoolName = String(state.systemSettings.schoolName || '').trim();
+      const schoolLogoImageUrl = String(state.systemSettings.schoolLogoImageUrl || '').trim();
+      if (schoolName.length > 100) throw new Error('학교명은 100자 이하여야 합니다.');
       const initialPassword = String(state.systemSettings.initialPassword ?? "").trim();
       const autoLogoutMinutes = Math.round(Number(state.systemSettings.autoLogoutMinutes));
       const admissionHomepageUrl = String(state.systemSettings.admissionHomepageUrl ?? "").trim();
-      const admitCardDataSource = normalizeAdmitCardDataSource(state.systemSettings.admitCardDataSource);
+
       const applicantExamNoDigitCount = Math.round(Number(state.systemSettings.applicantExamNoDigitCount));
       const applicantExamNoComponents = Array.isArray(state.systemSettings.applicantExamNoComponents)
         ? state.systemSettings.applicantExamNoComponents.map((value) => String(value || "").trim())
@@ -1459,10 +1467,11 @@
       }
 
       return {
+        schoolName,
+        schoolLogoImageUrl,
         initialPassword,
         autoLogoutMinutes,
         admissionHomepageUrl,
-        admitCardDataSource,
         applicantExamNoDigitCount,
         applicantExamNoComponents,
       };
@@ -1592,36 +1601,22 @@
       const deletedExaminees = Number(result.deletedExaminees || 0);
       const deletedPhotos = Number(result.deletedPhotos || 0);
       const deletedApplicantSettings = Number(result.deletedApplicantSettings || 0);
-      const deletedApplicantAssignments = Number(result.deletedApplicantAssignments || 0);
+
       const deletedPrintHistory = Number(result.deletedPrintHistory || 0);
       const deletedApplicantSubmissions = Number(result.deletedApplicantSubmissions || 0);
+      const deletedMembers = Number(result.deletedMembers || 0);
+      if (scope === 'applicant-members') return `회원 ${deletedMembers}명의 가입정보를 삭제했습니다. 접수 이력은 보존하고 회원 연결을 해제했습니다.`;
 
       if (scope === "all") {
-        return `전체 데이터를 삭제했습니다. 수험생 ${deletedExaminees}건, 사진 ${deletedPhotos}건, 전형 관리 ${deletedApplicantSettings}건, 배정표 ${deletedApplicantAssignments}건, 출력 이력 ${deletedPrintHistory}건, 접수 이력 ${deletedApplicantSubmissions}건이 정리되었습니다.`;
+        return `전체 데이터를 삭제했습니다. 회원 ${deletedMembers}명, 전형 관리 ${deletedApplicantSettings}건, 출력 이력 ${deletedPrintHistory}건, 접수 이력 ${deletedApplicantSubmissions}건이 정리되었습니다.`;
       }
 
       if (scope === "applicant-settings") {
         return `전형 관리 데이터 ${deletedApplicantSettings}건을 삭제했습니다.`;
       }
 
-      if (scope === "applicant-assignments") {
-        return `배정표 데이터 ${deletedApplicantAssignments}건을 삭제했습니다.`;
-      }
-
-      if (scope === "photos") {
-        return `사진 데이터 ${deletedPhotos}건을 삭제했습니다.`;
-      }
-
       if (scope === "applicant-history") {
         return `접수 이력 데이터 ${deletedApplicantSubmissions}건을 삭제했습니다.`;
-      }
-
-      if (scope === "examinees") {
-        if (deletedPrintHistory > 0) {
-          return `수험생 데이터 ${deletedExaminees}건을 삭제했습니다. 사진 ${deletedPhotos}건과 연관된 출력 이력 ${deletedPrintHistory}건이 함께 정리되었습니다.`;
-        }
-
-        return `수험생 데이터 ${deletedExaminees}건을 삭제했습니다. 사진 ${deletedPhotos}건이 함께 정리되었습니다.`;
       }
 
       return `수험표 출력 이력 ${deletedPrintHistory}건을 삭제했습니다.`;
@@ -1662,6 +1657,9 @@
         });
 
         applySuperAdminPayload(savedSettings, { preserveStatus: true });
+        if (!state.systemSettings.hasUnsavedChanges) {
+          applySystemSettingsPayload({ ...state.systemSettings, schoolName: savedSettings.schoolName, schoolLogoImageUrl: savedSettings.logoImageUrl }, { preserveStatus: true });
+        }
         setSuperAdminStatus("슈퍼관리자 설정을 저장했습니다.");
         showToast("슈퍼관리자 설정을 저장했습니다.");
         renderView();
@@ -1684,6 +1682,7 @@
 
     async function saveSystemSettings() {
       let nextSettings;
+      if (state.systemSettings.isSaving || state.systemSettings.isUploadingLogo) return false;
 
       if (isSystemDataOperationActive()) {
         setSystemSettingsStatus("백업, 복원 또는 데이터 삭제 작업이 끝난 뒤 저장하세요.", "warning");
@@ -1946,6 +1945,10 @@
         }
       }
 
+      if (normalizedScope === 'applicant-members') {
+        currentPassword = String(window.prompt('회원가입 데이터를 삭제하려면 현재 로그인한 관리자 계정의 비밀번호를 입력하세요.', '') || '');
+        if (!currentPassword) return;
+      }
       state.systemDataDeletion.isDeleting = true;
       state.systemDataDeletion.activeScope = normalizedScope;
       setSystemDataDeletionStatus("");
@@ -1954,7 +1957,7 @@
       try {
         const result = await apiRequest(`/api/system-data/${encodeURIComponent(normalizedScope)}`, {
           method: "DELETE",
-          body: normalizedScope === "all" ? JSON.stringify({ currentPassword }) : undefined,
+          body: ['all', 'applicant-members'].includes(normalizedScope) ? JSON.stringify({ currentPassword }) : undefined,
         });
 
         await loadBootstrapData({ showLoading: false });
@@ -2046,7 +2049,7 @@
       const restoredTableCount = Number(result.restoredTableCount || 0);
       const restoredRowCount = Number(result.restoredRowCount || 0);
       const restoredFileCount = Number(result.restoredFileCount || 0);
-      return `선택한 백업 항목을 복원했습니다. 데이터베이스 테이블 ${restoredTableCount}개, 데이터 ${restoredRowCount}건, 파일 ${restoredFileCount}건을 반영했습니다.`;
+      return `선택한 백업 항목을 복원했습니다. 데이터베이스 테이블 ${restoredTableCount}개, 데이터 ${restoredRowCount}건(회원 ${Number(result.restoredMembers || 0)}명 포함), 파일 ${restoredFileCount}건을 반영했습니다.`;
     }
 
     async function importSystemBackupAction() {

@@ -17,7 +17,7 @@
     downloadSystemBackupAction,
     loadSystemAuditLogs,
     runSystemBackupAutomationNow,
-    downloadExamineeTemplate,
+
     hasUnsavedSystemSettingsChanges,
     importSystemBackupAction,
     logoutCurrentUser,
@@ -32,7 +32,7 @@
     saveSystemBackupAutomationSettings,
     saveSystemSettings,
     setAccountCreateError,
-    setExamineeUploadMode,
+
     setSuperAdminStatus,
     setSystemSettingsStatus,
     startAccountEdit,
@@ -205,6 +205,11 @@
 
     async function handleClick(event) {
       const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest('[data-school-logo-reset]')) {
+        if (state.systemSettings.isSaving || state.systemSettings.isUploadingLogo) return true;
+        state.systemSettings.schoolLogoImageUrl = '';
+        syncSystemSettingsDirtyState(); renderView(); return true;
+      }
       const noticeLink = target?.closest(".login-notice-content a[href]") || null;
       const activeSystemSchedulePopoverTarget = String(state.systemSettings.applicantSchedulePopoverTarget || "").trim();
       const systemSchedulePopoverRoot = target?.closest("[data-system-settings-schedule-popover-root]") || null;
@@ -215,7 +220,7 @@
       const openModalTrigger = target?.closest("[data-open-modal]") || null;
       const passwordSetupCloseTrigger = target?.closest("[data-password-setup-close]") || null;
       const closeTrigger = target?.closest("[data-close-modal]") || null;
-      const downloadTrigger = target?.closest("[data-download-template]") || null;
+
       const authLogoutTrigger = target?.closest("[data-auth-logout]") || null;
       const accountEditTrigger = target?.closest("[data-account-edit]") || null;
       const accountSaveTrigger = target?.closest("[data-account-save]") || null;
@@ -231,7 +236,6 @@
       const systemAuditLogTrigger = target?.closest("[data-system-audit-log-action]") || null;
       const systemBackupAutomationTrigger = target?.closest("[data-system-backup-automation-action]") || null;
       const systemBackupRestoreTrigger = target?.closest("[data-system-backup-restore]") || null;
-      const examineeUploadModeTrigger = target?.closest("[data-examinee-upload-mode]") || null;
 
       if (noticeLink instanceof HTMLAnchorElement && !noticeLink.closest("[contenteditable='true']")) {
         event.preventDefault();
@@ -396,17 +400,7 @@
         return true;
       }
 
-      if (downloadTrigger) {
-        await downloadExamineeTemplate();
-        return true;
-      }
 
-      if (examineeUploadModeTrigger) {
-        setExamineeUploadMode?.(examineeUploadModeTrigger.dataset.examineeUploadMode);
-        await requestCloseModal("uploadTypeModal");
-        openModal("uploadModal");
-        return true;
-      }
 
       if (openModalTrigger) {
         if (openModalTrigger.dataset.openModal === "batchPrintDownloadModal" && !prepareBatchPrintDownloadModal()) {
@@ -462,6 +456,20 @@
 
     async function handleChange(event) {
       const target = event.target instanceof Element ? event.target : null;
+      if (target?.id === 'systemSettingsSchoolLogo') {
+        const file = target.files?.[0];
+        if (!file || state.systemSettings.isSaving || state.systemSettings.isUploadingLogo) return true;
+        state.systemSettings.isUploadingLogo = true; syncSystemSettingsDirtyState();
+        try {
+          if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) throw new Error('PNG·JPG·WEBP 이미지(2MB 이하)를 선택하세요.');
+          const dataUrl = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(new Error('이미지를 읽지 못했습니다.')); reader.readAsDataURL(file); });
+          const image = new Image(); image.src = dataUrl; await image.decode();
+          state.systemSettings.schoolLogoImageUrl = dataUrl;
+          setSystemSettingsStatus('학교 로고를 선택했습니다. 저장 버튼을 눌러 적용하세요.');
+        } catch (error) { setSystemSettingsStatus(error.message || '이미지를 읽지 못했습니다.', 'warning'); }
+        finally { state.systemSettings.isUploadingLogo = false; syncSystemSettingsDirtyState(); renderView(); }
+        return true;
+      }
       const accountField = target?.closest("[data-account-field]") || null;
       const scheduleTarget = String(target?.dataset.systemSettingsScheduleTarget || "").trim();
       const schedulePart = String(target?.dataset.systemSettingsSchedulePart || "").trim();
@@ -566,17 +574,6 @@
         }
       }
 
-      if (target?.dataset.systemSettingsAdmitCardDataSource) {
-        state.systemSettings.admitCardDataSource = String(target.dataset.systemSettingsAdmitCardDataSource || "").trim() || "examinee";
-        syncSystemSettingsDirtyState();
-
-        if (state.systemSettings.statusMessage) {
-          setSystemSettingsStatus("");
-        }
-
-        renderView();
-        return true;
-      }
 
       if (target?.dataset.batchPrintOutputMode) {
         updateBatchPrintOutputMode(target.dataset.batchPrintOutputMode || target.value);
@@ -642,6 +639,11 @@
           setSystemSettingsStatus("");
         }
         return true;
+      }
+
+      if (target?.id === 'systemSettingsSchoolName') {
+        state.systemSettings.schoolName = target.value;
+        syncSystemSettingsDirtyState(); setSystemSettingsStatus(''); return true;
       }
 
       if (target?.id === "systemSettingsAdmissionHomepageUrl") {

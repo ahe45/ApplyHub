@@ -20,10 +20,7 @@ function createPrintHistorySchemaBootstrap({
         printed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
         KEY idx_print_log_examinee_no (examinee_no),
-        KEY idx_print_log_printed_at (printed_at),
-        CONSTRAINT fk_print_log_examinee_no
-          FOREIGN KEY (examinee_no) REFERENCES examinee (examinee_no)
-          ON DELETE CASCADE
+        KEY idx_print_log_printed_at (printed_at)
       )
     `);
 
@@ -70,13 +67,7 @@ function createPrintHistorySchemaBootstrap({
     `);
 
     for (const foreignKey of foreignKeys) {
-      const isExpectedForeignKey = String(foreignKey.columnName || "") === "examinee_no"
-        && String(foreignKey.referencedTableName || "") === "examinee"
-        && String(foreignKey.referencedColumnName || "") === "examinee_no";
-
-      if (!isExpectedForeignKey) {
-        await query(`ALTER TABLE print_log DROP FOREIGN KEY \`${foreignKey.constraintName}\``);
-      }
+      await query(`ALTER TABLE print_log DROP FOREIGN KEY \`${foreignKey.constraintName}\``);
     }
 
     printHistoryColumns = await getTableColumns("print_log");
@@ -94,10 +85,8 @@ function createPrintHistorySchemaBootstrap({
     const invalidPrintHistoryRows = await query(`
       SELECT COUNT(*) AS invalidCount
       FROM print_log ph
-      LEFT JOIN examinee e ON e.examinee_no = ph.examinee_no
       WHERE ph.examinee_no IS NULL
          OR ph.examinee_no = ''
-         OR e.examinee_no IS NULL
     `);
     const invalidCount = Number(invalidPrintHistoryRows[0]?.invalidCount || 0);
 
@@ -139,33 +128,6 @@ function createPrintHistorySchemaBootstrap({
       await query(`ALTER TABLE print_log ADD KEY idx_print_log_printed_at (printed_at)`);
     }
 
-    const refreshedForeignKeys = await query(`
-      SELECT
-        CONSTRAINT_NAME AS constraintName,
-        COLUMN_NAME AS columnName,
-        REFERENCED_TABLE_NAME AS referencedTableName,
-        REFERENCED_COLUMN_NAME AS referencedColumnName
-      FROM information_schema.KEY_COLUMN_USAGE
-      WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = 'print_log'
-        AND COLUMN_NAME = 'examinee_no'
-        AND REFERENCED_TABLE_NAME IS NOT NULL
-    `);
-
-    const hasExpectedForeignKey = refreshedForeignKeys.some(
-      (foreignKey) => String(foreignKey.columnName || "") === "examinee_no"
-        && String(foreignKey.referencedTableName || "") === "examinee"
-        && String(foreignKey.referencedColumnName || "") === "examinee_no",
-    );
-
-    if (!hasExpectedForeignKey) {
-      await query(`
-        ALTER TABLE print_log
-        ADD CONSTRAINT fk_print_log_examinee_no
-        FOREIGN KEY (examinee_no) REFERENCES examinee (examinee_no)
-        ON DELETE CASCADE
-      `);
-    }
   }
 
   return Object.freeze({

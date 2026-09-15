@@ -1,0 +1,62 @@
+/* Shared form and search layouts */
+
+.table-photo-cell {
+  text-align: center;
+  font-weight: 700;
+}
+
+.table-photo-cell.available {
+  color: var(--glass-success);
+}
+
+.table-photo-cell.missing {
+  color: var(--glass-error);
+}
+
+.search-grid,
+.form-grid,
+.account-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.search-grid.four,
+.form-grid.four,
+.account-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.search-grid.five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.search-grid.three,
+.form-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.search-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field label {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--glass-ink);
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(var(--glass-line-rgb), 0.76);
+  background: rgba(var(--glass-surface-rgb), 0.88);
+  color: var(--text);
+}

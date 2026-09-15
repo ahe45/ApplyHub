@@ -91,32 +91,47 @@
     Object.freeze({ key: "phone", label: "전화번호" }),
     Object.freeze({ key: "nationality", label: "국적" }),
     Object.freeze({ key: "select", label: "선택지" }),
-    Object.freeze({ key: "date", label: "날짜" }),
     Object.freeze({ key: "birthdate", label: "생년월일" }),
     Object.freeze({ key: "photo", label: "사진 업로드" }),
     Object.freeze({ key: "file", label: "파일 업로드" }),
   ]);
 
+  const answerTypeDescriptions = Object.freeze({
+    text: '주소처럼 짧은 내용을 직접 입력합니다.',
+    textarea: '여러 줄의 긴 내용을 직접 입력합니다.',
+    phone: '전화번호를 숫자로 입력합니다.',
+    nationality: '국가명을 검색한 뒤 목록에서 선택합니다.',
+    select: '등록한 선택지 중 하나를 선택합니다. 직접 입력 항목도 추가할 수 있습니다.',
+    date: '연도, 월, 일을 선택합니다.',
+    birthdate: '생년월일의 연도, 월, 일을 선택합니다.',
+    time: '시간과 분을 입력합니다.',
+    photo: 'JPG·PNG 사진을 업로드합니다.',
+    file: '서류 파일을 업로드합니다. 저장 파일명 규칙과 허용 확장자를 설정할 수 있습니다.',
+  });
+
+  const applicationAnswerTypeOptions = Object.freeze(answerTypeOptions.filter(option => option.key !== 'birthdate'));
+  function getMemberBirthDate(member, questions = []) {
+    const profile = member?.profile || {};
+    if (typeof profile.birth === 'string' && profile.birth.trim()) return profile.birth.trim();
+    const question = questions.find(q => q.inputType === 'birthdate' && typeof profile[q.key] === 'string' && profile[q.key].trim());
+    return question ? profile[question.key].trim() : '';
+  }
+
   const systemFieldOptions = Object.freeze([
     Object.freeze({ key: "", label: "일반 항목" }),
     Object.freeze({ key: "name", label: "이름" }),
     Object.freeze({ key: "birth", label: "생년월일" }),
-    Object.freeze({ key: "date", label: "시험날짜" }),
-    Object.freeze({ key: "time", label: "시간" }),
     Object.freeze({ key: "track", label: "모집시기" }),
     Object.freeze({ key: "admission", label: "전형" }),
     Object.freeze({ key: "series", label: "계열" }),
     Object.freeze({ key: "unit", label: "모집단위" }),
     Object.freeze({ key: "major", label: "전공" }),
-    Object.freeze({ key: "building", label: "고사건물" }),
-    Object.freeze({ key: "room", label: "고사실" }),
-    Object.freeze({ key: "group", label: "조" }),
     Object.freeze({ key: "photo", label: "수험생 사진" }),
   ]);
 
   const applicantStatusOptions = Object.freeze([
     Object.freeze({ key: "submitted", label: "접수 완료" }),
-    Object.freeze({ key: "promoted", label: "배정 완료" }),
+    Object.freeze({ key: "promoted", label: "접수 완료" }),
   ]);
 
   const defaultApplicantExamNoPattern = "AD-{YY}{MM}{DD}-{SEQ:4}";
@@ -310,6 +325,16 @@
     };
   }
 
+  function getApplicantDocumentSubmissionScheduleState(schedule = {}, referenceDate = new Date()) {
+    const documentSubmissionScheduleStartAt = normalizeApplicantScheduleDateTime(schedule?.documentSubmissionScheduleStartAt);
+    const documentSubmissionScheduleEndAt = normalizeApplicantScheduleDateTime(schedule?.documentSubmissionScheduleEndAt);
+    return {
+      documentSubmissionScheduleStartAt,
+      documentSubmissionScheduleEndAt,
+      ...buildApplicantScheduleWindowState(documentSubmissionScheduleStartAt, documentSubmissionScheduleEndAt, referenceDate),
+    };
+  }
+
   function getApplicantAdmitCardLookupScheduleState(schedule = {}, referenceDate = new Date()) {
     const admitCardLookupScheduleStartAt = normalizeApplicantScheduleDateTime(schedule?.admitCardLookupScheduleStartAt);
     const admitCardLookupScheduleEndAt = normalizeApplicantScheduleDateTime(schedule?.admitCardLookupScheduleEndAt);
@@ -417,14 +442,44 @@
     const isScheduleOpen = isApplicantScheduleOpen(options);
 
     if (normalizedStatus === "promoted") {
-      return applicantStatusLabelMap.promoted || "배정 완료";
+      return applicantStatusLabelMap.promoted || "접수 완료";
     }
 
     return isScheduleOpen ? "접수 중" : applicantStatusLabelMap.submitted || "접수 완료";
   }
 
+  function normalizeFileUploadSettings(value = {}, scope = "application") {
+    const fileNamePattern = String(value.fileNamePattern || "").trim();
+    const tokens = scope === "signup" ? ["ID", "질문제목", "원본파일명"] : ["수험번호", "질문제목", "원본파일명"];
+    if (fileNamePattern.length > 120 || /[<>:"/\\|?*\u0000-\u001f]/.test(fileNamePattern)) throw new Error("저장 파일명 규칙은 경로 문자 없이 120자 이내로 입력하세요.");
+    if (fileNamePattern.replace(/\{([^{}]+)\}/g, (match, token) => {
+      if (!tokens.includes(token)) throw new Error(`사용 가능한 항목: ${tokens.map(t => `{${t}}`).join(", ")}`);
+      return "";
+    }).match(/[{}]/)) throw new Error("파일명 규칙의 중괄호를 확인하세요.");
+    const raw = Array.isArray(value.allowedExtensions) ? value.allowedExtensions : String(value.allowedExtensions || "").split(/[,\s]+/);
+    const allowedExtensions = [...new Set(raw.map(v => String(v).trim().toLowerCase().replace(/^\./, "")).filter(Boolean))];
+    if (allowedExtensions.length > 30 || allowedExtensions.some(v => !/^[a-z0-9]{1,10}$/.test(v))) throw new Error("확장자는 pdf, jpg처럼 쉼표로 구분해 입력하세요. (최대 30개)");
+    return { fileNamePattern, allowedExtensions };
+  }
+
+  function isAllowedUploadExtension(fileName, allowedExtensions = []) {
+    const extension = String(fileName || "").split(/[\\/]/).pop().match(/\.([^.]+)$/)?.[1]?.toLowerCase() || "";
+    return !allowedExtensions.length || allowedExtensions.includes(extension);
+  }
+
+  function formatUploadFileBaseName(pattern, values = {}) {
+    const text = String(pattern || "").replace(/\{([^{}]+)\}/g, (_, key) => String(values[key] || ""));
+    return text.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_").replace(/\s+/g, " ").replace(/^[. ]+|[. ]+$/g, "").slice(0, 100) || "file";
+  }
+
   return Object.freeze({
+    normalizeFileUploadSettings,
+    isAllowedUploadExtension,
+    formatUploadFileBaseName,
     answerTypeOptions,
+    answerTypeDescriptions,
+    applicationAnswerTypeOptions,
+    getMemberBirthDate,
     applicantNationalityRegionCodes,
     applicantStatusOptions,
     defaultApplicantExamNoPattern,
@@ -432,6 +487,7 @@
     findApplicantNationalityOption,
     findApplicantScheduleRecord,
     getApplicantAdmitCardLookupScheduleState,
+    getApplicantDocumentSubmissionScheduleState,
     getApplicantAggregateScheduleState,
     getApplicantAnswerTypeLabel,
     getApplicantScheduleTimestamp,

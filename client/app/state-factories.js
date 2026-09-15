@@ -138,22 +138,9 @@
       fields: [],
       recruitmentUnits: [],
       schedules: [],
-      assignments: [],
+
       submissions: [],
-      promotion: {
-        selectedSubmissionIds: [],
-        previewRows: [],
-        summary: null,
-        allowMissingPhoto: false,
-        allowOverbooking: false,
-        overbookingPercent: "10",
-        sortField1: "examineeNo",
-        sortField2: "",
-        sortField3: "",
-        breakField: "unit",
-        isLoading: false,
-        isCommitting: false,
-      },
+
       settings: {
         examNoPattern: "AD-{YY}{MM}{DD}-{SEQ:4}",
         examNoSequenceStart: 1,
@@ -187,8 +174,11 @@
       },
       scheduleEditor: {
         isActive: false,
+        isBulk: false,
+        isSaving: false,
         editingId: 0,
         scheduleKey: "",
+        targetScheduleKeys: [],
         trackName: "",
         admissionCode: "",
         admissionName: "",
@@ -196,36 +186,10 @@
         applicantScheduleEndAt: "",
         admitCardLookupScheduleStartAt: "",
         admitCardLookupScheduleEndAt: "",
+        documentSubmissionScheduleStartAt: "",
+        documentSubmissionScheduleEndAt: "",
       },
-      assignmentEditor: {
-        isActive: false,
-        editingId: 0,
-        track: "",
-        admission: "",
-        series: "",
-        unit: "",
-        major: "",
-        date: "",
-        time: "",
-        buildingCode: "",
-        building: "",
-        roomCode: "",
-        room: "",
-        assignedCount: "1",
-      },
-    };
-  }
 
-  function createExamineeDetailState() {
-    return {
-      selectedExamineeNo: "",
-      originalExamineeNo: "",
-      baseRecord: null,
-      draftRecord: null,
-      isSaving: false,
-      isPhotoUploading: false,
-      statusMessage: "",
-      statusType: "",
     };
   }
 
@@ -377,13 +341,10 @@
     });
   }
 
-  function normalizeSystemAdmitCardDataSource(value, { defaultValue = "examinee" } = {}) {
-    const normalizedValue = String(value ?? "").trim();
-    return ["submission", "examinee"].includes(normalizedValue) ? normalizedValue : defaultValue;
-  }
-
   function normalizeSystemSettingsPayload(payload = {}, options = {}) {
     return {
+      schoolName: String(payload.schoolName || '').trim(),
+      schoolLogoImageUrl: String(payload.schoolLogoImageUrl || '').trim(),
       initialPassword: normalizeSystemInitialPassword(payload.initialPassword, options.defaultPassword),
       autoLogoutMinutes: String(
         normalizeSystemAutoLogoutMinutes(payload.autoLogoutMinutes, {
@@ -393,9 +354,6 @@
       ),
       admissionHomepageUrl: normalizeSystemAdmissionHomepageUrl(payload.admissionHomepageUrl, {
         defaultValue: options.defaultAdmissionHomepageUrl,
-      }),
-      admitCardDataSource: normalizeSystemAdmitCardDataSource(payload.admitCardDataSource, {
-        defaultValue: options.defaultAdmitCardDataSource,
       }),
       applicantExamNoDigitCount: String(
         normalizeSystemApplicantExamNoDigitCount(payload.applicantExamNoDigitCount, {
@@ -411,10 +369,11 @@
 
   function cloneSystemSettingsSnapshot(snapshot = {}) {
     return {
+      schoolName: String(snapshot.schoolName || ''),
+      schoolLogoImageUrl: String(snapshot.schoolLogoImageUrl || ''),
       initialPassword: String(snapshot.initialPassword ?? ""),
       autoLogoutMinutes: String(snapshot.autoLogoutMinutes ?? ""),
       admissionHomepageUrl: String(snapshot.admissionHomepageUrl ?? ""),
-      admitCardDataSource: String(snapshot.admitCardDataSource ?? "examinee"),
       applicantExamNoDigitCount: String(snapshot.applicantExamNoDigitCount ?? ""),
       applicantExamNoComponents: Array.isArray(snapshot.applicantExamNoComponents)
         ? snapshot.applicantExamNoComponents.map((value) => String(value ?? ""))
@@ -444,13 +403,11 @@
       activeScope: "",
       backupAssetSelections: {
         database: true,
-        "examinee-photos": true,
         "applicant-photos": true,
         "applicant-files": true,
       },
       restoreSelections: {
         database: true,
-        "examinee-photos": true,
         "applicant-photos": true,
         "applicant-files": true,
       },
@@ -471,7 +428,7 @@
         time: "03:00",
         retentionCount: 7,
         includeDatabase: true,
-        includedAssetKeys: ["examinee-photos", "applicant-photos", "applicant-files"],
+        includedAssetKeys: ["applicant-photos", "applicant-files"],
         lastRunAt: "",
         lastSuccessAt: "",
         lastFailureAt: "",
@@ -490,7 +447,7 @@
           time: "03:00",
           retentionCount: 7,
           includeDatabase: true,
-          includedAssetKeys: ["examinee-photos", "applicant-photos", "applicant-files"],
+          includedAssetKeys: ["applicant-photos", "applicant-files"],
         },
       },
       statusMessage: "",
@@ -548,18 +505,6 @@
     };
   }
 
-  function createUploadState() {
-    return {
-      isActive: false,
-      activatedAt: 0,
-      title: "수험생 데이터 업로드 중",
-      message: "",
-      progressMode: "hidden",
-      progressValue: 0,
-      progressLabel: "",
-    };
-  }
-
   function getDefaultLoginNoticeHtml(initialPassword = "1111") {
     return [
       '<p><span style="display:inline-flex;padding:3px 8px;border-radius:6px;background:#2f63c8;color:#fff;font-weight:800;">계정 안내</span></p>',
@@ -573,7 +518,7 @@
     return [
       '<p><span style="display:inline-flex;padding:3px 8px;border-radius:6px;background:#2f63c8;color:#fff;font-weight:800;">접수 안내</span></p>',
       "<p>이메일 인증 후 접수를 진행하고, 접수 완료 후 수험표를 열람하고 인쇄할 수 있습니다.</p>",
-      "<p>관리자가 수험생 데이터 반영을 완료하기 전에는 수험표 PDF가 표시되지 않을 수 있습니다.</p>",
+      "<p>수험표 조회 기간에 접수 이력을 기준으로 수험표 PDF가 표시됩니다.</p>",
     ].join("");
   }
 
@@ -659,7 +604,7 @@
     createApplicantManagementState,
     createAuthState,
     createBatchPrintState,
-    createExamineeDetailState,
+
     createHeaderFilters,
     createLoginNoticeState,
     createLookupFilters,
@@ -673,7 +618,6 @@
     createTemplateEditorState,
     createTemplatePreviewState,
     createToastState,
-    createUploadState,
     getDefaultApplicantNoticeHtml,
     getDefaultLoginNoticeHtml,
     normalizeGridSortDirection,

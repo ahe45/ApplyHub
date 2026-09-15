@@ -11,7 +11,7 @@ const gridRuntimeModule = globalThis.AdmitCardGridRuntime;
 const modalControllerModule = globalThis.AdmitCardModalController;
 const viewShellModule = globalThis.AdmitCardViewShell;
 const renderersExamineePhotoUtilsModule = globalThis.AdmitCardExamineePhotoUtils;
-const examineeDetailModalModule = globalThis.AdmitCardExamineeDetailModal;
+
 const examineePageRenderers = globalThis.AdmitCardExamineePageRenderers;
 const applicantAdminModule = globalThis.AdmitCardApplicantAdmin;
 const printHistoryRenderers = globalThis.AdmitCardPrintHistoryRenderers;
@@ -68,15 +68,11 @@ if (!viewShellModule?.createViewShellController) {
 }
 
 if (!renderersExamineePhotoUtilsModule) {
-  throw new Error("client/features/examinees/photo-utils.js must be loaded before client/renderers.js.");
-}
-
-if (!examineeDetailModalModule) {
-  throw new Error("client/features/examinees/detail-modal.js must be loaded before client/renderers.js.");
+  throw new Error("client/features/admit-cards/photo-utils.js must be loaded before client/renderers.js.");
 }
 
 if (!examineePageRenderers) {
-  throw new Error("client/features/examinees/renderers.js must be loaded before client/renderers.js.");
+  throw new Error("client/features/admit-cards/renderers.js must be loaded before client/renderers.js.");
 }
 
 if (!applicantAdminModule?.createApplicantAdminController) {
@@ -138,11 +134,11 @@ const {
 const { createGridRuntimeController } = gridRuntimeModule;
 const { createModalController } = modalControllerModule;
 const { createViewShellController } = viewShellModule;
-const { renderAdmitCardLookup, renderAdmitCardLookupGridSection, renderExamineeRegistration } = examineePageRenderers;
+const { renderAdmitCardLookup, renderAdmitCardLookupGridSection, } = examineePageRenderers;
 const { createApplicantAdminController } = applicantAdminModule;
 const { renderPrintHistory } = printHistoryRenderers;
 const {
-  renderApplicantAssignmentManagement,
+
   renderApplicantHistory,
   renderApplicantHistoryDetailModalContent,
   renderApplicantQuestionTemplateManagement,
@@ -167,7 +163,7 @@ const getApplicantStatusLabel = (status, options = {}) => {
   }
 
   const isScheduleOpen = isApplicantScheduleOpen(applicantStatusOptions);
-  return String(status || "").trim() === "promoted" ? "배정 완료" : isScheduleOpen ? "접수 중" : "접수 완료";
+  return String(status || "").trim() === "promoted" ? "접수 완료" : isScheduleOpen ? "접수 중" : "접수 완료";
 };
 
 const applicantHistoryGridColumns = Object.freeze([
@@ -202,23 +198,10 @@ const applicantScheduleGridColumns = Object.freeze([
   Object.freeze({ key: "admissionName", label: "전형", sortable: true, filterable: true }),
   Object.freeze({ key: "applicantScheduleStartAtLabel", label: "접수 시작", sortable: true, filterable: true }),
   Object.freeze({ key: "applicantScheduleEndAtLabel", label: "접수 종료", sortable: true, filterable: true }),
+  Object.freeze({ key: "documentSubmissionScheduleStartAtLabel", label: "서류 제출 시작", sortable: true, filterable: true }),
+  Object.freeze({ key: "documentSubmissionScheduleEndAtLabel", label: "서류 제출 종료", sortable: true, filterable: true }),
   Object.freeze({ key: "admitCardLookupScheduleStartAtLabel", label: "수험표 조회 시작", sortable: true, filterable: true }),
   Object.freeze({ key: "admitCardLookupScheduleEndAtLabel", label: "수험표 조회 종료", sortable: true, filterable: true }),
-]);
-
-const applicantAssignmentGridColumns = Object.freeze([
-  Object.freeze({ key: "track", label: "모집시기", sortable: true, filterable: true }),
-  Object.freeze({ key: "admission", label: "전형", sortable: true, filterable: true }),
-  Object.freeze({ key: "series", label: "계열", sortable: true, filterable: true }),
-  Object.freeze({ key: "unit", label: "모집단위", sortable: true, filterable: true }),
-  Object.freeze({ key: "major", label: "전공", sortable: true, filterable: true }),
-  Object.freeze({ key: "date", label: "날짜", sortable: true, filterable: true }),
-  Object.freeze({ key: "time", label: "시간", sortable: true, filterable: true }),
-  Object.freeze({ key: "buildingCode", label: "고사건물코드", sortable: true, filterable: true }),
-  Object.freeze({ key: "building", label: "고사건물", sortable: true, filterable: true }),
-  Object.freeze({ key: "roomCode", label: "고사실코드", sortable: true, filterable: true }),
-  Object.freeze({ key: "room", label: "고사실", sortable: true, filterable: true }),
-  Object.freeze({ key: "assignedCount", label: "배정인원", sortable: true, filterable: true }),
 ]);
 
 let viewShellController = null;
@@ -293,48 +276,6 @@ const {
   updateLoginNoticeFormattingControls,
 } = loginNoticeEditorController;
 
-const examineeDetailModalController = examineeDetailModalModule.createExamineeDetailModalController({
-  EXAMINEE_DETAIL_FIELDS,
-  EXAMINEE_DETAIL_FIELD_KEYS,
-  apiRequest,
-  areExamineeDetailDraftsEqual,
-  arrayBufferToBase64,
-  buildExamineePhotoUrl: (examinee) => renderersBuildExamineePhotoUrl(examinee, { buildApiUrl }),
-  buildExamineeDetailDraft,
-  createExamineeDetailState,
-  escapeAttribute: renderersEscapeAttribute,
-  escapeHtml: renderersEscapeHtml,
-  getExamineeDetailBody: () => examineeDetailBody,
-  getExamineeDetailCloseConfirmMessage: () => examineeDetailCloseConfirmMessage,
-  getExamineeDetailCloseConfirmModal: () => examineeDetailCloseConfirmModal,
-  getExamineeDetailCloseConfirmSummary: () => examineeDetailCloseConfirmSummary,
-  getExamineeDetailSaveButton: () => examineeDetailSaveButton,
-  getExamineeGridRows,
-  handleAuthenticationFailure,
-  loadBootstrapData,
-  normalizeExamineeRecord,
-  openModal,
-  readFileAsArrayBuffer,
-  renderView,
-  showToast,
-  state,
-});
-
-const {
-  closeExamineeDetailCloseConfirmModal,
-  getDirtyExamineeDetailFieldLabels,
-  getSelectedExamineeDetailRow,
-  isExamineeDetailDirty,
-  openExamineeDetail,
-  promptExamineeDetailCloseAction,
-  resetExamineeDetailEditor,
-  saveExamineeDetail,
-  syncExamineeDetailCloseConfirmModal,
-  syncExamineeDetailModal,
-  updateExamineeDetailField,
-  uploadExamineeDetailPhoto,
-} = examineeDetailModalController;
-
 const accountActionController = createAccountActionController({
   apiRequest,
   createAccountEditorState,
@@ -360,9 +301,7 @@ const applicantAdminController = createApplicantAdminController({
   arrayBufferToBase64,
   apiRequest,
   buildApiUrl,
-  getApplicantAssignmentUploadFileInput: () => applicantAssignmentUploadFileInput,
-  getApplicantAssignmentUploadFileName: () => applicantAssignmentUploadFileName,
-  getApplicantAssignmentUploadPreviewMount: () => applicantAssignmentUploadPreviewMount,
+
   getApplicantUnitUploadFileInput: () => applicantUnitUploadFileInput,
   getApplicantUnitUploadFileName: () => applicantUnitUploadFileName,
   getApplicantUnitUploadPreviewMount: () => applicantUnitUploadPreviewMount,
@@ -376,58 +315,51 @@ const applicantAdminController = createApplicantAdminController({
   state,
 });
 const {
-  activateApplicantAssignmentCreation,
+
   activateApplicantRecruitmentUnitCreation,
   activateApplicantFieldCreation,
   addApplicantFieldOption,
-  clearApplicantAssignmentUploadFiles,
+
   clearApplicantRecruitmentUnitUploadFiles,
-  deleteApplicantAssignment,
+
   deleteApplicantSubmission,
   deleteApplicantRecruitmentUnit,
   deleteApplicantField,
-  downloadApplicantAssignmentTemplate,
-  downloadApplicantAssignments,
-  downloadApplicantPromotionPreview,
+
   downloadApplicantSubmissionPhotos,
   downloadApplicantSubmissions,
   downloadApplicantRecruitmentUnits,
   downloadApplicantRecruitmentUnitTemplate,
   moveApplicantField,
-  openApplicantAssignmentManagementView,
-  openApplicantPromotionModal,
+
   openApplicantFieldPreview,
-  previewApplicantAssignmentUploadFile,
+
   previewApplicantRecruitmentUnitUploadFile,
-  previewApplicantPromotionsAction,
-  resetApplicantPromotionsAction,
+
   reorderApplicantField,
-  resetApplicantAssignmentEditor,
-  resetApplicantPromotionWorkflow,
+
   resetApplicantScheduleEditor,
   resetApplicantRecruitmentUnitEditor,
   resetApplicantFieldEditor,
   resetApplicantSubmissionDetail,
   removeApplicantFieldOption,
-  saveApplicantAssignment,
+
   saveApplicantSchedule,
   saveApplicantRecruitmentUnit,
   saveApplicantFieldEditor,
   saveApplicantSettings,
   setApplicantSettingsSection,
   setApplicantManagerTab,
-  startApplicantAssignmentEdit,
+
   startApplicantRecruitmentUnitEdit,
+  startApplicantScheduleBulkEdit,
   startApplicantScheduleEdit,
   startApplicantFieldEdit,
   toggleApplicantSubmissionDetail,
-  commitApplicantPromotionsAction,
-  uploadApplicantAssignmentFile,
+
   uploadApplicantRecruitmentUnitFile,
   uploadApplicantSubmissionPhoto,
-  updateApplicantAssignmentEditorField,
-  updateApplicantAssignmentUploadExistingDataPolicy,
-  updateApplicantPromotionField,
+
   updateApplicantScheduleEditorField,
   updateApplicantRecruitmentUnitUploadExistingDataPolicy,
   updateApplicantRecruitmentUnitEditorField,
@@ -512,20 +444,18 @@ function syncSystemAuditLogModal() {
 modalController = createModalController({
   TEMPLATE_EDITOR_DEFAULT_FONT_FAMILY: renderersDefaultFontFamily,
   TEMPLATE_EDITOR_DEFAULT_FONT_SIZE: renderersDefaultFontSize,
-  clearApplicantAssignmentUploadFiles,
+
   clearApplicantRecruitmentUnitUploadFiles,
-  clearSelectedUploadFiles,
+
   clearTemplateEditorActiveCell,
   clearTemplateEditorImageSelection,
   clearTemplateEditorTableHoverState,
   clearTemplateEditorTableSelection,
-  closeExamineeDetailCloseConfirmModal,
+
   createTemplateEditorState,
   createTemplatePreviewState,
   getAccountCreateModal: () => accountCreateModal,
-  getApplicantAssignmentModal: () => applicantAssignmentModal,
-  getApplicantAssignmentUploadModal: () => applicantAssignmentUploadModal,
-  getApplicantPromotionModal: () => applicantPromotionModal,
+
   getApplicantScheduleModal: () => applicantScheduleModal,
   getApplicantSubmissionDownloadModal: () => applicantSubmissionDownloadModal,
   getApplicantSubmissionDetailModal: () => applicantSubmissionDetailModal,
@@ -533,8 +463,7 @@ modalController = createModalController({
   getApplicantUnitUploadModal: () => applicantUnitUploadModal,
   getBatchPrintDownloadModal: () => batchPrintDownloadModal,
   getSystemAuditLogModal: () => systemAuditLogModal,
-  getExamineeDetailCloseConfirmModal: () => examineeDetailCloseConfirmModal,
-  getExamineeDetailModal: () => examineeDetailModal,
+
   getTemplateEditorDescription: () => templateEditorDescription,
   getTemplateEditorFontFamily: () => templateEditorFontFamily,
   getTemplateEditorFontSize: () => templateEditorFontSize,
@@ -544,27 +473,22 @@ modalController = createModalController({
   getTemplateEditorTableRows: () => templateEditorTableRows,
   getTemplatePreviewModal: () => templatePreviewModal,
   getTemplatePreviewStage: () => templatePreviewStage,
-  getUploadModal: () => uploadModal,
-  getUploadTypeModal: () => uploadTypeModal,
-  isExamineeDetailDirty,
+
   prepareAccountCreateModal,
-  resetApplicantAssignmentEditor,
-  resetApplicantPromotionWorkflow,
-  promptExamineeDetailCloseAction,
+
   releaseTemplateEditorTableResizeSession,
   releaseTemplateEditorTableSelectionSession,
   resetAccountCreateFormState,
   resetApplicantScheduleEditor,
   resetApplicantRecruitmentUnitEditor,
   resetApplicantSubmissionDetail,
-  resetUploadState,
-  saveExamineeDetail,
+
   setTemplateEditorTableInsertPanelVisibility,
   state,
   syncEditorToolbarFontSizeControls,
 });
 const gridRuntimeController = createGridRuntimeController({
-  applicantAssignmentGridColumns,
+
   applicantHistoryGridColumns,
   applicantRecruitmentGridColumns,
   applicantScheduleGridColumns,
@@ -573,8 +497,7 @@ const gridRuntimeController = createGridRuntimeController({
   createTableState,
   escapeAttribute: renderersEscapeAttribute,
   escapeHtml: renderersEscapeHtml,
-  examineePhotoColumn,
-  examineeRegistrationGridColumns,
+
   getApplicantStatusLabel,
   getAccountGridRows,
   getExamineeGridRows,
@@ -583,12 +506,11 @@ const gridRuntimeController = createGridRuntimeController({
   headerFilterFields,
   lookupSelectKeys,
   normalizeGridSortRules,
-  openExamineeDetail,
+
   printHistoryGridColumns,
   renderAccountRoleOptions,
   renderView,
-  resultGridColumns,
-  startApplicantAssignmentEdit,
+
   startApplicantRecruitmentUnitEdit,
   startApplicantScheduleEdit,
   state,
@@ -635,7 +557,7 @@ const {
   renderBatchPrintButton,
   renderExamineeResultTable,
   renderGridHeaderActions,
-  renderUploadHeaderAction,
+
   rerenderWithFocus,
   setGridFilterValues,
   setHeaderComboOpen,
@@ -651,21 +573,22 @@ const {
 } = gridRuntimeController;
 const dashboardRendererController = createDashboardRenderer({
   escapeHtml: renderersEscapeHtml,
-  getCurrentUserRole: (...args) => (typeof getCurrentUserRole === "function" ? getCurrentUserRole(...args) : ""),
-  getExamineeGridRows,
-  getHeaderFilteredRows: (...args) => getHeaderFilteredRows(...args),
-  getPrintHistoryRows,
+  isViewAccessible: (...args) => isViewAccessible(...args),
   state,
 });
 const { renderDashboard } = dashboardRendererController;
 const renderers = {
   dashboard: renderDashboard,
   applicantHistory: renderApplicantHistory,
+  applicantMembers: () => globalThis.AdmitCardMemberList.render(() => renderView(), state.auth.currentUser?.id),
   applicantRecruitmentManagement: renderApplicantRecruitmentManagement,
-  applicantQuestionTemplateManagement: renderApplicantQuestionTemplateManagement,
+  applicantQuestionTemplateManagement: () => globalThis.AdmitCardSignupSettings.renderQuestionManagement(
+    renderApplicantQuestionTemplateManagement,
+    () => renderView(),
+    ["관리자", "슈퍼관리자"].includes(state.auth.currentUser?.role),
+  ),
   applicantScheduleManagement: renderApplicantScheduleManagement,
-  applicantAssignmentManagement: renderApplicantAssignmentManagement,
-  examineeRegistration: renderExamineeRegistration,
+
   admitCardLookup: renderAdmitCardLookup,
   printHistory: renderPrintHistory,
   templateManagement: renderTemplateManagement,
@@ -692,13 +615,12 @@ viewShellController = createViewShellController({
   syncApplicantSubmissionDetailModal: (...args) =>
     (typeof syncApplicantSubmissionDetailModal === "function" ? syncApplicantSubmissionDetailModal(...args) : undefined),
   syncSystemAuditLogModal: (...args) => (typeof syncSystemAuditLogModal === "function" ? syncSystemAuditLogModal(...args) : undefined),
-  syncExamineeDetailModal: (...args) => (typeof syncExamineeDetailModal === "function" ? syncExamineeDetailModal(...args) : undefined),
+
   syncGridSelectionIndicators,
   syncHeaderSelectOptions,
   syncLoginFormAutofocus,
   syncOpenGridFilterMenuPosition,
   syncPdfGenerationOverlay,
-  syncUploadOverlay,
   titles,
   updateAuthChrome,
   updateMetricBadges,

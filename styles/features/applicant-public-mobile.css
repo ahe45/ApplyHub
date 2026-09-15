@@ -1,0 +1,54 @@
+/* One mobile-first layout on every public route; admin previews are unchanged. */
+.applicant-public-body { --applicant-page-width: 520px; }
+.applicant-public-body .applicant-public-shell {
+  min-height: 100dvh;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  place-items: start center;
+  grid-template-rows: max-content;
+  align-content: safe center;
+}
+.applicant-public-body .applicant-public-frame { width: min(var(--applicant-page-width), 100%); min-height: 0; align-items: start; }
+.applicant-public-body #applicantPageRoot { min-height: 0; align-items: start; gap: 16px; overflow-wrap: anywhere; }
+.applicant-public-body :is(.applicant-public-home-stage, .applicant-public-home, .applicant-public-step) {
+  width: 100%; min-height: 0; grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: start;
+}
+.applicant-public-body :is(.applicant-public-panel, .applicant-public-slab, .applicant-public-hero) {
+  width: 100%; max-width: 100%; min-width: 0; min-height: 0; padding: 20px; border-radius: 20px;
+}
+.applicant-public-body .applicant-public-action-grid { gap: 24px; }
+.applicant-public-body .applicant-public-hero.login-notice-card { gap: 12px; }
+.applicant-public-body :is(.applicant-public-action-stack, .applicant-public-home-actions) { gap: 16px; }
+.applicant-public-body .applicant-public-browser-home-link { position: static; justify-self: end; min-width: 0; margin: 0; }
+.applicant-public-body .applicant-public-copyright { justify-self: center; margin: 0; text-align: center; }
+.applicant-public-body :is(.applicant-public-action-header, .applicant-public-ticket-viewer-head) { flex-direction: column; align-items: flex-start; }
+.applicant-public-body .applicant-public-brand { gap: 12px; }
+.applicant-public-body .applicant-public-brand-mark { width: 48px; height: 48px; }
+.applicant-public-body .applicant-public-brand strong { font-size: 20px; }
+.applicant-public-body :is(.applicant-public-slab h2, .applicant-public-dialog h2) { font-size: 24px; line-height: 1.35; }
+.applicant-public-body :is(.applicant-member-form-grid, .applicant-public-inline, .applicant-public-summary-grid, .applicant-public-ticket-layout, .applicant-public-ticket-layout .applicant-public-summary-grid) { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.applicant-public-body :is(.applicant-public-field, .applicant-public-field > *, .applicant-member-form-grid > *) { min-width: 0; }
+.applicant-public-body :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]), select, textarea) { max-width: 100%; min-height: 48px; font-size: 16px; }
+.applicant-public-body :is(.primary-button, .ghost-button) { min-height: 48px; font-size: 16px; white-space: normal; }
+.applicant-public-body .applicant-public-actions { gap: 10px; }
+.applicant-public-body .applicant-public-actions > :is(button, a) { flex: 1 1 140px; min-width: 0; }
+.applicant-public-body .applicant-public-date-select-grid { grid-template-columns: minmax(0, 1fr); }
+.applicant-public-body .applicant-member-birthdate .applicant-public-date-select-grid { grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)); gap: 8px; }
+.applicant-public-body .applicant-member-birthdate select { width: 100%; min-width: 0; padding-inline: 8px; }
+.applicant-public-body .applicant-member-terms { padding: 16px; }
+.applicant-public-body .applicant-member-welcome { flex-wrap: wrap; font-size: 14px; }
+.applicant-public-body .applicant-member-menu { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.applicant-public-body .applicant-member-menu .applicant-member-tile { min-height: 120px; padding: 14px; }
+.applicant-public-body .applicant-member-tile strong { font-size: 16px; }
+.applicant-public-body .applicant-public-application-panel { padding: 0; }
+.applicant-public-body .applicant-public-application-header { display: grid; grid-template-columns: minmax(0, 1fr); padding: 20px; gap: 16px; }
+.applicant-public-body .applicant-public-application-header-actions { justify-content: flex-start; }
+.applicant-public-body .applicant-public-form-section { padding: 20px; border-radius: 16px; }
+.applicant-public-body .applicant-public-application-form { padding: 0; }
+.applicant-public-body .applicant-public-application-actions { padding: 0 20px 20px; }
+.applicant-public-body .applicant-public-preview-note { margin: 16px 20px 0; }
+.applicant-public-body :is(.applicant-public-ticket-summary-panel, .applicant-public-ticket-head, .applicant-public-summary-item) { width: 100%; min-width: 0; }
+.applicant-public-body :is(.applicant-public-dialog-layer, .applicant-public-pdf-viewer-layer) { padding: 16px; }
+.applicant-public-body :is(.applicant-public-dialog, .applicant-public-pdf-viewer) { width: min(var(--applicant-page-width), 100%); max-height: calc(100dvh - 32px); overflow: auto; padding: 20px; border-radius: 20px; }
+.applicant-public-body .applicant-public-pdf-viewer-head { display: grid; }
+.applicant-public-body :is(.applicant-public-pdf-frame, .applicant-public-pdf-frame iframe) { min-height: 60dvh; height: 60dvh; }
+.applicant-public-body .applicant-public-toast-root { left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); width: auto; min-width: 0; max-width: var(--applicant-page-width); margin-inline: auto; }

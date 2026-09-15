@@ -1,32 +1,3 @@
-CREATE TABLE IF NOT EXISTS examinee (
-  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  exam_date DATE NOT NULL,
-  `time` VARCHAR(5) NOT NULL,
-  track VARCHAR(100) NOT NULL,
-  admission VARCHAR(100) NOT NULL,
-  series VARCHAR(100) NOT NULL,
-  unit VARCHAR(100) NOT NULL,
-  major VARCHAR(100) NOT NULL,
-  building VARCHAR(100) NOT NULL,
-  room VARCHAR(100) NOT NULL,
-  `group` VARCHAR(30) NOT NULL DEFAULT '',
-  examinee_no VARCHAR(30) NOT NULL,
-  name VARCHAR(100) NOT NULL,
-  birth_date DATE NOT NULL,
-  admission_code VARCHAR(30) NOT NULL DEFAULT '',
-  series_code VARCHAR(30) NOT NULL DEFAULT '',
-  unit_code VARCHAR(30) NOT NULL DEFAULT '',
-  major_code VARCHAR(30) NOT NULL DEFAULT '',
-  building_code VARCHAR(30) NOT NULL DEFAULT '',
-  room_code VARCHAR(30) NOT NULL DEFAULT '',
-  photo_name VARCHAR(255) NULL,
-  photo_mime VARCHAR(100) NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uniq_examinee_examinee_no (examinee_no),
-  KEY idx_examinee_exam_date (exam_date)
-);
 
 CREATE TABLE IF NOT EXISTS print_log (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -35,10 +6,7 @@ CREATE TABLE IF NOT EXISTS print_log (
   printed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_print_log_examinee_no (examinee_no),
-  KEY idx_print_log_printed_at (printed_at),
-  CONSTRAINT fk_print_log_examinee_no
-    FOREIGN KEY (examinee_no) REFERENCES examinee (examinee_no)
-    ON DELETE CASCADE
+  KEY idx_print_log_printed_at (printed_at)
 );
 
 CREATE TABLE IF NOT EXISTS templates (
@@ -97,7 +65,6 @@ VALUES
   ('initialPassword', '1111'),
   ('autoLogoutMinutes', '0'),
   ('admissionHomepageUrl', ''),
-  ('admitCardDataSource', 'examinee'),
   ('applicantExamNoDigitCount', '10'),
   ('applicantExamNoComponentsJson', '["admissionCode","seriesCode","unitCode","sequence",""]'),
   ('applicantExamNoPattern', 'AD-{YY}{MM}{DD}-{SEQ:4}'),
@@ -105,6 +72,7 @@ VALUES
 
 CREATE TABLE IF NOT EXISTS app_form (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  form_scope ENUM('application', 'documents') NOT NULL DEFAULT 'application',
   field_key VARCHAR(60) NOT NULL,
   question_text VARCHAR(255) NOT NULL,
   question_description VARCHAR(500) NOT NULL DEFAULT '',
@@ -139,11 +107,53 @@ CREATE TABLE IF NOT EXISTS app_subm (
 
 CREATE TABLE IF NOT EXISTS app_meta (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  member_id BIGINT UNSIGNED NULL,
   promoted_examinee_no VARCHAR(30) NULL,
   promotion_override_json MEDIUMTEXT NULL,
   promoted_at DATETIME NULL,
   PRIMARY KEY (id),
+  UNIQUE KEY uniq_app_meta_member (member_id),
   KEY idx_app_meta_promoted (promoted_examinee_no)
+);
+
+CREATE TABLE IF NOT EXISTS applicant_members (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  login_id VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  email_verified TINYINT NOT NULL DEFAULT 0,
+  profile_json MEDIUMTEXT NOT NULL,
+  consent_json MEDIUMTEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS applicant_member_sessions (
+  token_hash CHAR(64) PRIMARY KEY,
+  member_id BIGINT UNSIGNED NOT NULL,
+  expires_at DATETIME NOT NULL,
+  KEY (member_id), KEY (expires_at)
+);
+
+CREATE TABLE IF NOT EXISTS applicant_member_recovery (
+  id CHAR(48) PRIMARY KEY,
+  member_id BIGINT UNSIGNED NULL,
+  email VARCHAR(255) NOT NULL,
+  purpose VARCHAR(16) NOT NULL,
+  code_hash CHAR(64) NOT NULL,
+  attempts INT NOT NULL DEFAULT 0,
+  expires_at DATETIME NOT NULL,
+  KEY (member_id), KEY (expires_at)
+);
+
+CREATE TABLE IF NOT EXISTS applicant_member_verifications (
+  id CHAR(48) PRIMARY KEY,
+  email VARCHAR(255) NOT NULL,
+  code_hash CHAR(64) NOT NULL,
+  attempts INT NOT NULL DEFAULT 0,
+  verified TINYINT NOT NULL DEFAULT 0,
+  expires_at DATETIME NOT NULL,
+  KEY (email), KEY (expires_at)
 );
 
 CREATE TABLE IF NOT EXISTS app_unit (
@@ -175,6 +185,8 @@ CREATE TABLE IF NOT EXISTS app_schedule (
   applicant_schedule_end_at DATETIME NULL,
   admit_card_lookup_schedule_start_at DATETIME NULL,
   admit_card_lookup_schedule_end_at DATETIME NULL,
+  document_submission_schedule_start_at DATETIME NULL,
+  document_submission_schedule_end_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -183,27 +195,6 @@ CREATE TABLE IF NOT EXISTS app_schedule (
   KEY idx_app_schedule_admission_name (admission_name)
 );
 
-CREATE TABLE IF NOT EXISTS app_assign (
-  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  track VARCHAR(100) NOT NULL DEFAULT '',
-  admission VARCHAR(100) NOT NULL,
-  series VARCHAR(100) NOT NULL DEFAULT '',
-  unit VARCHAR(100) NOT NULL DEFAULT '',
-  major VARCHAR(100) NOT NULL DEFAULT '',
-  exam_date DATE NOT NULL,
-  `time` VARCHAR(5) NOT NULL,
-  building_code VARCHAR(30) NOT NULL,
-  building VARCHAR(100) NOT NULL,
-  room_code VARCHAR(30) NOT NULL,
-  room VARCHAR(100) NOT NULL,
-  assigned_count INT NOT NULL,
-  sort_order INT NOT NULL DEFAULT 0,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY uniq_app_assign_room_slot (exam_date, `time`, building_code, room_code),
-  KEY idx_app_assign_sort_order (sort_order)
-);
 
 CREATE TABLE IF NOT EXISTS app_email_log (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -221,20 +212,7 @@ CREATE TABLE IF NOT EXISTS app_email_log (
 ALTER TABLE templates
   ADD COLUMN IF NOT EXISTS description VARCHAR(255) NOT NULL DEFAULT '' AFTER name;
 
-ALTER TABLE examinee
-  ADD COLUMN IF NOT EXISTS series VARCHAR(100) NOT NULL DEFAULT '' AFTER admission,
-  ADD COLUMN IF NOT EXISTS `group` VARCHAR(30) NOT NULL DEFAULT '' AFTER room,
-  ADD COLUMN IF NOT EXISTS admission_code VARCHAR(30) NOT NULL DEFAULT '' AFTER birth_date,
-  ADD COLUMN IF NOT EXISTS series_code VARCHAR(30) NOT NULL DEFAULT '' AFTER admission_code,
-  ADD COLUMN IF NOT EXISTS unit_code VARCHAR(30) NOT NULL DEFAULT '' AFTER series_code,
-  ADD COLUMN IF NOT EXISTS major_code VARCHAR(30) NOT NULL DEFAULT '' AFTER unit_code,
-  ADD COLUMN IF NOT EXISTS building_code VARCHAR(30) NOT NULL DEFAULT '' AFTER major_code,
-  ADD COLUMN IF NOT EXISTS room_code VARCHAR(30) NOT NULL DEFAULT '' AFTER building_code,
-  ADD COLUMN IF NOT EXISTS photo_name VARCHAR(255) NULL AFTER room_code,
-  ADD COLUMN IF NOT EXISTS photo_mime VARCHAR(100) NULL AFTER photo_name;
 
-ALTER TABLE examinee
-  DROP COLUMN IF EXISTS photo_blob;
 
 ALTER TABLE app_meta
   ADD COLUMN IF NOT EXISTS promotion_override_json MEDIUMTEXT NULL AFTER promoted_examinee_no;

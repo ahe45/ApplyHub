@@ -4,7 +4,6 @@ function createTemplateBootstrapService({
   defaultTemplateSeeds,
   normalizeTemplatePayload,
   query,
-  templateLayoutSchemaVersion,
   templateTagSchemaVersion,
 }) {
   async function ensureTemplateSchema() {
@@ -58,66 +57,6 @@ function createTemplateBootstrapService({
     return nextMarkup;
   }
 
-  function migrateTemplateSeriesLayoutMarkup(contentHtml) {
-    let nextMarkup = String(contentHtml || "");
-
-    if (!nextMarkup || nextMarkup.includes("#계열")) {
-      return nextMarkup;
-    }
-
-    nextMarkup = nextMarkup.replace('rowspan="6" colspan="1"', 'rowspan="7" colspan="1"');
-
-    nextMarkup = nextMarkup.replace(
-      '<th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">생년월일</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#생년월일<br></td>\n' +
-        '            <th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">모집단위</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#모집단위<br></td>',
-      '<th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">생년월일</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#생년월일<br></td>\n' +
-        '            <th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">계&nbsp; &nbsp; &nbsp;열</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#계열<br></td>',
-    );
-
-    nextMarkup = nextMarkup.replace(
-      '<th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">고사건물</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#고사건물<br></td>\n' +
-        '            <th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">전 공 명</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#전공<br></td>',
-      '<th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">고사건물</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#고사건물<br></td>\n' +
-        '            <th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">모집단위</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#모집단위<br></td>',
-    );
-
-    nextMarkup = nextMarkup.replace(
-      '<th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">고 사 실</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#고사실<br></td>\n' +
-        '            <th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">시험날짜</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#시험날짜<br></td>',
-      '<th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">고 사 실</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#고사실<br></td>\n' +
-        '            <th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">전 공 명</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#전공<br></td>',
-    );
-
-    nextMarkup = nextMarkup.replace(
-      '<th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">조</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#조<br></td>\n' +
-        '            <th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">시&nbsp; &nbsp; 간</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#시간<br></td>',
-      '<th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="" rowspan="2">조</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="" rowspan="2">#조<br></td>\n' +
-        '            <th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">시험날짜</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#시험날짜<br></td>\n' +
-        '          </tr>\n' +
-        '          <tr>\n' +
-        '            <th style="text-align: center; border: 1px solid rgb(0, 0, 0); padding: 12px 14px; background: rgb(246, 248, 252); vertical-align: top;" class="">시&nbsp; &nbsp; 간</th>\n' +
-        '            <td style="border: 1px solid rgb(0, 0, 0); padding: 12px 14px; text-align: left; vertical-align: top;" class="">#시간<br></td>',
-    );
-
-    return nextMarkup;
-  }
-
   function normalizeTemplateSeed(seed, status) {
     const id = String(seed?.id || `template-${randomUUID()}`).trim();
 
@@ -127,7 +66,7 @@ function createTemplateBootstrapService({
         description: seed?.description,
         version: seed?.version,
         status,
-        contentHtml: migrateLegacyTemplateTagMarkup(seed?.contentHtml),
+        contentHtml: seed?.contentHtml,
       },
       { id },
     );
@@ -215,59 +154,9 @@ function createTemplateBootstrapService({
     );
   }
 
-  async function migrateTemplateLayoutSchema() {
-    const [schemaVersionRow] = await query(
-      `
-        SELECT setting_value AS settingValue
-        FROM system_set
-        WHERE setting_key = 'templateLayoutSchemaVersion'
-      `,
-    );
-
-    if (String(schemaVersionRow?.settingValue || "") === templateLayoutSchemaVersion) {
-      return;
-    }
-
-    const templates = await query(`
-      SELECT
-        id,
-        content_html AS contentHtml
-      FROM templates
-    `);
-
-    for (const template of templates) {
-      const migratedContentHtml = migrateTemplateSeriesLayoutMarkup(template.contentHtml);
-
-      if (migratedContentHtml === template.contentHtml) {
-        continue;
-      }
-
-      await query(
-        `
-          UPDATE templates
-          SET content_html = ?
-          WHERE id = ?
-        `,
-        [migratedContentHtml, template.id],
-      );
-    }
-
-    await query(
-      `
-        INSERT INTO system_set (setting_key, setting_value)
-        VALUES ('templateLayoutSchemaVersion', ?)
-        ON DUPLICATE KEY UPDATE
-          setting_value = VALUES(setting_value)
-      `,
-      [templateLayoutSchemaVersion],
-    );
-  }
-
   return Object.freeze({
     ensureTemplateSchema,
     migrateLegacyTemplateTagMarkup,
-    migrateTemplateLayoutSchema,
-    migrateTemplateSeriesLayoutMarkup,
     migrateTemplateTagSchema,
     normalizeTemplateSeed,
     seedTemplates,

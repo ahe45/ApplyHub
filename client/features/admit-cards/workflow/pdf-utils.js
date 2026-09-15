@@ -92,7 +92,7 @@
     }
 
     async function fetchExamineeAdmitCardPdfUrl(examineeNo) {
-      const response = await fetch(buildApiUrl(`/api/examinees/${encodeURIComponent(examineeNo)}/admit-card.pdf`));
+      const response = await fetch(buildApiUrl(`/api/admit-cards/${encodeURIComponent(examineeNo)}/pdf`));
       const contentType = response.headers.get("content-type") || "";
 
       if (!response.ok) {

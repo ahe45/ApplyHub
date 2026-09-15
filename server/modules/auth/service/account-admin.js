@@ -40,6 +40,9 @@ function createAuthAccountAdminService({
       throw createHttpError(409, "이미 등록된 계정 ID입니다.", "ACCOUNT_ID_EXISTS");
     }
 
+    const [member] = await query("SELECT id FROM applicant_members WHERE email = ?", [nextAccount.id]);
+    if (member) throw createHttpError(409, "이미 사용 중인 계정 ID입니다.", "ACCOUNT_ID_EXISTS");
+
     const { initialPassword } = await getSystemSettings();
 
     try {

@@ -1,7 +1,7 @@
 (function (globalScope, factory) {
   if (typeof module === "object" && module.exports) {
     module.exports = factory({
-      defaultContentModule: require("./lifecycle/default-content"),
+      defaultContentModule: require("../../../shared/domain/default-template"),
       modalFlowModule: require("./lifecycle/modal-flow"),
       templateActionModule: require("./lifecycle/template-actions"),
     });
@@ -20,7 +20,7 @@
 }) => {
 
   if (!defaultContentModule?.createDefaultTemplateContentBuilder) {
-    throw new Error("client/features/template-editor/lifecycle/default-content.js must be loaded before lifecycle.js.");
+    throw new Error("shared/domain/default-template.js must be loaded before lifecycle.js.");
   }
 
   if (!templateActionModule?.createTemplateLifecycleActionController) {

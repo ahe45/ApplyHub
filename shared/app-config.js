@@ -14,7 +14,7 @@
     "applicantRecruitmentManagement",
     "applicantScheduleManagement",
     "applicantQuestionTemplateManagement",
-    "applicantAssignmentManagement",
+
     "applicantHistory",
   ]);
   const accountRoleOptions = Object.freeze([superAdminRole, "관리자", "운영자", "조회용"]);
@@ -25,10 +25,10 @@
     dashboard: "대시보드",
     applicantRecruitmentManagement: "전형 관리",
     applicantScheduleManagement: "일정 관리",
-    applicantQuestionTemplateManagement: "질문 양식 관리",
+    applicantQuestionTemplateManagement: "가입·접수 설정",
     applicantHistory: "접수 이력",
-    applicantAssignmentManagement: "배정표 관리",
-    examineeRegistration: "수험생 데이터",
+    applicantMembers: "회원 목록",
+
     admitCardLookup: "수험표 출력",
     printHistory: "수험표 출력 이력",
     templateManagement: "수험표 양식 설정",
@@ -43,24 +43,14 @@
     Object.freeze({
       key: "application-management",
       title: "접수 및 등록",
-      views: Object.freeze([
-        "applicantRecruitmentManagement",
-        "applicantScheduleManagement",
-        "applicantQuestionTemplateManagement",
-        "applicantAssignmentManagement",
-        "applicantHistory",
-      ]),
+      views: Object.freeze(["applicantRecruitmentManagement", "applicantScheduleManagement", "applicantQuestionTemplateManagement", "applicantMembers", "applicantHistory"]),
     }),
     Object.freeze({
       key: "admit-card-management",
-      title: "수험생 관리",
-      views: Object.freeze([
-        "examineeRegistration",
-        "admitCardLookup",
-        "printHistory",
-        "templateManagement",
-      ]),
+      title: "수험표 관리",
+      views: Object.freeze(["admitCardLookup", "printHistory", "templateManagement"]),
     }),
+
     Object.freeze({
       key: "system-management",
       title: "시스템 관리",
@@ -120,8 +110,8 @@
       title: pageTitles.applicantQuestionTemplateManagement,
     }),
     Object.freeze({ view: "applicantHistory", path: "/applicant-history", title: pageTitles.applicantHistory }),
-    Object.freeze({ view: "applicantAssignmentManagement", path: "/applicant-assignments", title: pageTitles.applicantAssignmentManagement }),
-    Object.freeze({ view: "examineeRegistration", path: "/examinee-registration", title: pageTitles.examineeRegistration }),
+    Object.freeze({ view: "applicantMembers", path: "/applicant-members", title: pageTitles.applicantMembers }),
+
     Object.freeze({ view: "admitCardLookup", path: "/admit-cards", title: pageTitles.admitCardLookup }),
     Object.freeze({ view: "printHistory", path: "/print-history", title: pageTitles.printHistory }),
     Object.freeze({ view: "templateManagement", path: "/templates", title: pageTitles.templateManagement }),
@@ -136,12 +126,13 @@
   const roleMenuViews = Object.freeze({
     [superAdminRole]: Object.freeze([...sidebarMenuViews]),
     관리자: Object.freeze([
+      "applicantMembers",
       "applicantRecruitmentManagement",
       "applicantScheduleManagement",
       "applicantQuestionTemplateManagement",
-      "applicantAssignmentManagement",
+
       "applicantHistory",
-      "examineeRegistration",
+
       "admitCardLookup",
       "printHistory",
       "templateManagement",
@@ -155,9 +146,9 @@
       "applicantRecruitmentManagement",
       "applicantScheduleManagement",
       "applicantQuestionTemplateManagement",
-      "applicantAssignmentManagement",
+
       "applicantHistory",
-      "examineeRegistration",
+
       "admitCardLookup",
       "printHistory",
       "templateManagement",
@@ -318,15 +309,6 @@
       legacyTokens: ["@{날짜}"],
       legacyTags: ["@날짜"],
     }),
-    createTemplateTagDefinition({ label: "시험날짜", examineeKey: "date" }),
-    createTemplateTagDefinition({ label: "조", examineeKey: "group" }),
-    createTemplateTagDefinition({
-      label: "시간",
-      examineeKey: "time",
-      aliases: ["교시"],
-      legacyTokens: ["@{교시}"],
-      legacyTags: ["@교시"],
-    }),
     createTemplateTagDefinition({ label: "모집시기", examineeKey: "track" }),
     createTemplateTagDefinition({
       label: "전형",
@@ -338,12 +320,20 @@
     createTemplateTagDefinition({ label: "계열", examineeKey: "series" }),
     createTemplateTagDefinition({ label: "모집단위", examineeKey: "unit" }),
     createTemplateTagDefinition({ label: "전공", examineeKey: "major" }),
-    createTemplateTagDefinition({ label: "고사건물", examineeKey: "building" }),
-    createTemplateTagDefinition({ label: "고사실", examineeKey: "room" }),
     createTemplateTagDefinition({ label: "수험생사진", examineeKey: "examineePhoto" }),
   ].sort((left, right) => String(left?.label || "").localeCompare(String(right?.label || ""), "ko-KR")));
 
+  // Keep saved layouts intact, but never print retired tags or stale assignment values.
+  // These definitions are only used for rendering, never offered in the editor.
+  const templateRenderTagDefinitions = Object.freeze([
+    ...templateTagDefinitions,
+    ...["시험날짜", "고사건물", "고사실", "시간", "교시", "조"].map((label) =>
+      createTemplateTagDefinition({ label, examineeKey: null }),
+    ),
+  ]);
+
   return {
+    templateRenderTagDefinitions,
     accountRoleOptions,
     availableViews,
     buildRoleMenuVisibilityFromSuperAdminSettings,

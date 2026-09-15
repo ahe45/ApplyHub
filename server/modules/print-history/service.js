@@ -31,7 +31,7 @@ function createPrintHistoryService({
 
       for (const examineeNo of examineeNos) {
         const [examineeRows] = await connection.query(
-          `SELECT examinee_no FROM examinee WHERE examinee_no = ? FOR UPDATE`,
+          `SELECT m.id FROM app_meta m WHERE m.promoted_examinee_no = ? AND EXISTS (SELECT 1 FROM app_subm s WHERE s.id = m.id) FOR UPDATE`,
           [examineeNo],
         );
 

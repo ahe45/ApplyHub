@@ -57,7 +57,7 @@
               type="checkbox"
               data-grid-key="${gridKey}"
               data-grid-select-row="${escapeAttribute(rowId)}"
-              aria-label="${escapeAttribute(row.name || row.examineeNo || "행")} 선택"
+              aria-label="${escapeAttribute(row.name || row.admissionName || row.admission || row.examineeNo || "행")} 선택"
               ${isGridRowSelected(gridKey, rowId) ? "checked" : ""}
             />
           </td>`
@@ -137,65 +137,6 @@
       });
     }
 
-    function getApplicantPromotionAvailability() {
-      const selectedSubmissions = getApplicantSelectedSubmissions(["submitted"]);
-      const schedules = Array.isArray(state.applicantManager?.schedules) ? state.applicantManager.schedules : [];
-      const handledScheduleKeys = new Set();
-      const scheduleEntries = [];
-
-      selectedSubmissions.forEach((submission) => {
-        const matchedSchedule = findApplicantScheduleRecord(schedules, submission);
-        const scheduleKey =
-          String(matchedSchedule?.scheduleKey || submission?.scheduleKey || `${submission?.track || ""}|${submission?.admissionCode || ""}|${submission?.admission || ""}`).trim();
-
-        if (scheduleKey && handledScheduleKeys.has(scheduleKey)) {
-          return;
-        }
-
-        if (scheduleKey) {
-          handledScheduleKeys.add(scheduleKey);
-        }
-
-        scheduleEntries.push({
-          submission,
-          scheduleState: getApplicantSubmissionScheduleState(matchedSchedule),
-        });
-      });
-
-      const blockingEntry = scheduleEntries.find((entry) => entry.scheduleState.reason !== "after_end") || null;
-
-      return {
-        isAvailable: selectedSubmissions.length > 0 && !blockingEntry,
-        blockingEntry,
-        selectedSubmissions,
-      };
-    }
-
-    function getApplicantPromotionBlockedTitle(blockingEntry = null) {
-      if (!blockingEntry) {
-        return "접수기간 종료 후에만 고사실 배정을 진행할 수 있습니다.";
-      }
-
-      const contextLabel = buildApplicantScheduleContextLabel(blockingEntry.submission);
-      const scheduleRangeLabel = formatApplicantScheduleRangeForTitle(
-        buildApplicantScheduleRangeLabel(blockingEntry.scheduleState, "submission"),
-      );
-
-      if (blockingEntry.scheduleState.reason === "not_configured") {
-        return `${contextLabel} 접수 기간이 설정되지 않아 고사실 배정을 진행할 수 없습니다.`;
-      }
-
-      if (blockingEntry.scheduleState.reason === "before_start") {
-        return `${contextLabel} 접수 일정이 아직 시작되지 않았습니다.${scheduleRangeLabel ? ` 접수 기간: ${scheduleRangeLabel}` : ""}`;
-      }
-
-      if (blockingEntry.scheduleState.reason === "invalid") {
-        return `${contextLabel} 접수 기간 설정을 확인한 뒤 다시 시도하세요.`;
-      }
-
-      return `${contextLabel} 접수기간 중에는 고사실 배정을 진행할 수 없습니다.${scheduleRangeLabel ? ` 접수 기간: ${scheduleRangeLabel}` : ""}`;
-    }
-
     function getApplicantHistorySelectionCounts() {
       const selectedRowIds =
         Array.isArray(state.tableSettings?.applicantHistoryGrid?.selectedRowIds)
@@ -237,26 +178,6 @@
         gridKey === "applicantHistoryGrid"
           ? getApplicantHistorySelectionCounts()
           : { selectedCount: 0, submittedCount: 0, promotedCount: 0 };
-      const applicantPromotionAvailability =
-        gridKey === "applicantHistoryGrid"
-          ? getApplicantPromotionAvailability()
-          : { isAvailable: false, blockingEntry: null };
-      const applicantPromotionAvailable = gridKey === "applicantHistoryGrid" && applicantPromotionAvailability.isAvailable;
-      const applicantPromotionLabel = `고사실 배정(${applicantHistorySelectionCounts.submittedCount}명)`;
-      const applicantPromotionResetLabel = `배정 초기화(${applicantHistorySelectionCounts.promotedCount}명)`;
-      const applicantPromotionTitle = applicantPromotionAvailable
-        ? "배정표 관리 메뉴에 저장된 고사실 순서와 배정 기준으로 선택한 접수 이력을 자동 배정합니다."
-        : applicantHistorySelectionCounts.selectedCount === 0
-          ? "배정할 접수 이력을 먼저 선택하세요."
-          : applicantHistorySelectionCounts.submittedCount === 0
-            ? "선택한 접수 이력 중 접수 완료 상태만 고사실 배정할 수 있습니다."
-            : getApplicantPromotionBlockedTitle(applicantPromotionAvailability.blockingEntry);
-      const applicantPromotionResetTitle =
-        applicantHistorySelectionCounts.promotedCount > 0
-          ? "선택한 접수 이력의 고사실 배정 결과를 초기화하고 제출 상태로 되돌립니다."
-          : applicantHistorySelectionCounts.selectedCount > 0
-            ? "선택한 접수 이력 중 배정 완료 상태만 배정 초기화할 수 있습니다."
-            : "배정 초기화할 접수 이력을 먼저 선택하세요.";
 
       return `
         ${includeBatchPrint ? renderBatchPrintButton() : ""}
@@ -279,41 +200,12 @@
         }
         ${
           gridKey === "applicantHistoryGrid"
-            ? `<button
-                class="outline-button"
-                data-applicant-submission-promotion-open="true"
-                type="button"
-                title="${escapeAttribute(applicantPromotionTitle)}"
-                ${!applicantPromotionAvailable || applicantHistorySelectionCounts.submittedCount === 0 ? "disabled" : ""}
-              >
-                <svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M4 20V6l8-2 8 2v14"></path>
-                  <path d="M9 9h.01"></path>
-                  <path d="M15 9h.01"></path>
-                  <path d="M9 13h.01"></path>
-                  <path d="M15 13h.01"></path>
-                  <path d="M10 20v-3h4v3"></path>
-                </svg>
-                <span>${escapeHtml(applicantPromotionLabel)}</span>
-              </button>`
+            ? ``
             : ""
         }
         ${
           gridKey === "applicantHistoryGrid"
-            ? `<button
-                class="outline-button danger-button"
-                data-applicant-submission-promotion-reset="true"
-                type="button"
-                title="${escapeAttribute(applicantPromotionResetTitle)}"
-                ${applicantHistorySelectionCounts.promotedCount === 0 ? "disabled" : ""}
-              >
-                <svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M3 12a9 9 0 1 0 3-6.7"></path>
-                  <path d="M3 4v5h5"></path>
-                  <path d="M12 8v4l3 2"></path>
-                </svg>
-                <span>${escapeHtml(applicantPromotionResetLabel)}</span>
-              </button>`
+            ? ``
             : ""
         }
         ${
@@ -334,27 +226,6 @@
             <path d="M20 4v6h-6"></path>
           </svg>
           <span>새로고침</span>
-        </button>
-      `;
-    }
-
-    function renderUploadHeaderAction() {
-      return `
-        <button class="outline-button" data-download-examinees="true" type="button">
-          <svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M12 4v10"></path>
-            <path d="m7.5 10.5 4.5 4.5 4.5-4.5"></path>
-            <path d="M4 20h16"></path>
-          </svg>
-          <span>다운로드</span>
-        </button>
-        <button class="primary-button" data-open-modal="uploadTypeModal" type="button">
-          <svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M12 16V4"></path>
-            <path d="M7.5 8.5 12 4l4.5 4.5"></path>
-            <path d="M4 20h16"></path>
-          </svg>
-          <span>데이터 업로드</span>
         </button>
       `;
     }
@@ -476,7 +347,7 @@
       renderLeadingGridCells,
       renderLeadingGridHeaders,
       renderTableFilterStrip,
-      renderUploadHeaderAction,
+
       syncGridSelectionIndicators,
     });
   }

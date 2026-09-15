@@ -1,0 +1,53 @@
+.applicant-member-login { display: grid; gap: 18px; width: 100%; }
+.applicant-member-login .applicant-public-field { display: grid; gap: 8px; }
+.applicant-member-login input { width: 100%; min-height: 48px; }
+.applicant-member-welcome { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: 100%; }
+.applicant-member-menu { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; width: 100%; }
+.applicant-member-menu .applicant-member-tile { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 10px; min-height: 145px; padding: 20px; border-radius: 18px; text-align: left; background: var(--glass-surface); border: 1px solid var(--glass-line); white-space: normal; }
+.applicant-member-tile:hover { background: var(--glass-bg); border-color: var(--glass-line); }
+.applicant-member-tile strong { color: var(--glass-link); font-size: 18px; }
+.applicant-member-tile small { color: var(--glass-muted); font-size: 12px; }
+.applicant-member-tile-number { font-size: 12px; font-weight: 700; color: var(--glass-muted); }
+.applicant-member-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.applicant-member-signup { width: min(850px, 100%); margin-inline: auto; }
+.applicant-member-signup [data-member-step][hidden] { display: none; }
+.applicant-member-steps { display: flex; gap: 20px; padding: 0; margin: 16px 0; list-style: none; color: var(--glass-muted); font-size: 14px; }
+.applicant-member-steps [aria-current="step"] { color: var(--glass-link); font-weight: 700; }
+.applicant-member-signup .applicant-public-field { display: grid; gap: 8px; }
+.applicant-member-terms { padding: 20px; border: 1px solid var(--glass-line); border-radius: 14px; }
+.applicant-member-terms-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.applicant-member-terms-heading h3 { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.applicant-member-terms-consent .applicant-member-terms-view { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; }
+.applicant-member-terms-view svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.applicant-member-terms-consent { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.applicant-member-consent-options { display: inline-grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; max-width: 100%; padding: 4px; border: 1px solid var(--glass-line); border-radius: 14px; background: var(--glass-tint); }
+.applicant-member-consent-option { position: relative; min-width: 0; cursor: pointer; }
+.applicant-public-body .applicant-member-consent-option > input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.applicant-member-consent-option > span { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 12px; border-radius: 10px; color: var(--glass-muted); font-size: 14px; font-weight: 600; white-space: nowrap; transition: background-color 160ms ease, color 160ms ease; }
+.applicant-member-consent-option input:checked + span { background: var(--glass-primary); color: #fff; }
+.applicant-member-consent-option input:focus-visible + span { outline: 2px solid var(--glass-link); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .applicant-member-consent-option > span { transition: none; }
+}
+.applicant-member-term-dialog { width: min(520px, calc(100% - 32px)); max-width: none; max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); box-sizing: border-box; margin: auto; padding: 24px; border: 1px solid var(--glass-line); border-radius: 20px; color: var(--glass-ink); background: var(--glass-surface); box-shadow: var(--glass-dialog-shadow); overflow: hidden; }
+.applicant-member-term-dialog[open] { display: flex; flex-direction: column; gap: 20px; }
+.applicant-member-term-dialog::backdrop { background: rgba(var(--glass-shadow-rgb), 0.502); }
+.applicant-member-term-dialog-heading { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.applicant-member-term-dialog-heading h2 { flex: 1; min-width: 0; margin: 0; font-size: 20px; line-height: 1.5; overflow-wrap: anywhere; }
+.applicant-member-term-dialog-heading button { flex: 0 0 auto; min-height: 44px; }
+.applicant-member-term-dialog-text { min-height: 0; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; overscroll-behavior: contain; }
+body:has(.applicant-member-term-dialog[open]) { overflow: hidden; }
+.applicant-member-terms-text { white-space: pre-wrap; max-height: 240px; overflow-y: auto; margin-bottom: 16px; line-height: 1.7; overflow-wrap: anywhere; }
+.applicant-member-input-action { display: grid; grid-template-columns: minmax(0, 1fr) 108px; align-items: center; gap: 8px; }
+.applicant-public-body .applicant-member-input-action > input { width: 100%; min-width: 0; }
+.applicant-public-body .applicant-member-input-action > button { width: 100%; min-width: 0; padding-inline: 8px; font-size: 13px; white-space: nowrap; }
+.applicant-member-signup [data-member-verified]:empty { display: none; }
+.applicant-member-error { color: var(--glass-error); padding-block: 12px; }
+.applicant-member-success { color: var(--glass-success); padding-block: 12px; }
+@media (max-width: 600px) {
+  .applicant-member-form-grid { grid-template-columns: 1fr; }
+  .applicant-member-menu { gap: 10px; }
+  .applicant-member-menu .applicant-member-tile { min-height: 120px; padding: 14px; }
+  .applicant-member-tile strong { font-size: 16px; }
+  .applicant-member-welcome { font-size: 14px; }
+}

@@ -1,0 +1,85 @@
+/* Interaction states only. Keep document canvases and semantic status colors intact. */
+:root body :is(.primary-button, .table-inline-button.primary, [data-applicant-action="member-verify-code"]):not(:disabled) {
+  border-color: var(--glass-selected-line);
+  box-shadow: inset 0 0 0 1px var(--glass-selected-line), var(--glass-selected-shadow);
+}
+:root body :is(.primary-button, .table-inline-button.primary, [data-applicant-action="member-verify-code"]):hover:not(:disabled) {
+  background: var(--glass-selected);
+}
+:root body :is(
+  .nav-item.active,
+  .template-management-tab.active,
+  .filter-chip.active, .table-page-button.active, .page-btn.active,
+  .page-size-option.active, .header-chip-combo-option.active,
+  .template-toolbar-icon-select-option.active, .template-toolbar-combo-option.active,
+  .template-tool-button.is-active, .template-tool-button[aria-pressed="true"],
+  .applicant-public-nationality-option.is-selected,
+  .system-settings-schedule-calendar-day.is-selected,
+  .recovery-tabs a[aria-current="page"],
+  .applicant-member-steps [aria-current="step"],
+  .applicant-member-consent-option input:checked + span,
+  .template-toolbar-choice-option > input:checked + span,
+  .template-page-orientation-options input:checked + span
+):not(:disabled) {
+  background: var(--glass-selected);
+  color: #fff;
+  border-color: var(--glass-selected-line);
+  box-shadow: inset 0 0 0 1px var(--glass-selected-line), var(--glass-selected-shadow);
+  font-weight: 700;
+}
+:root body .nav-item.active .nav-icon-wrap {
+  background: #ffffff24; color: #fff; box-shadow: none;
+}
+:root body .applicant-public-nationality-option.is-selected span {
+  color: #fff;
+}
+/* Selected rows need readable data, not a solid primary fill. */
+:root body .result-grid-card tbody tr.is-selected,
+:root body .result-grid-card tbody tr.is-selected:hover {
+  background: var(--glass-selected-soft);
+}
+:root body .result-grid-card tbody tr.is-selected > td {
+  background: var(--glass-selected-soft);
+  border-bottom-color: var(--glass-selected-line);
+}
+:root body .result-grid-card tbody tr.is-selected > td:first-child {
+  box-shadow: inset 3px 0 var(--glass-selected-line);
+}
+/* Keep swatch colors intact: emphasize their outline only. */
+:root body :is(.template-toolbar-color-swatch.active, .template-toolbar-color-swatch[aria-pressed="true"]) {
+  outline: 3px solid var(--glass-selected-line); outline-offset: 2px;
+}
+:root body .system-settings-schedule-trigger.is-active {
+  border-color: var(--glass-selected-line);
+  box-shadow: inset 0 0 0 1px var(--glass-selected-line);
+}
+:root body .super-admin-switch input:checked + .super-admin-switch-track {
+  background: var(--glass-selected);
+  box-shadow: inset 0 0 0 1px var(--glass-selected-line);
+}
+:root body .super-admin-switch input:checked + .super-admin-switch-track .super-admin-switch-thumb {
+  background: #fff;
+}
+/* Disabled actions have their own neutral fill, never a faded active fill. */
+:root body :is(
+  button.primary-button, button.ghost-button, button.secondary-button,
+  button.outline-button, button.icon-button, button.table-inline-button,
+  button.template-tool-button, button.page-btn, button.table-page-button
+):disabled {
+  background: var(--glass-disabled-bg); color: var(--glass-disabled-ink);
+  border-color: var(--glass-line); box-shadow: none; opacity: 1;
+  cursor: not-allowed;
+}
+/* Focus is an additional cue, separate from selection or hover. */
+:root body.applicant-public-body .applicant-member-menu .applicant-member-tile:disabled :is(strong, small) { color: var(--glass-disabled-ink); }
+:root body.applicant-public-body .applicant-member-menu .applicant-member-tile.is-complete:disabled {
+  background: var(--glass-success-bg); border-color: var(--glass-success-line); color: var(--glass-success);
+}
+:root body.applicant-public-body .applicant-member-menu .applicant-member-tile.is-complete:disabled :is(strong, small) { color: var(--glass-success); }
+:root body.applicant-public-body .applicant-member-menu .applicant-member-tile.is-complete .applicant-member-tile-number { background: transparent; color: var(--glass-success); }
+:root body :is(button, a, input, select, textarea, summary):focus-visible {
+  outline: 3px solid var(--glass-selected-line); outline-offset: 3px;
+}
+:root body :is(.applicant-member-consent-option, .template-toolbar-choice-option) input:focus-visible + span {
+  outline: 3px solid var(--glass-selected-line); outline-offset: 3px;
+}

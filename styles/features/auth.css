@@ -18,11 +18,8 @@
   inset: -20px;
   z-index: -1;
   border-radius: 38px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.32), rgba(236, 242, 248, 0.16)),
-    radial-gradient(circle at top left, rgba(111, 152, 255, 0.12), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(81, 203, 170, 0.1), transparent 24%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.38);
+  background: var(--glass-surface);
+  box-shadow: inset 0 0 0 1px rgba(88, 121, 143, 0.38);
 }
 
 .login-shell > .login-hero-card,
@@ -34,17 +31,17 @@
   grid-column: 1 / -1;
   justify-self: end;
   margin: -6px 2px 0 0;
-  color: #7a8899;
+  color: var(--glass-muted);
   font-size: 0.72rem;
   letter-spacing: 0.04em;
 }
 
 .login-hero-card,
 .login-panel-card {
-  border: 1px solid rgba(203, 213, 225, 0.44);
+  border: 1px solid rgba(var(--glass-line-rgb), 0.44);
   background: var(--panel);
   backdrop-filter: blur(14px);
-  box-shadow: var(--shadow);
+  box-shadow: var(--glass-shadow);
 }
 
 .login-hero-card {
@@ -54,10 +51,7 @@
   min-height: 420px;
   padding: 40px;
   border-radius: 30px;
-  background:
-    radial-gradient(circle at top right, rgba(84, 211, 186, 0.18), transparent 24%),
-    radial-gradient(circle at bottom left, rgba(45, 99, 245, 0.18), transparent 30%),
-    rgba(255, 255, 255, 0.82);
+  background: var(--glass-surface);
 }
 
 .login-hero-card h2 {
@@ -99,18 +93,24 @@
 
 .login-notice-head {
   display: grid;
-  gap: 14px;
+}
+
+.login-notice-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
 }
 
 .login-notice-content {
   min-height: 0;
   height: 100%;
   padding: 22px 24px;
-  border: 1px solid rgba(191, 208, 229, 0.72);
+  border: 1px solid rgba(var(--glass-line-rgb), 0.72);
   border-radius: 24px;
-  background: rgba(255, 255, 255, 0.9);
-  color: #16324b;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  background: rgba(var(--glass-surface-rgb), 0.9);
+  color: var(--glass-ink);
+  box-shadow: inset 0 1px 0 rgba(88, 121, 143, 0.9);
   overflow: auto;
 }
 
@@ -142,23 +142,23 @@
 .login-notice-content th,
 .login-notice-content td {
   padding: 10px 12px;
-  border: 1px solid #aebacd;
+  border: 1px solid var(--glass-line);
   text-align: left;
   vertical-align: top;
 }
 
 .login-notice-content th {
-  background: #f6f8fc;
+  background: var(--glass-surface);
 }
 
 .login-notice-content hr {
   margin: 16px 0;
   border: 0;
-  border-top: 1px solid #d7e0ea;
+  border-top: 1px solid var(--glass-line);
 }
 
 .login-notice-content a {
-  color: #245fd7;
+  color: var(--glass-link);
   font-weight: 700;
 }
 
@@ -171,9 +171,7 @@
   grid-template-rows: auto minmax(0, 1fr);
   align-content: stretch;
   gap: 26px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 248, 253, 0.94)),
-    var(--panel);
+  background: var(--glass-surface);
 }
 
 .login-stage-brand {
@@ -200,12 +198,12 @@
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #6d7f92;
+  color: var(--glass-muted);
 }
 
 .login-stage-brand-copy strong {
   font-size: 1.48rem;
-  color: #173d5d;
+  color: var(--glass-ink);
   line-height: 1.15;
 }
 
@@ -222,12 +220,12 @@
 .login-stage-form h3 {
   margin: 0;
   font-size: 1.85rem;
-  color: #173d5d;
+  color: var(--glass-ink);
 }
 
 .login-stage-description {
   margin: -2px 0 6px;
-  color: #66788c;
+  color: var(--glass-muted);
   line-height: 1.6;
 }
 
@@ -286,7 +284,7 @@
   padding: 18px;
   overflow: auto;
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(231, 238, 247, 0.92), rgba(244, 247, 252, 0.92));
+  background: var(--glass-surface);
 }
 
 .login-shell.login-notice-editor-stage {
@@ -314,13 +312,10 @@
   gap: 22px;
   min-height: 600px;
   padding: 32px;
-  border: 1px solid rgba(203, 213, 225, 0.44);
+  border: 1px solid rgba(var(--glass-line-rgb), 0.44);
   border-radius: 30px;
-  background:
-    radial-gradient(circle at top right, rgba(84, 211, 186, 0.14), transparent 24%),
-    radial-gradient(circle at bottom left, rgba(45, 99, 245, 0.14), transparent 30%),
-    rgba(255, 255, 255, 0.82);
-  box-shadow: var(--shadow);
+  background: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
 }
 
 .applicant-notice-preview-header {
@@ -354,10 +349,10 @@
   height: 100%;
   min-height: 0;
   overflow: auto;
-  border: 1px solid rgba(191, 208, 229, 0.72);
+  border: 1px solid rgba(var(--glass-line-rgb), 0.72);
   border-radius: 24px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  background: rgba(var(--glass-surface-rgb), 0.9);
+  box-shadow: inset 0 1px 0 rgba(88, 121, 143, 0.9);
 }
 
 .login-notice-stage-panel {
@@ -379,7 +374,7 @@
 }
 
 .login-notice-editor-surface img.is-selected-object {
-  outline: 3px solid rgba(36, 95, 215, 0.7);
+  outline: 3px solid rgba(var(--glass-primary-rgb), 0.7);
   outline-offset: 3px;
 }
 
@@ -403,9 +398,9 @@
   flex-wrap: wrap;
   gap: 10px;
   padding: 12px;
-  border: 1px solid rgba(203, 213, 225, 0.8);
+  border: 1px solid rgba(var(--glass-line-rgb), 0.8);
   border-radius: 16px;
-  background: #f5f7fa;
+  background: var(--glass-surface);
 }
 
 .notice-toolbar-group {
@@ -415,7 +410,7 @@
   flex-wrap: wrap;
   padding-right: 10px;
   margin-right: 2px;
-  border-right: 1px solid #d9e1e9;
+  border-right: 1px solid var(--glass-line);
 }
 
 .notice-toolbar-group:last-child {
@@ -428,13 +423,13 @@
   min-width: 38px;
   min-height: 38px;
   padding: 8px 12px;
-  border: 1px solid #cad5e0;
+  border: 1px solid var(--glass-line);
   border-radius: 10px;
-  background: #ffffff;
-  color: #33485f;
+  background: var(--glass-surface);
+  color: var(--glass-ink);
   font: inherit;
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .notice-tool-field,
@@ -445,7 +440,7 @@
 
 .notice-tool-field span,
 .notice-color-field span {
-  color: #6a7e92;
+  color: var(--glass-muted);
   font-size: 0.7rem;
   font-weight: 700;
 }
@@ -453,10 +448,10 @@
 .notice-tool-select {
   min-height: 38px;
   padding: 8px 10px;
-  border: 1px solid #cad5e0;
+  border: 1px solid var(--glass-line);
   border-radius: 10px;
-  background: #ffffff;
-  color: #22384f;
+  background: var(--glass-surface);
+  color: var(--glass-ink);
   font: inherit;
   font-size: 0.82rem;
 }
@@ -465,25 +460,25 @@
   width: 42px;
   height: 38px;
   padding: 4px;
-  border: 1px solid #cad5e0;
+  border: 1px solid var(--glass-line);
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--glass-surface);
 }
 
 .notice-editor-canvas {
   min-height: 320px;
   padding: 18px 20px;
-  border: 1px solid rgba(203, 213, 225, 0.84);
+  border: 1px solid rgba(var(--glass-line-rgb), 0.84);
   border-radius: 18px;
-  background: #ffffff;
-  color: #1c2c3d;
+  background: var(--glass-surface);
+  color: var(--glass-ink);
   line-height: 1.65;
   overflow: auto;
 }
 
 .notice-editor-canvas:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(54, 126, 214, 0.15);
+  box-shadow: 0 0 0 3px rgba(var(--glass-primary-rgb), 0.15);
 }
 
 .notice-editor-canvas p {
@@ -511,16 +506,16 @@
 
 .login-field span {
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text-dim);
 }
 
 .login-field input {
   min-height: 44px;
   padding: 0 14px;
-  border: 1px solid rgba(203, 213, 225, 0.92);
+  border: 1px solid rgba(var(--glass-line-rgb), 0.92);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(var(--glass-surface-rgb), 0.96);
   color: var(--text);
   font: inherit;
   font-size: 0.94rem;
@@ -529,19 +524,19 @@
 
 .login-field input:focus {
   outline: none;
-  border-color: rgba(45, 99, 245, 0.72);
-  box-shadow: 0 0 0 3px rgba(45, 99, 245, 0.12);
+  border-color: rgba(var(--glass-primary-rgb), 0.72);
+  box-shadow: 0 0 0 3px rgba(var(--glass-primary-rgb), 0.12);
 }
 
 .login-field input:disabled {
-  background: rgba(241, 245, 249, 0.92);
-  color: #8391a3;
+  background: rgba(var(--glass-surface-rgb), 0.92);
+  color: var(--glass-muted);
 }
 
 .login-error,
 .password-setup-error {
   margin: 0;
-  color: #b42318;
+  color: var(--glass-error);
   font-size: 0.82rem;
   font-weight: 700;
 }
