@@ -66,7 +66,7 @@
     updateEditorToolbarFormattingState,
   }) {
     function getLoginNoticeEditorElement() {
-      return document.getElementById("loginNoticeEditor");
+      return document.getElementById(state.noticeManagement.activeLanguage === "en" ? "loginNoticeEditorEn" : "loginNoticeEditor");
     }
 
     function getLoginNoticePreviewElement() {

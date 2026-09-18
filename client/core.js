@@ -113,7 +113,7 @@ if (!systemSettingsModule?.createSystemSettingsController) {
 const {
   accountRoleOptions,
   availableViews,
-  buildRoleMenuVisibilityFromSuperAdminSettings,
+  buildDefaultRoleMenuVisibility,
   defaultView: DEFAULT_VIEW,
   getDefaultAccessibleView: getDefaultAccessibleViewForRoleConfig,
   getViewFromPathname,
@@ -447,7 +447,7 @@ syncAccountCreateDescription();
 let confirmPendingSystemSettingsNavigation = async () => true;
 let hasPendingSystemSettingsChanges = () => false;
 const getSavedRoleMenuVisibility = () =>
-  buildRoleMenuVisibilityFromSuperAdminSettings(state.superAdmin?.savedSnapshot || state.superAdmin || {});
+  buildDefaultRoleMenuVisibility();
 const applySuperAdminPayload = (payload = {}) => {
   state.superAdmin = createSuperAdminState(payload);
 };

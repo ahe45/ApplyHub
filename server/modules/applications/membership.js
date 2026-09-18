@@ -24,7 +24,10 @@ function normalizeSignupSettings(value = {}) {
     required: field.required === true,
     inputType: field.inputType || 'text',
     description: field.description || '',
+    labelEn: field.labelEn || '',
+    descriptionEn: field.descriptionEn || '',
     options: field.options || [],
+    optionsEn: field.optionsEn || {},
     customOptionLabel: field.customOptionLabel || '',
   })).filter((field) => field.label);
   if (new Set(extraFields.map((field) => field.key)).size !== extraFields.length) throw new Error("추가 항목의 식별자가 중복됩니다.");
@@ -106,11 +109,13 @@ function createApplicantMembershipService({ query, getPool, createHttpError, sen
   async function sendCode(payload, ip) {
     const email = normalizeEmail(payload.email);
     throttle(`mail-ip:${ip}`, 15);
+    const [existing] = await query("SELECT email FROM applicant_members WHERE email = ? UNION ALL SELECT login_id AS email FROM accounts WHERE login_id = ? LIMIT 1", [email, email]);
+    if (existing) fail(409, "이미 사용 중인 이메일입니다.", 'email');
     throttle(`mail:${email}`, 1, 10000);
     const id = randomBytes(24).toString("hex");
     const code = String(randomInt(100000, 1000000));
     if (!showDevelopmentCode) {
-      await sendEmail({ applicantName: "회원가입 신청자", email, codeValue: code, expiresAt: new Date(Date.now() + 600000) });
+      await sendEmail({ applicantName: "회원가입 신청자", email, codeValue: code, expiresAt: new Date(Date.now() + 600000), language: payload.language === 'en' ? 'en' : 'ko' });
     }
     await query("DELETE FROM applicant_member_verifications WHERE email = ? OR expires_at <= NOW()", [email]);
     await query("INSERT INTO applicant_member_verifications (id,email,code_hash,expires_at) VALUES (?,?,?,DATE_ADD(NOW(), INTERVAL 10 MINUTE))", [id, email, digest(id + code)]);

@@ -80,6 +80,9 @@
   }
 
   const APPLICANT_IS_PREVIEW_MODE = new URLSearchParams(window.location.search).get("preview") === "1";
+  const APPLICANT_IS_THUMBNAIL = APPLICANT_IS_PREVIEW_MODE && new URLSearchParams(window.location.search).get("thumbnail") === "1";
+  document.documentElement.classList.toggle("applicant-template-thumbnail", APPLICANT_IS_THUMBNAIL);
+  const APPLICANT_PREVIEW_TEMPLATE_ID = APPLICANT_IS_PREVIEW_MODE ? Number(new URLSearchParams(window.location.search).get("templateId")) : 0;
   const recruitmentSummaryObserver = typeof ResizeObserver === 'function'
     ? new ResizeObserver(() => fitRecruitmentSummaryValues()) : null;
   document.fonts?.ready.then(() => fitRecruitmentSummaryValues());
@@ -141,6 +144,7 @@
         admissionHomepageUrl: "",
       },
       noticeHtml: "",
+      noticeHtmlEn: "",
     },
     message: {
       type: "",
@@ -248,6 +252,7 @@
     return {
       logoImageUrl: String(settings?.logoImageUrl || "").trim(),
       backgroundImageUrl: String(settings?.backgroundImageUrl || "").trim(),
+      recruitmentEnabled: settings?.recruitmentEnabled !== false,
     };
   }
 
@@ -488,8 +493,20 @@
     return [...(state.formConfig.fields || []), ...(state.formConfig.documentFields || [])];
   }
 
+  function getTemplateFields(formScope) {
+    const fields = formScope === 'documents' ? state.formConfig.documentFields || [] : state.formConfig.fields || [];
+    const selection = state.currentSubmission?.id
+      ? { ...getApplicantRecruitmentSelectionFromSubmission(state.currentSubmission), ...state.currentSubmission.fieldOverrides }
+      : state.recruitment;
+    const schedule = findApplicantScheduleRecord(getApplicantSchedules(), selection);
+    const previewId = APPLICANT_PREVIEW_TEMPLATE_ID;
+    const templateId = previewId || schedule?.[formScope === 'documents' ? 'documentTemplateId' : 'applicationTemplateId']
+      || state.formConfig.formTemplates?.find(item => item.formScope === formScope && item.isDefault)?.id;
+    return templateId ? fields.filter(field => Number(field.templateId) === Number(templateId)) : fields;
+  }
+
   function getActiveApplicantFields() {
-    return state.mode === 'documents' ? (state.formConfig.documentFields || []) : (state.formConfig.fields || []);
+    return getTemplateFields(state.mode === 'documents' ? 'documents' : 'application');
   }
 
   function createSerializableDraftAnswers() {
@@ -538,6 +555,7 @@
   }
 
   function persistApplicantPublicState() {
+    if (APPLICANT_IS_THUMBNAIL) return;
     try {
       window.sessionStorage.setItem(
         APPLICANT_PUBLIC_STATE_STORAGE_KEY,
@@ -994,6 +1012,17 @@
     return APPLICANT_RECRUITMENT_SELECTION_FIELDS.findIndex((field) => field.key === String(fieldKey || "").trim());
   }
 
+  function getRecruitmentEnglishName(fieldKey, value, selection = state.recruitment) {
+    if (!["admission", "unit", "major"].includes(fieldKey)) return value;
+    const definitionIndex = getApplicantRecruitmentSelectionIndex(fieldKey);
+    const definition = APPLICANT_RECRUITMENT_SELECTION_FIELDS[definitionIndex];
+    const candidates = (state.formConfig.recruitmentUnits || []).filter(unit =>
+      String(unit[definition.unitKey] || "").trim() === value &&
+      APPLICANT_RECRUITMENT_SELECTION_FIELDS.slice(0, definitionIndex).every(parent =>
+        !selection[parent.key] || String(unit[parent.unitKey] || "").trim() === selection[parent.key]));
+    return candidates.map(unit => String(unit[`${definition.unitKey}En`] || "").trim()).find(Boolean) || value;
+  }
+
   function hasApplicantRecruitmentSelectionPrerequisites(fieldKey = "", selection = state.recruitment) {
     const definitionIndex = getApplicantRecruitmentSelectionIndex(fieldKey);
 
@@ -1171,6 +1200,7 @@
     const normalizedMode = String(requestedMode || "").trim();
     if (!APPLICANT_IS_PREVIEW_MODE && !membership?.member && !["home", "signup"].includes(normalizedMode)) return "home";
     if (normalizedMode === "signup") return membership?.member ? "home" : "signup";
+    if (normalizedMode === "document-status") return APPLICANT_IS_PREVIEW_MODE || state.currentSubmission?.id ? "document-status" : "home";
     if (normalizedMode === "documents") return APPLICANT_IS_PREVIEW_MODE || state.currentSubmission?.id ? "documents" : "home";
 
     if (normalizedMode === "verify") {
@@ -1225,7 +1255,7 @@
     syncApplicantLookupTargetWithMode(state.mode);
     updateApplicantDocumentTitle();
     const targetPath = getApplicantRoutePath(state.mode);
-    const targetLocation = `${targetPath}${APPLICANT_PREVIEW_SEARCH}`;
+    const targetLocation = `${targetPath}${APPLICANT_PREVIEW_SEARCH}${APPLICANT_PREVIEW_TEMPLATE_ID ? `&templateId=${APPLICANT_PREVIEW_TEMPLATE_ID}` : ""}`;
     const currentPath = normalizeApplicantRoutePath(window.location.pathname);
     const currentLocation = `${currentPath}${window.location.search || ""}`;
 
@@ -1428,7 +1458,7 @@
     const bodyMarkup = canUseInlineViewer
       ? `
           <div class="applicant-public-pdf-frame applicant-public-pdf-viewer-frame">
-            <iframe title="${escapeAttribute(state.pdfPreview.fileName || "PDF 미리보기")}" src="${escapeAttribute(state.pdfPreview.viewerUrl)}"></iframe>
+            <iframe ${state.pdfPreview.fileName ? 'data-i18n-preserve="title"' : ''} title="${escapeAttribute(state.pdfPreview.fileName || "PDF 미리보기")}" src="${escapeAttribute(state.pdfPreview.viewerUrl)}"></iframe>
           </div>
         `
       : `
@@ -1454,8 +1484,8 @@
         >
           <div class="applicant-public-pdf-viewer-head">
             <div class="applicant-public-pdf-viewer-copy">
-              <h2 id="applicantPdfPreviewTitle">${escapeHtml(state.pdfPreview.title || "PDF 미리보기")}</h2>
-              <p>${escapeHtml(state.pdfPreview.fileName || "")}</p>
+              <h2 id="applicantPdfPreviewTitle">${state.pdfPreview.fieldKey ? applicantPublicRenderingHelpersModule.renderAuthoredText(state.pdfPreview.title, state.pdfPreview.titleEn) : escapeHtml(state.pdfPreview.title || "PDF 미리보기")}</h2>
+              <p translate="no">${escapeHtml(state.pdfPreview.fileName || "")}</p>
             </div>
             <div class="applicant-public-actions applicant-public-pdf-viewer-actions">
               ${
@@ -1725,6 +1755,8 @@
       return recruitmentSelection.major || "";
     }
 
+    if (normalizedInputType === "multiselect") return (field.options || []).filter(option => option !== field.customOptionLabel).slice(0, 2);
+
     if (normalizedInputType === "select") {
       const fieldOptions = Array.isArray(field.options) ? field.options : [];
 
@@ -1949,6 +1981,11 @@
     return applicantPublicRenderingHelpersModule.renderNationalityOptions(filteredNationalityOptions, fieldKey, fieldValue);
   }
 
+  function getNationalityDisplayValue(value = '') {
+    const country = applicantFormConfig.findApplicantNationalityOption(value);
+    return country ? applicantPublicRenderingHelpersModule.formatNationalitySelection(country) : String(value || '');
+  }
+
   function syncNationalityFieldUI(fieldKey = "") {
     const normalizedFieldKey = String(fieldKey || "").trim();
 
@@ -1959,7 +1996,8 @@
     const fieldElement = findApplicantFieldElement(normalizedFieldKey);
 
     if (fieldElement instanceof HTMLInputElement) {
-      fieldElement.value = String(state.draftAnswers[normalizedFieldKey] || "");
+      const value = String(state.draftAnswers[normalizedFieldKey] || '');
+      fieldElement.value = state.nationalityPicker.openFieldKey === normalizedFieldKey ? value : getNationalityDisplayValue(value);
     }
 
     const pickerElement = findApplicantNationalityPickerElement(normalizedFieldKey);
@@ -2043,6 +2081,7 @@
       isOpen: true,
       fieldKey: normalizedFieldKey,
       title: String(field?.questionText || "").trim() || "PDF 미리보기",
+      titleEn: field?.questionTextEn || "",
       fileName: String(previewFile.name || fieldValue?.fileName || "").trim() || "document.pdf",
       file: previewFile,
       objectUrl,
@@ -2242,7 +2281,7 @@
 
       <section class="applicant-public-home-stage">
         <section class="applicant-public-home">
-          ${applicantPublicRenderingHelpersModule.renderCompactNotice({ html: getApplicantNoticeMarkup(state.formConfig.noticeHtml, "접수 전 공지사항을 확인하세요."), cardClassName: 'applicant-public-hero', contentClassName: 'applicant-public-notice-surface' })}
+          ${applicantPublicRenderingHelpersModule.renderCompactNotice({ html: getApplicantNoticeMarkup(state.formConfig.noticeHtml, "접수 전 공지사항을 확인하세요."), htmlEn: state.formConfig.noticeHtmlEn.trim() ? getApplicantNoticeMarkup(state.formConfig.noticeHtmlEn) : '', userContent: Boolean(String(state.formConfig.noticeHtml || "").trim()), cardClassName: 'applicant-public-hero', contentClassName: 'applicant-public-notice-surface' })}
 
           <article class="applicant-public-panel applicant-public-action-grid login-panel-card login-stage-panel">
             ${renderMessage()}
@@ -2262,12 +2301,12 @@
                 : ""
             }
             ${!APPLICANT_IS_PREVIEW_MODE ? membership.home() : `<div class="applicant-public-action-stack applicant-public-home-actions">
-              <button
+              ${getApplicantBrandSettings().recruitmentEnabled ? `<button
                 class="primary-button"
                 data-applicant-action="go-verify"
                 type="button"
                 title="${escapeAttribute(applyButtonTitle)}"
-              >${renderApplicantHomeActionButtonLabel("접수하기", "apply")}</button>
+              >${renderApplicantHomeActionButtonLabel("접수하기", "apply")}</button>` : ""}
               <button
                 class="ghost-button"
                 data-applicant-action="go-lookup-summary"
@@ -2411,7 +2450,7 @@
       <div class="applicant-public-field applicant-public-static-field">
         <label for="${escapeAttribute(fieldId)}">${escapeHtml(label)}</label>
         ${helperText ? `<span class="applicant-public-file-note applicant-public-field-note">${escapeHtml(helperText)}</span>` : ""}
-        <input id="${escapeAttribute(fieldId)}" type="text" value="${escapeAttribute(value)}" readonly />
+        <input id="${escapeAttribute(fieldId)}" type="text" value="${escapeAttribute(value)}" ${fieldId === 'applicationBirth' ? `data-i18n-display-value="${escapeAttribute(value)}"` : ''} readonly />
       </div>
     `;
   }
@@ -2470,9 +2509,9 @@
 
     return `
       <div class="applicant-public-field">
-        <label>${escapeHtml(field.questionText)} ${requiredBadge}</label>
+        <label>${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn)} ${requiredBadge}</label>
         ${fieldDescriptionMarkup}
-        ${applicantPublicRenderingHelpersModule.renderDateSelectControls({ fieldKey: field.fieldKey, inputType: field.inputType, parts: dateParts, label: field.questionText, disabled: isReadOnly })}
+        ${applicantPublicRenderingHelpersModule.renderDateSelectControls({ fieldKey: field.fieldKey, inputType: field.inputType, parts: dateParts, label: field.questionText, labelEn: field.questionTextEn, disabled: isReadOnly })}
         <input type="hidden" data-applicant-field-key="${escapeAttribute(field.fieldKey)}" value="${escapeAttribute(fieldValue || "")}" />
       </div>
     `;
@@ -2483,15 +2522,15 @@
     const isReadOnly = options.isReadOnly === true || field.systemFieldKey === "name";
     const requiredBadge = globalThis.AdmitCardPublicFormFeedback.badge(field.required);
     const fieldDescription = String(field.questionDescription || "").trim();
-    const fieldDescriptionMarkup = fieldDescription
-      ? `<span class="applicant-public-file-note applicant-public-field-note">${escapeHtml(fieldDescription)}</span>`
+    const fieldDescriptionMarkup = fieldDescription || field.questionDescriptionEn
+      ? `<span class="applicant-public-file-note applicant-public-field-note">${applicantPublicRenderingHelpersModule.renderAuthoredText(fieldDescription, field.questionDescriptionEn)}</span>`
       : "";
     const fieldTypeAttribute = `data-applicant-field-type="${escapeAttribute(field.inputType || "text")}"`;
 
     if (field.inputType === "textarea") {
       return `
         <div class="applicant-public-field">
-          <label for="field-${escapeAttribute(field.fieldKey)}">${escapeHtml(field.questionText)} ${requiredBadge}</label>
+          <label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn)} ${requiredBadge}</label>
           ${fieldDescriptionMarkup}
           <textarea
             id="field-${escapeAttribute(field.fieldKey)}"
@@ -2501,6 +2540,10 @@
           >${escapeHtml(fieldValue || "")}</textarea>
         </div>
       `;
+    }
+
+    if (field.inputType === "multiselect") {
+      return `<div class="applicant-public-field"><span>${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn)} ${requiredBadge}</span>${fieldDescriptionMarkup}${applicantPublicRenderingHelpersModule.renderMultiSelect(field, fieldValue, { disabled: isReadOnly })}</div>`;
     }
 
     if (field.inputType === "select") {
@@ -2530,7 +2573,7 @@
 
       return `
         <div class="applicant-public-field">
-          <label for="field-${escapeAttribute(field.fieldKey)}">${escapeHtml(field.questionText)} ${requiredBadge}</label>
+          <label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn)} ${requiredBadge}</label>
           ${fieldDescriptionMarkup}
           <select
             id="field-${escapeAttribute(field.fieldKey)}"
@@ -2543,7 +2586,7 @@
             ${normalizedOptions
               .map(
                 (option) => `
-                  <option value="${escapeAttribute(option)}" ${selectedOptionValue === option ? "selected" : ""}>${escapeHtml(option)}</option>
+                  <option translate="no" data-i18n-ko="${escapeAttribute(option)}" data-i18n-en="${escapeAttribute(field.optionsEn?.[option] || option)}" value="${escapeAttribute(option)}" ${selectedOptionValue === option ? "selected" : ""}>${escapeHtml(option)}</option>
                 `,
               )
               .join("")}
@@ -2578,7 +2621,7 @@
 
       return `
         <div class="applicant-public-field applicant-public-file-field">
-          <label for="field-${escapeAttribute(field.fieldKey)}">${escapeHtml(field.questionText)} ${requiredBadge}</label>
+          <label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn)} ${requiredBadge}</label>
           ${fieldDescriptionMarkup}
           <div class="applicant-public-file-shell">
             ${!isPhotoField && field.allowedExtensions?.length ? `<small class="muted">허용 확장자: ${escapeHtml(field.allowedExtensions.join(', '))}</small>` : ''}
@@ -2596,7 +2639,7 @@
                 ? `
                   <label class="applicant-public-file-display" for="field-${escapeAttribute(field.fieldKey)}">
                     <span class="applicant-public-file-button">파일 선택</span>
-                    <span class="applicant-public-file-name">${escapeHtml(uploadLabel)}</span>
+                    <span ${fieldValue?.file?.name || fieldValue?.fileName ? 'translate="no"' : ''} class="applicant-public-file-name">${escapeHtml(uploadLabel)}</span>
                   </label>
                 `
                 : `
@@ -2612,14 +2655,14 @@
                       isPdfPreviewAvailable
                         ? `
                           <button
-                            class="applicant-public-file-name applicant-public-file-name-button"
+                            translate="no" class="applicant-public-file-name applicant-public-file-name-button"
                             data-applicant-action="open-uploaded-pdf-preview"
                             data-applicant-upload-field-key="${escapeAttribute(field.fieldKey)}"
                             type="button"
                             title="${escapeAttribute(uploadLabel)}"
                           >${escapeHtml(uploadLabel)}</button>
                         `
-                        : `<span class="applicant-public-file-name">${escapeHtml(uploadLabel)}</span>`
+                        : `<span ${fieldValue?.file?.name || fieldValue?.fileName ? 'translate="no"' : ''} class="applicant-public-file-name">${escapeHtml(uploadLabel)}</span>`
                     }
                   </div>
                 `
@@ -2634,7 +2677,7 @@
 
       return `
         <div class="applicant-public-field applicant-public-nationality-field">
-          <label for="field-${escapeAttribute(field.fieldKey)}">${escapeHtml(field.questionText)} ${requiredBadge}</label>
+          <label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn)} ${requiredBadge}</label>
           ${fieldDescriptionMarkup}
           <div class="applicant-public-nationality-combobox">
             <input
@@ -2642,7 +2685,7 @@
               data-applicant-field-key="${escapeAttribute(field.fieldKey)}"
               ${fieldTypeAttribute}
               type="search"
-              value="${escapeAttribute(fieldValue || "")}"
+              value="${escapeAttribute(isPickerOpen ? fieldValue || "" : getNationalityDisplayValue(fieldValue))}"
               placeholder="국가를 검색하세요"
               autocomplete="off"
               spellcheck="false"
@@ -2675,7 +2718,7 @@
 
     return `
       <div class="applicant-public-field">
-        <label for="field-${escapeAttribute(field.fieldKey)}">${escapeHtml(field.questionText)} ${requiredBadge}</label>
+        <label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn)} ${requiredBadge}</label>
         ${fieldDescriptionMarkup}
         <input
           id="field-${escapeAttribute(field.fieldKey)}"
@@ -2691,7 +2734,7 @@
   }
 
   function getVisibleApplicantFormFields() {
-    const fields = Array.isArray(state.formConfig.fields) ? state.formConfig.fields : [];
+    const fields = getTemplateFields('application');
 
     if (!hasApplicantRecruitmentSelectionStep()) {
       return fields;
@@ -2717,6 +2760,7 @@
     const summaryItems = APPLICANT_RECRUITMENT_SELECTION_FIELDS
       .map((definition) => ({
         label: definition.label,
+        key: definition.key,
         value: String(state.recruitment?.[definition.key] || "").trim(),
       }))
       .filter((item) => item.value);
@@ -2732,7 +2776,7 @@
             (item) => `
               <div class="applicant-public-selection-summary-item">
                 <strong>${escapeHtml(item.label)}</strong>
-                <span class="applicant-public-selection-summary-value" title="${escapeHtml(item.value)}">${escapeHtml(item.value)}</span>
+                <span translate="no" class="applicant-public-selection-summary-value" data-i18n-ko="${escapeAttribute(item.value)}" data-i18n-en="${escapeAttribute(getRecruitmentEnglishName(item.key, item.value))}" title="${escapeAttribute(item.value)}" data-i18n-title-en="${escapeAttribute(getRecruitmentEnglishName(item.key, item.value))}">${escapeHtml(item.value)}</span>
               </div>
             `,
           )
@@ -2772,7 +2816,7 @@
             ${options
               .map(
                 (option) => `
-                  <option value="${escapeAttribute(option)}" ${selectedValue === option ? "selected" : ""}>${escapeHtml(option)}</option>
+                  <option translate="no" value="${escapeAttribute(option)}" data-i18n-ko="${escapeAttribute(option)}" data-i18n-en="${escapeAttribute(getRecruitmentEnglishName(definition.key, option))}" ${selectedValue === option ? "selected" : ""}>${escapeHtml(option)}</option>
                 `,
               )
               .join("")}
@@ -2813,7 +2857,7 @@
             </div>
 
             <div class="applicant-public-actions applicant-public-application-actions applicant-public-step-navigation">
-              <button class="ghost-button" data-applicant-action="back-home" type="button">이전</button>
+              <button class="ghost-button applicant-public-back-button" data-applicant-action="back-home" type="button">이전</button>
               <button
                 class="primary-button"
                 data-applicant-action="continue-application"
@@ -2917,11 +2961,11 @@
               ${
                 isPreviewMode
                   ? `
-                    <button class="ghost-button" data-applicant-action="preview-home" type="button">첫 화면 보기</button>
+                    <button class="ghost-button applicant-public-back-button" data-applicant-action="preview-home" type="button">이전</button>
                     <button class="primary-button" type="button" disabled>미리보기 전용</button>
                   `
                   : `
-                    <button class="ghost-button" data-applicant-action="back-form" type="button">이전</button>
+                    <button class="ghost-button applicant-public-back-button" data-applicant-action="back-form" type="button">이전</button>
                     <button
                       class="primary-button"
                       type="submit"
@@ -2940,6 +2984,7 @@
   }
 
   function renderSummaryItems(answerItems = []) {
+    const recruitmentSelection = getApplicantRecruitmentSelectionFromSubmission({ answerItems });
     const documentKeys = new Set((state.formConfig.documentFields || []).map(field => field.fieldKey));
     const fieldOrderMap = (Array.isArray(state.formConfig?.fields) ? state.formConfig.fields : []).reduce((orderMap, field, fieldIndex) => {
       const fieldKey = String(field?.fieldKey || "").trim();
@@ -3000,12 +3045,12 @@
                   ? answerItem?.value?.hasFile
                     ? answerItem?.value?.fileName || "등록된 파일"
                     : "미등록"
-                : String(answerItem?.value || "").trim() || "-";
+                : (Array.isArray(answerItem?.value) ? answerItem.value.join(", ") : String(answerItem?.value || "").trim()) || "-";
 
             return `
               <div class="applicant-public-summary-item">
-                <strong>${escapeHtml(answerItem?.questionText || "-")}</strong>
-                <span>${escapeHtml(value)}</span>
+                <strong>${applicantPublicRenderingHelpersModule.renderAuthoredText(answerItem?.questionText || "-", answerItem?.questionTextEn)}</strong>
+                <span ${answerItem?.inputType === "photo" || answerItem?.inputType === "file" ? (answerItem?.value?.fileName ? 'translate="no"' : '') : 'translate="no"'}>${["admission", "unit", "major"].includes(answerItem.systemFieldKey) ? applicantPublicRenderingHelpersModule.renderAuthoredText(value, getRecruitmentEnglishName(answerItem.systemFieldKey, value, recruitmentSelection)) : applicantFormConfig.isChoiceInputType(answerItem.inputType) ? applicantPublicRenderingHelpersModule.renderChoiceAnswer(getApplicantFormFieldByKey(answerItem.fieldKey) || {}, answerItem.value) : escapeHtml(value)}</span>
               </div>
             `;
           })
@@ -3019,13 +3064,13 @@
       <section class="applicant-public-step">
         <article class="applicant-public-slab">
           <h2>접수 결과</h2>
-          <p>입력한 내용을 한 번 더 확인한 뒤 확인 완료를 누르면 처음 화면으로 돌아갑니다.</p>
+          <p>접수 내용을 확인한 뒤 이전 버튼을 누르면 첫 화면으로 돌아갑니다.</p>
           ${renderMessage()}
 
           ${renderSummaryItems(state.currentSubmission?.answerItems)}
 
           <div class="applicant-public-actions">
-            <button class="primary-button" data-applicant-action="confirm-result" type="button">확인 완료</button>
+            <button class="ghost-button applicant-public-back-button" data-applicant-action="confirm-result" type="button">이전</button>
           </div>
         </article>
       </section>
@@ -3078,7 +3123,7 @@
             </div>
 
             <div class="applicant-public-actions">
-              <button class="ghost-button" data-applicant-action="back-home" type="button">취소</button>
+              <button class="ghost-button applicant-public-back-button" data-applicant-action="back-home" type="button">이전</button>
               <button class="primary-button" type="submit" ${state.lookup.isLoading ? "disabled" : ""}>
                 ${state.lookup.isLoading ? "조회 중..." : "조회"}
               </button>
@@ -3104,14 +3149,14 @@
           ${renderSummaryItems(submission?.answerItems)}
 
           <div class="applicant-public-actions">
+            <button class="ghost-button applicant-public-back-button" data-applicant-action="back-home" type="button">이전</button>
             <button
-              class="ghost-button"
+              class="primary-button"
               data-applicant-action="edit-application"
               type="button"
               ${isEditDisabled ? "disabled" : ""}
               title="${isEditDisabled ? escapeAttribute(formEditAvailabilityState.disabledMessage) : "접수 내용 수정"}"
             >수정</button>
-            <button class="primary-button" data-applicant-action="back-home" type="button">홈</button>
           </div>
         </article>
       </section>
@@ -3145,25 +3190,41 @@
               <h2>수험표 조회</h2>
               <div class="applicant-ticket-number-row">
                 <p>수험번호: ${escapeHtml(examineeNo || "미부여")}</p>
-                ${pdfUrl ? `<a class="primary-button applicant-ticket-download" href="${escapeAttribute(`${pdfUrl}&download=1`)}" download="${escapeAttribute(`수험표_${examineeNo || submission.id}.pdf`)}">다운로드</a>` : ''}
               </div>
             </div>
           </div>
           ${renderMessage()}
           ${previewMarkup}
+          <div class="applicant-public-actions">
+            <button class="ghost-button applicant-public-back-button" data-applicant-action="back-home" type="button">이전</button>
+            ${pdfUrl ? `<a class="primary-button applicant-ticket-download" href="${escapeAttribute(`${pdfUrl}&download=1`)}" download="${escapeAttribute(`수험표_${examineeNo || submission.id}.pdf`)}">다운로드</a>` : ''}
+          </div>
         </article>
       </section>
     `;
   }
 
+  function renderMemberDocumentStatus() {
+    const documents = state.documentStatus?.documents || [];
+    return `<section class="applicant-public-step"><article class="applicant-public-slab"><h2>서류 제출 확인</h2>
+      <p class="muted">서류별 제출 상태를 확인해 주세요.</p>${renderMessage()}
+      <div class="applicant-document-status-list">${documents.map(item => `<div class="applicant-document-status-row">
+        <div><strong>${applicantPublicRenderingHelpersModule.renderAuthoredText(item.questionText, item.questionTextEn)}</strong>
+          ${item.fileName ? `<p translate="no">${escapeHtml(item.fileName)}</p>` : ''}</div>
+        <span class="applicant-document-status-badge is-${escapeAttribute(item.status)}">${escapeHtml(item.statusLabel)}</span>
+      </div>`).join('') || '<p>확인할 서류 항목이 없습니다.</p>'}</div>
+      <div class="applicant-public-actions"><button class="ghost-button applicant-public-back-button" type="button" data-applicant-action="member-home">이전</button><button class="primary-button" type="button" data-applicant-action="member-document-status">새로고침</button></div>
+    </article></section>`;
+  }
+
   function renderMemberDocuments() {
-    const fields = state.formConfig.documentFields || [];
+    const fields = getTemplateFields('documents');
     const availability = getApplicantFormEditAvailabilityState();
     return `<section class="applicant-public-step"><article class="applicant-public-slab"><h2>서류 제출</h2>
       ${availability.periodLabel ? `<p class="applicant-public-preview-note">서류 제출 기간: ${escapeHtml(availability.periodLabel)}</p>` : ""}
       ${renderMessage()}${!availability.isEditable ? `<p class="applicant-public-preview-note">${escapeHtml(availability.disabledMessage)}</p>` : ""}
       <form class="applicant-public-form" data-applicant-form="member-documents"><div class="applicant-public-form-stack">${fields.length ? fields.map((field) => renderApplicantField(field, { isReadOnly: !availability.isEditable })).join("") : "<p>제출할 서류 항목이 없습니다.</p>"}</div>
-      <div class="applicant-public-actions"><button class="ghost-button" type="button" data-applicant-action="member-home">첫 화면</button><button class="primary-button" type="submit" ${!fields.length || !availability.isEditable || state.isSaving ? "disabled" : ""}>${state.isSaving ? "제출 중…" : "서류 제출"}</button></div></form></article></section>`;
+      <div class="applicant-public-actions"><button class="ghost-button applicant-public-back-button" type="button" data-applicant-action="member-home">이전</button><button class="primary-button" type="submit" ${!fields.length || !availability.isEditable || state.isSaving ? "disabled" : ""}>${state.isSaving ? "제출 중…" : "서류 제출"}</button></div></form></article></section>`;
   }
 
   async function saveMemberDocuments() {
@@ -3195,6 +3256,8 @@
     const markup =
       state.mode === "signup"
         ? membership.signupScreen()
+        : state.mode === "document-status"
+        ? renderMemberDocumentStatus()
         : state.mode === "documents"
         ? renderMemberDocuments()
         : state.mode === "verify"
@@ -3241,6 +3304,7 @@
       state.formConfig = {
         fields: Array.isArray(payload?.fields) ? payload.fields : [],
         documentFields: Array.isArray(payload?.documentFields) ? payload.documentFields : [],
+        formTemplates: Array.isArray(payload?.formTemplates) ? payload.formTemplates : [],
         recruitmentUnits: Array.isArray(payload?.recruitmentUnits) ? payload.recruitmentUnits : [],
         schedules: Array.isArray(payload?.schedules) ? payload.schedules : [],
         settings: payload?.settings || {},
@@ -3250,6 +3314,7 @@
           ...(payload?.systemSettings && typeof payload.systemSettings === "object" ? payload.systemSettings : {}),
         },
         noticeHtml: String(payload?.noticeHtml || ""),
+        noticeHtmlEn: String(payload?.noticeHtmlEn || ""),
       };
       syncApplicantRecruitmentSelection({ preserveExisting: true });
       state.draftAnswers = {
@@ -3364,7 +3429,7 @@
   }
 
   function getPublicApplicationControl(fieldKey) {
-    return [...root.querySelectorAll('[data-applicant-field-key]')].find(input => input.dataset.applicantFieldKey === fieldKey);
+    return [...root.querySelectorAll('[data-applicant-field-key]')].find(input => input.dataset.applicantFieldKey === fieldKey) || [...root.querySelectorAll('[data-choice-prefix=applicant]')].find(group => group.dataset.choiceGroup === fieldKey)?.querySelector('[data-choice-option]');
   }
 
   function showPublicApplicationFieldError(error) {
@@ -3905,6 +3970,9 @@
       return;
     }
 
+    const multiGroup = target.closest('[data-choice-prefix="applicant"]');
+    if (multiGroup) { state.draftAnswers[multiGroup.dataset.choiceGroup] = applicantPublicRenderingHelpersModule.readMultiSelect(multiGroup); persistApplicantPublicState(); return; }
+
     const customSelectFieldKey = String(target.dataset.applicantSelectCustomFieldKey || "").trim();
 
     if (customSelectFieldKey) {
@@ -3958,6 +4026,9 @@
       element.dispatchEvent(mirroredInputEvent);
       return;
     }
+
+    const multiGroup = element.closest('[data-choice-prefix="applicant"]');
+    if (multiGroup) { state.draftAnswers[multiGroup.dataset.choiceGroup] = applicantPublicRenderingHelpersModule.readMultiSelect(multiGroup); persistApplicantPublicState(); return; }
 
     const dateFieldKey = String(element.dataset.applicantDateFieldKey || "").trim();
     const datePart = String(element.dataset.applicantDatePart || "").trim();
@@ -4060,7 +4131,7 @@
       }
 
       if (element.dataset.applicantFieldType === "nationality") {
-        state.draftAnswers[fieldKey] = element.value;
+        if (element.value !== getNationalityDisplayValue(state.draftAnswers[fieldKey])) state.draftAnswers[fieldKey] = element.value;
         persistApplicantPublicState();
         return;
       }
@@ -4147,6 +4218,7 @@
 
   membership = globalThis.createApplicantMembershipController({
     apiRequest, escapeHtml, render, navigate: navigateToApplicantMode, setMessage,
+    isApplyButtonVisible: () => getApplicantBrandSettings().recruitmentEnabled,
     getApplyAvailability: () => {
       const availability = getApplicantApplyEntryAvailabilityState();
       return { ...availability, disabledMessage: getApplicantApplyEntryDisabledMessage(availability) };
@@ -4155,6 +4227,7 @@
       window.sessionStorage.removeItem(APPLICANT_PUBLIC_STATE_STORAGE_KEY);
       state.identity = { name: "", email: "", accessToken: "", submissionId: 0, source: "" };
       state.currentSubmission = null;
+      state.documentStatus = null;
       state.draftAnswers = {};
       state.recruitment = {};
       state.verification.name = "";
@@ -4183,6 +4256,10 @@
         const availability = getApplicantApplyEntryAvailabilityState();
         if (!availability.isAvailable) { notifyApplicantApplyEntryUnavailable(availability); return; }
         navigateToApplicantMode(getApplicantFlowEntryMode());
+      } else if (action === "document-status") {
+        state.documentStatus = null;
+        state.documentStatus = await apiRequest("/api/public/members/document-status");
+        navigateToApplicantMode("document-status");
       } else if (action === "documents") {
         navigateToApplicantMode("documents");
       } else {
@@ -4194,7 +4271,7 @@
   });
   const initialMode = getApplicantModeFromPathname(window.location.pathname);
   if (APPLICANT_IS_PREVIEW_MODE) {
-    restoreApplicantPublicState();
+    if (!APPLICANT_IS_THUMBNAIL) restoreApplicantPublicState();
     state.mode = initialMode;
     render();
     loadFormConfig();
@@ -4207,8 +4284,8 @@
     render();
     membership.initialize().then(async () => {
       await loadFormConfig();
-      if (membership.member && ["form", "apply", "lookup-summary", "lookup-ticket", "documents", "result"].includes(initialMode)) {
-        const action = ["form", "apply"].includes(initialMode) ? "apply" : initialMode === "lookup-ticket" ? "ticket" : initialMode === "documents" ? "documents" : "summary";
+      if (membership.member && ["form", "apply", "lookup-summary", "lookup-ticket", "documents", "document-status", "result"].includes(initialMode)) {
+        const action = ["form", "apply"].includes(initialMode) ? "apply" : initialMode === "lookup-ticket" ? "ticket" : initialMode === "documents" ? "documents" : initialMode === "document-status" ? "document-status" : "summary";
         await membership.handleAction(`member-${action}`);
       }
     }).catch((error) => { state.loadError = error.message; state.isLoadingForm = false; render(); });

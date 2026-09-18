@@ -59,11 +59,12 @@ globalScope.AdmitCardApplicantSubmissionWorkflow);
     applicantFormConfig?.buildApplicantScheduleContextLabel || ((value = {}) => String(value?.track || value?.trackName || "선택한 전형"));
   const buildApplicantScheduleRangeLabel = applicantFormConfig?.buildApplicantScheduleRangeLabel || (() => "");
 
-  function createEmptyApplicantFieldEditor({ isActive = false, isDraft = false, formScope = 'application', inputType = 'text' } = {}) {
+  function createEmptyApplicantFieldEditor({ isActive = false, isDraft = false, formScope = 'application', templateId = null, inputType = 'text' } = {}) {
     return {
       isActive,
       isDraft,
       formScope,
+      templateId,
       editingId: 0,
       questionText: "",
       questionDescription: "",
@@ -71,6 +72,8 @@ globalScope.AdmitCardApplicantSubmissionWorkflow);
       systemFieldKey: "",
       options: [],
       optionDraft: "",
+      optionDraftEn: "",
+      optionsEn: {},
       allowCustomOption: false,
       customOptionLabel: "",
       required: false,
@@ -84,12 +87,15 @@ globalScope.AdmitCardApplicantSubmissionWorkflow);
       trackName: "",
       admissionCode: "",
       admissionName: "",
+      admissionNameEn: "",
       seriesCode: "",
       seriesName: "",
       unitCode: "",
       unitName: "",
+      unitNameEn: "",
       majorCode: "",
       majorName: "",
+      majorNameEn: "",
     };
   }
 
@@ -104,12 +110,18 @@ globalScope.AdmitCardApplicantSubmissionWorkflow);
       trackName: "",
       admissionCode: "",
       admissionName: "",
+      applicantScheduleEnabled: true,
+      documentSubmissionScheduleEnabled: true,
+      documentReviewScheduleEnabled: true,
+      admitCardLookupScheduleEnabled: true,
       applicantScheduleStartAt: "",
       applicantScheduleEndAt: "",
       admitCardLookupScheduleStartAt: "",
       admitCardLookupScheduleEndAt: "",
       documentSubmissionScheduleStartAt: "",
+      documentReviewScheduleStartAt: "",
       documentSubmissionScheduleEndAt: "",
+      documentReviewScheduleEndAt: "",
     };
   }
 
@@ -166,6 +178,9 @@ globalScope.AdmitCardApplicantSubmissionWorkflow);
         const isDocuments = new URLSearchParams(window.location.search).get('tab') === 'documents';
         const previewUrl = new URL(buildApiUrl(isDocuments ? '/applicant/documents' : '/applicant/form'));
         previewUrl.searchParams.set("preview", "1");
+        const scope = isDocuments ? 'documents' : 'application';
+        const selectedId = state.applicantManager.selectedFormTemplates?.[scope] || state.applicantManager.formTemplates?.find(item => item.formScope === scope && item.isDefault)?.id;
+        if (selectedId) previewUrl.searchParams.set('templateId', String(selectedId));
         window.open(previewUrl.toString(), "_blank", "noopener,noreferrer");
       } catch (error) {
         showToast("미리보기 페이지를 열지 못했습니다.", "error", 3200);

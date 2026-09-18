@@ -54,6 +54,38 @@
       })();
     }
 
+    const copyingTemplateIds = new Set();
+
+    async function copyTemplateCard(templateId) {
+      const source = findTemplateCard(templateId);
+      if (!source || copyingTemplateIds.has(templateId)) return;
+      copyingTemplateIds.add(templateId);
+
+      try {
+        const names = new Set(state.templateCards.map(card => card.name));
+        const copyName = suffix => `${source.name.slice(0, 200 - suffix.length)}${suffix}`;
+        let name = copyName(" 복사");
+        for (let index = 2; names.has(name); index += 1) name = copyName(` 복사 ${index}`);
+        const createdTemplate = await apiRequest("/api/templates", {
+          method: "POST",
+          body: JSON.stringify({
+            name,
+            description: source.description,
+            version: source.version,
+            status: "unused",
+            contentHtml: source.contentHtml,
+          }),
+        });
+        state.templateCards = [...state.templateCards, createdTemplate];
+        renderView();
+        showToast("양식을 복사했습니다.");
+      } catch (error) {
+        showToast(error.message, 4200);
+      } finally {
+        copyingTemplateIds.delete(templateId);
+      }
+    }
+
     function applyTemplateCard(templateId) {
       return (async () => {
         const templateCard = findTemplateCard(templateId);
@@ -117,6 +149,7 @@
     return Object.freeze({
       addTemplateCard,
       applyTemplateCard,
+      copyTemplateCard,
       deleteTemplateCard,
       updateTemplateCard,
     });

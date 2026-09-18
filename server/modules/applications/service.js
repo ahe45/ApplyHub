@@ -1,3 +1,5 @@
+const { createFormTemplateService } = require('./form-templates');
+const applicantFormConfig = require("../../../shared/domain/applicant-form");
 const { randomInt, randomUUID } = require("crypto");
 const AdmZip = require("adm-zip");
 const path = require("path");
@@ -6,6 +8,7 @@ const { normalizeFileUploadSettings, isAllowedUploadExtension } = require("../..
 const {
 
   createApplicantImportHelpers,
+  buildApplicantRecruitmentUnitImportKey,
   getApplicantRecruitmentImportRowLabel,
   normalizeApplicantImportExistingDataPolicy,
   shouldProcessApplicantImportOperation,
@@ -14,6 +17,7 @@ const { createApplicantAttachmentStorage } = require("./attachment-storage");
 
 const { createApplicantPublicAccessStore } = require("./public-access-store");
 const { createApplicantWorkbookService } = require("./workbook-service");
+const { createDocumentStatusService } = require("./document-status");
 const { createApplicantArchiveJobs } = require("./archive-jobs");
 
 const {
@@ -67,6 +71,8 @@ function createApplicantService({
   sendVerificationEmail,
   verifyPassword = (plainPassword, storedPassword) => String(plainPassword ?? "") === String(storedPassword ?? ""),
 }) {
+  const formTemplates = createFormTemplateService({ query, getPool, createHttpError, randomUUID });
+  const documentStatusService = createDocumentStatusService({ query, getPool, getFields: getApplicantFormFields, getFieldsForSubmission: getDocumentFieldsForSubmission, getTemplateContext: getDocumentTemplateContext, getSubmission: getApplicantSubmissionById, getSubmissions: getApplicantSubmissions, createHttpError });
   const attachmentArchiveJobs = createApplicantArchiveJobs({
     query, getSubmission: getApplicantSubmissionById, getPhoto: getApplicantSubmissionPhoto,
     getFile: getApplicantSubmissionFile, createHttpError,
@@ -379,6 +385,7 @@ function createApplicantService({
 
       return {
         items,
+        optionsEn: applicantFormConfig.normalizeChoiceTranslations(items, parsedValue.optionsEn),
         allowCustomOption,
         customOptionLabel,
         fileNamePattern: String(parsedValue.fileNamePattern || ""),
@@ -434,14 +441,18 @@ function createApplicantService({
 
     return {
       id: Number(row.id || 0),
+      templateId: Number(row.templateId || 0),
       formScope: row.formScope === 'documents' ? 'documents' : 'application',
       fieldKey: String(row.fieldKey || "").trim(),
       questionText: String(row.questionText || "").trim(),
       questionDescription: String(row.questionDescription || "").trim(),
+      questionTextEn: String(row.questionTextEn || "").trim(),
+      questionDescriptionEn: String(row.questionDescriptionEn || "").trim(),
       inputType: String(row.inputType || "text").trim(),
       systemFieldKey: String(row.systemFieldKey || "").trim(),
       options,
       optionValuesText: options.join("\n"),
+      optionsEn: applicantFormConfig.normalizeChoiceTranslations(options, optionConfig.optionsEn),
       fileNamePattern: optionConfig.fileNamePattern || "",
       allowedExtensions: optionConfig.allowedExtensions || [],
       allowCustomOption: optionConfig.allowCustomOption === true,
@@ -558,12 +569,15 @@ function createApplicantService({
       trackName: String(row.trackName || "").trim(),
       admissionCode: String(row.admissionCode || "").trim(),
       admissionName: String(row.admissionName || "").trim(),
+      admissionNameEn: String(row.admissionNameEn || "").trim(),
       seriesCode: String(row.seriesCode || "").trim(),
       seriesName: String(row.seriesName || "").trim(),
       unitCode: String(row.unitCode || "").trim(),
       unitName: String(row.unitName || "").trim(),
+      unitNameEn: String(row.unitNameEn || "").trim(),
       majorCode: String(row.majorCode || "").trim(),
       majorName: String(row.majorName || "").trim(),
+      majorNameEn: String(row.majorNameEn || "").trim(),
       sortOrder: Number(row.sortOrder || 0),
       createdAt: String(row.createdAt || "").trim(),
       updatedAt: String(row.updatedAt || "").trim(),
@@ -641,6 +655,9 @@ function createApplicantService({
 
   function normalizeApplicantRecruitmentUnitPayload(payload = {}, existingUnit = {}) {
     return {
+      admissionNameEn: normalizeApplicantText(payload.admissionNameEn ?? existingUnit.admissionNameEn, "전형명(영어)", { required: false, maxLength: 200, errorCode: "APPLICANT_RECRUITMENT_ADMISSION_NAME_EN_INVALID" }),
+      unitNameEn: normalizeApplicantText(payload.unitNameEn ?? existingUnit.unitNameEn, "모집단위명(영어)", { required: false, maxLength: 200, errorCode: "APPLICANT_RECRUITMENT_UNIT_NAME_EN_INVALID" }),
+      majorNameEn: normalizeApplicantText(payload.majorNameEn ?? existingUnit.majorNameEn, "전공명(영어)", { required: false, maxLength: 200, errorCode: "APPLICANT_RECRUITMENT_MAJOR_NAME_EN_INVALID" }),
       trackName: normalizeApplicantText(payload.trackName ?? existingUnit.trackName, "모집시기", {
         required: false,
         maxLength: 100,
@@ -651,7 +668,7 @@ function createApplicantService({
         maxLength: 30,
         errorCode: "APPLICANT_RECRUITMENT_ADMISSION_CODE_INVALID",
       }),
-      admissionName: normalizeApplicantText(payload.admissionName ?? existingUnit.admissionName, "전형", {
+      admissionName: normalizeApplicantText(payload.admissionName ?? existingUnit.admissionName, "전형명(한글)", {
         required: false,
         maxLength: 100,
         errorCode: "APPLICANT_RECRUITMENT_ADMISSION_NAME_INVALID",
@@ -671,7 +688,7 @@ function createApplicantService({
         maxLength: 30,
         errorCode: "APPLICANT_RECRUITMENT_UNIT_CODE_INVALID",
       }),
-      unitName: normalizeApplicantText(payload.unitName ?? existingUnit.unitName, "모집단위", {
+      unitName: normalizeApplicantText(payload.unitName ?? existingUnit.unitName, "모집단위명(한글)", {
         required: false,
         maxLength: 100,
         errorCode: "APPLICANT_RECRUITMENT_UNIT_NAME_INVALID",
@@ -681,7 +698,7 @@ function createApplicantService({
         maxLength: 30,
         errorCode: "APPLICANT_RECRUITMENT_MAJOR_CODE_INVALID",
       }),
-      majorName: normalizeApplicantText(payload.majorName ?? existingUnit.majorName, "전공", {
+      majorName: normalizeApplicantText(payload.majorName ?? existingUnit.majorName, "전공명(한글)", {
         required: false,
         maxLength: 100,
         errorCode: "APPLICANT_RECRUITMENT_MAJOR_NAME_INVALID",
@@ -692,6 +709,15 @@ function createApplicantService({
   const { classifyApplicantRecruitmentUnitImportRows } = createApplicantImportHelpers({
     normalizeApplicantRecruitmentUnitPayload,
   });
+
+  function normalizeRecruitmentImportRows(rows, currentUnits) {
+    const existingByKey = new Map(currentUnits.map(unit => [buildApplicantRecruitmentUnitImportKey(unit), unit]));
+    return rows.map(row => {
+      const key = buildApplicantRecruitmentUnitImportKey(normalizeApplicantRecruitmentUnitPayload(row));
+      // Legacy uploads omit English columns; retain previously authored translations.
+      return normalizeApplicantRecruitmentUnitPayload(row, existingByKey.get(key));
+    });
+  }
 
   function normalizeApplicantRecruitmentImportCodeValue(value) {
     return String(value ?? "").trim().toUpperCase();
@@ -813,7 +839,7 @@ function createApplicantService({
             return answerItem?.value?.hasFile ? String(answerItem?.value?.fileName || "등록된 파일").trim() : "미등록";
           }
 
-          return String(answerItem?.value || "").trim();
+          return Array.isArray(answerItem?.value) ? answerItem.value.join(", ") : String(answerItem?.value || "").trim();
         }),
       };
     });
@@ -901,7 +927,7 @@ function createApplicantService({
 
     const currentUnits = await getApplicantRecruitmentUnits();
     validateApplicantRecruitmentUnitImportRows(sourceRows, currentUnits);
-    const normalizedRows = sourceRows.map((row) => normalizeApplicantRecruitmentUnitPayload(row));
+    const normalizedRows = normalizeRecruitmentImportRows(sourceRows, currentUnits);
     const classifiedRows = classifyApplicantRecruitmentUnitImportRows(normalizedRows, currentUnits);
     const previewRows = [];
     let insertCount = 0;
@@ -924,12 +950,15 @@ function createApplicantService({
           trackName: row.trackName,
           admissionCode: row.admissionCode,
           admissionName: row.admissionName,
+          admissionNameEn: row.admissionNameEn,
           seriesCode: row.seriesCode,
           seriesName: row.seriesName,
           unitCode: row.unitCode,
           unitName: row.unitName,
+          unitNameEn: row.unitNameEn,
           majorCode: row.majorCode,
           majorName: row.majorName,
+          majorNameEn: row.majorNameEn,
         });
       }
     });
@@ -1168,28 +1197,40 @@ function createApplicantService({
     const applicantScheduleStartAt = normalizeApplicantScheduleDateTime(row.applicantScheduleStartAt);
     const applicantScheduleEndAt = normalizeApplicantScheduleDateTime(row.applicantScheduleEndAt);
     const documentSubmissionScheduleStartAt = normalizeApplicantScheduleDateTime(row.documentSubmissionScheduleStartAt);
+    const documentReviewScheduleStartAt = normalizeApplicantScheduleDateTime(row.documentReviewScheduleStartAt);
     const documentSubmissionScheduleEndAt = normalizeApplicantScheduleDateTime(row.documentSubmissionScheduleEndAt);
+    const documentReviewScheduleEndAt = normalizeApplicantScheduleDateTime(row.documentReviewScheduleEndAt);
     const admitCardLookupScheduleStartAt = normalizeApplicantScheduleDateTime(row.admitCardLookupScheduleStartAt);
     const admitCardLookupScheduleEndAt = normalizeApplicantScheduleDateTime(row.admitCardLookupScheduleEndAt);
 
     return {
       id: Number(row.id || 0),
+      applicationTemplateId: Number(row.applicationTemplateId || 0),
+      documentTemplateId: Number(row.documentTemplateId || 0),
       scheduleKey: buildApplicantAdmissionScheduleKey(trackName, admissionCode, admissionName),
       trackName,
       admissionCode,
       admissionName,
+      applicantScheduleEnabled: applicantFormConfig.isApplicantScheduleEnabled(row, 'submission'),
       applicantScheduleStartAt,
       applicantScheduleStartAtLabel: formatApplicantScheduleDateTimeLabel(applicantScheduleStartAt),
       applicantScheduleEndAt,
       applicantScheduleEndAtLabel: formatApplicantScheduleDateTimeLabel(applicantScheduleEndAt),
+      documentSubmissionScheduleEnabled: applicantFormConfig.isApplicantScheduleEnabled(row, 'documents'),
+      documentReviewScheduleEnabled: applicantFormConfig.isApplicantScheduleEnabled(row, 'document-status'),
       documentSubmissionScheduleStartAt,
+      documentReviewScheduleStartAt,
       documentSubmissionScheduleEndAt,
+      documentReviewScheduleEndAt,
       documentSubmissionScheduleStartAtLabel: formatApplicantScheduleDateTimeLabel(documentSubmissionScheduleStartAt),
+      documentReviewScheduleStartAtLabel: formatApplicantScheduleDateTimeLabel(documentReviewScheduleStartAt),
       documentSubmissionScheduleEndAtLabel: formatApplicantScheduleDateTimeLabel(documentSubmissionScheduleEndAt),
+      documentReviewScheduleEndAtLabel: formatApplicantScheduleDateTimeLabel(documentReviewScheduleEndAt),
       applicantScheduleLabel:
         applicantScheduleStartAt && applicantScheduleEndAt
           ? `${formatApplicantScheduleDateTimeLabel(applicantScheduleStartAt)} ~ ${formatApplicantScheduleDateTimeLabel(applicantScheduleEndAt)}`
           : "",
+      admitCardLookupScheduleEnabled: applicantFormConfig.isApplicantScheduleEnabled(row, 'lookup'),
       admitCardLookupScheduleStartAt,
       admitCardLookupScheduleStartAtLabel: formatApplicantScheduleDateTimeLabel(admitCardLookupScheduleStartAt),
       admitCardLookupScheduleEndAt,
@@ -1243,6 +1284,13 @@ function createApplicantService({
     };
   }
 
+  function normalizeScheduleEnabled(value, existing = true) {
+    if (value == null) return existing !== false && existing !== 0;
+    if (value === true || value === 1) return true;
+    if (value === false || value === 0) return false;
+    throw createHttpError(400, '일정 사용 여부가 올바르지 않습니다.', 'APPLICANT_SCHEDULE_ENABLED_INVALID');
+  }
+
   function normalizeApplicantSchedulePayload(payload = {}, existingSchedule = {}) {
     const trackName = normalizeApplicantText(payload.trackName ?? existingSchedule.trackName, "모집시기", {
       required: false,
@@ -1279,15 +1327,28 @@ function createApplicantService({
       payload.documentSubmissionScheduleStartAt ?? existingSchedule.documentSubmissionScheduleStartAt,
       payload.documentSubmissionScheduleEndAt ?? existingSchedule.documentSubmissionScheduleEndAt,
     );
+    const documentReviewScheduleRange = normalizeOptionalApplicantScheduleRange(
+      "서류 제출 확인 기간",
+      payload.documentReviewScheduleStartAt ?? existingSchedule.documentReviewScheduleStartAt,
+      payload.documentReviewScheduleEndAt ?? existingSchedule.documentReviewScheduleEndAt,
+    );
 
     return {
       trackName,
       admissionCode,
       admissionName,
+      applicationTemplateId: payload.applicationTemplateId ?? existingSchedule.applicationTemplateId ?? null,
+      documentTemplateId: payload.documentTemplateId ?? existingSchedule.documentTemplateId ?? null,
+      applicantScheduleEnabled: normalizeScheduleEnabled(payload.applicantScheduleEnabled, existingSchedule.applicantScheduleEnabled),
       applicantScheduleStartAt: applicantScheduleRange.startAt,
       applicantScheduleEndAt: applicantScheduleRange.endAt,
+      documentSubmissionScheduleEnabled: normalizeScheduleEnabled(payload.documentSubmissionScheduleEnabled, existingSchedule.documentSubmissionScheduleEnabled),
+      documentReviewScheduleEnabled: normalizeScheduleEnabled(payload.documentReviewScheduleEnabled, existingSchedule.documentReviewScheduleEnabled),
       documentSubmissionScheduleStartAt: documentSubmissionScheduleRange.startAt,
+      documentReviewScheduleStartAt: documentReviewScheduleRange.startAt,
       documentSubmissionScheduleEndAt: documentSubmissionScheduleRange.endAt,
+      documentReviewScheduleEndAt: documentReviewScheduleRange.endAt,
+      admitCardLookupScheduleEnabled: normalizeScheduleEnabled(payload.admitCardLookupScheduleEnabled, existingSchedule.admitCardLookupScheduleEnabled),
       admitCardLookupScheduleStartAt: admitCardLookupScheduleRange.startAt,
       admitCardLookupScheduleEndAt: admitCardLookupScheduleRange.endAt,
     };
@@ -1329,124 +1390,16 @@ function createApplicantService({
     return labelParts.length > 0 ? labelParts.join(" / ") : "선택한 전형";
   }
 
-  function buildApplicantScheduleWindowState(startAt, endAt, referenceDate = new Date()) {
-    const normalizedStartAt = normalizeApplicantScheduleDateTime(startAt);
-    const normalizedEndAt = normalizeApplicantScheduleDateTime(endAt);
-
-    if (!normalizedStartAt || !normalizedEndAt) {
-      return {
-        isConfigured: false,
-        isOpen: false,
-        reason: "not_configured",
-      };
-    }
-
-    const currentTimestamp = referenceDate instanceof Date ? referenceDate.getTime() : new Date(referenceDate).getTime();
-    const startTimestamp = getApplicantScheduleTimestamp(normalizedStartAt);
-    const endTimestamp = getApplicantScheduleTimestamp(normalizedEndAt, {
-      inclusiveEndMinute: true,
-    });
-
-    if (!Number.isFinite(currentTimestamp) || !Number.isFinite(startTimestamp) || !Number.isFinite(endTimestamp)) {
-      return {
-        isConfigured: true,
-        isOpen: false,
-        reason: "invalid",
-      };
-    }
-
-    if (currentTimestamp < startTimestamp) {
-      return {
-        isConfigured: true,
-        isOpen: false,
-        reason: "before_start",
-      };
-    }
-
-    if (currentTimestamp > endTimestamp) {
-      return {
-        isConfigured: true,
-        isOpen: false,
-        reason: "after_end",
-      };
-    }
-
-    return {
-      isConfigured: true,
-      isOpen: true,
-      reason: "open",
-    };
-  }
-
   function getApplicantSubmissionScheduleState(schedule = {}, referenceDate = new Date()) {
-    const applicantScheduleStartAt = normalizeApplicantScheduleDateTime(schedule?.applicantScheduleStartAt);
-    const applicantScheduleEndAt = normalizeApplicantScheduleDateTime(schedule?.applicantScheduleEndAt);
-
-    return {
-      applicantScheduleStartAt,
-      applicantScheduleEndAt,
-      ...buildApplicantScheduleWindowState(applicantScheduleStartAt, applicantScheduleEndAt, referenceDate),
-    };
+    return applicantFormConfig.getApplicantSubmissionScheduleState(schedule, referenceDate);
   }
 
   function getApplicantAdmitCardLookupScheduleState(schedule = {}, referenceDate = new Date()) {
-    const admitCardLookupScheduleStartAt = normalizeApplicantScheduleDateTime(schedule?.admitCardLookupScheduleStartAt);
-    const admitCardLookupScheduleEndAt = normalizeApplicantScheduleDateTime(schedule?.admitCardLookupScheduleEndAt);
-
-    return {
-      admitCardLookupScheduleStartAt,
-      admitCardLookupScheduleEndAt,
-      ...buildApplicantScheduleWindowState(admitCardLookupScheduleStartAt, admitCardLookupScheduleEndAt, referenceDate),
-    };
+    return applicantFormConfig.getApplicantAdmitCardLookupScheduleState(schedule, referenceDate);
   }
 
-  function getApplicantAggregateScheduleState(schedules = [], scheduleType = "submission", referenceDate = new Date()) {
-    const normalizedSchedules = Array.isArray(schedules) ? schedules : [];
-    const scheduleStateResolver =
-      scheduleType === "lookup" ? getApplicantAdmitCardLookupScheduleState : getApplicantSubmissionScheduleState;
-    const configuredStates = normalizedSchedules
-      .map((schedule) => scheduleStateResolver(schedule, referenceDate))
-      .filter((scheduleState) => scheduleState.isConfigured);
-
-    if (configuredStates.some((scheduleState) => scheduleState.isOpen)) {
-      return configuredStates.find((scheduleState) => scheduleState.isOpen) || scheduleStateResolver({}, referenceDate);
-    }
-
-    if (configuredStates.length === 0) {
-      return scheduleStateResolver({}, referenceDate);
-    }
-
-    const beforeStartStates = configuredStates
-      .filter((scheduleState) => scheduleState.reason === "before_start")
-      .sort((leftState, rightState) => {
-        const leftTimestamp = getApplicantScheduleTimestamp(
-          scheduleType === "lookup" ? leftState.admitCardLookupScheduleStartAt : leftState.applicantScheduleStartAt,
-        );
-        const rightTimestamp = getApplicantScheduleTimestamp(
-          scheduleType === "lookup" ? rightState.admitCardLookupScheduleStartAt : rightState.applicantScheduleStartAt,
-        );
-        return leftTimestamp - rightTimestamp;
-      });
-
-    if (beforeStartStates.length > 0) {
-      return beforeStartStates[0];
-    }
-
-    const afterEndStates = configuredStates
-      .filter((scheduleState) => scheduleState.reason === "after_end")
-      .sort((leftState, rightState) => {
-        const leftTimestamp = getApplicantScheduleTimestamp(
-          scheduleType === "lookup" ? leftState.admitCardLookupScheduleEndAt : leftState.applicantScheduleEndAt,
-          { inclusiveEndMinute: true },
-        );
-        const rightTimestamp = getApplicantScheduleTimestamp(
-          scheduleType === "lookup" ? rightState.admitCardLookupScheduleEndAt : rightState.applicantScheduleEndAt,
-          { inclusiveEndMinute: true },
-        );
-        return rightTimestamp - leftTimestamp;
-      });
-
-    return afterEndStates[0] || configuredStates[0];
+  function getApplicantAggregateScheduleState(schedules = [], scheduleType = 'submission', referenceDate = new Date()) {
+    return applicantFormConfig.getApplicantAggregateScheduleState(schedules, scheduleType, referenceDate);
   }
 
   function buildApplicantScheduleRangeLabel(scheduleState = {}, scheduleType = "submission") {
@@ -1595,12 +1548,15 @@ function createApplicantService({
         setting_key AS settingKey,
         setting_value AS settingValue
       FROM system_set
-      WHERE setting_key IN ('applicantNoticeHtml')
+      WHERE setting_key IN ('applicantNoticeHtml', 'applicantNoticeHtmlEn')
     `);
     const rowsByKey = new Map(rows.map((row) => [String(row.settingKey || "").trim(), String(row.settingValue || "")]));
     const storedHtml = String(rowsByKey.get("applicantNoticeHtml") || "");
 
-    return storedHtml.trim() ? storedHtml : String(getDefaultApplicantNoticeHtml() || "").trim();
+    return {
+      noticeHtml: storedHtml.trim() ? storedHtml : String(getDefaultApplicantNoticeHtml() || "").trim(),
+      noticeHtmlEn: String(rowsByKey.get("applicantNoticeHtmlEn") || ""),
+    };
   }
 
   async function updateApplicantSettings(payload = {}) {
@@ -1628,15 +1584,18 @@ function createApplicantService({
     return getApplicantSettings();
   }
 
-  async function getApplicantFormFields({ activeOnly = false, formScope = null } = {}) {
+  async function getApplicantFormFields({ activeOnly = false, formScope = null, templateId = null } = {}) {
     const rows = await query(
       `
         SELECT
           id,
           field_key AS fieldKey,
           form_scope AS formScope,
+          COALESCE(template_id, (SELECT id FROM app_form_template t WHERE t.form_scope = app_form.form_scope AND t.is_default = 1)) AS templateId,
           question_text AS questionText,
           question_description AS questionDescription,
+          question_text_en AS questionTextEn,
+          question_description_en AS questionDescriptionEn,
           input_type AS inputType,
           system_field_key AS systemFieldKey,
           options_json AS optionsJson,
@@ -1651,7 +1610,7 @@ function createApplicantService({
       `,
     );
 
-    return rows.map(normalizeApplicantFormFieldRecord).filter(field => !formScope || field.formScope === formScope);
+    return rows.map(normalizeApplicantFormFieldRecord).filter(field => (!formScope || field.formScope === formScope) && (templateId == null || field.templateId === Number(templateId)));
   }
 
   async function getApplicantFormFieldById(fieldId, options = {}) {
@@ -1667,8 +1626,11 @@ function createApplicantService({
           id,
           field_key AS fieldKey,
           form_scope AS formScope,
+          COALESCE(template_id, (SELECT id FROM app_form_template t WHERE t.form_scope = app_form.form_scope AND t.is_default = 1)) AS templateId,
           question_text AS questionText,
           question_description AS questionDescription,
+          question_text_en AS questionTextEn,
+          question_description_en AS questionDescriptionEn,
           input_type AS inputType,
           system_field_key AS systemFieldKey,
           options_json AS optionsJson,
@@ -1702,12 +1664,15 @@ function createApplicantService({
           track_name AS trackName,
           admission_code AS admissionCode,
           admission_name AS admissionName,
+          admission_name_en AS admissionNameEn,
           series_code AS seriesCode,
           series_name AS seriesName,
           unit_code AS unitCode,
           unit_name AS unitName,
+          unit_name_en AS unitNameEn,
           major_code AS majorCode,
           major_name AS majorName,
+          major_name_en AS majorNameEn,
           sort_order AS sortOrder,
           COALESCE(DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
           COALESCE(DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), '') AS updatedAt
@@ -1725,13 +1690,21 @@ function createApplicantService({
       `
         SELECT
           COALESCE(schedule.id, 0) AS id,
+          COALESCE(schedule.application_template_id, (SELECT id FROM app_form_template WHERE form_scope = 'application' AND is_default = 1)) AS applicationTemplateId,
+          COALESCE(schedule.document_template_id, (SELECT id FROM app_form_template WHERE form_scope = 'documents' AND is_default = 1)) AS documentTemplateId,
           grouped_units.track_name AS trackName,
           grouped_units.admission_code AS admissionCode,
           grouped_units.admission_name AS admissionName,
+          COALESCE(schedule.applicant_schedule_enabled, 1) AS applicantScheduleEnabled,
           COALESCE(DATE_FORMAT(schedule.applicant_schedule_start_at, '%Y-%m-%dT%H:%i'), '') AS applicantScheduleStartAt,
           COALESCE(DATE_FORMAT(schedule.applicant_schedule_end_at, '%Y-%m-%dT%H:%i'), '') AS applicantScheduleEndAt,
+          COALESCE(schedule.document_submission_schedule_enabled, 1) AS documentSubmissionScheduleEnabled,
+          COALESCE(schedule.document_review_schedule_enabled, 1) AS documentReviewScheduleEnabled,
           COALESCE(DATE_FORMAT(schedule.document_submission_schedule_start_at, '%Y-%m-%dT%H:%i'), '') AS documentSubmissionScheduleStartAt,
+          COALESCE(DATE_FORMAT(schedule.document_review_schedule_start_at, '%Y-%m-%dT%H:%i'), '') AS documentReviewScheduleStartAt,
           COALESCE(DATE_FORMAT(schedule.document_submission_schedule_end_at, '%Y-%m-%dT%H:%i'), '') AS documentSubmissionScheduleEndAt,
+          COALESCE(DATE_FORMAT(schedule.document_review_schedule_end_at, '%Y-%m-%dT%H:%i'), '') AS documentReviewScheduleEndAt,
+          COALESCE(schedule.admit_card_lookup_schedule_enabled, 1) AS admitCardLookupScheduleEnabled,
           COALESCE(DATE_FORMAT(schedule.admit_card_lookup_schedule_start_at, '%Y-%m-%dT%H:%i'), '') AS admitCardLookupScheduleStartAt,
           COALESCE(DATE_FORMAT(schedule.admit_card_lookup_schedule_end_at, '%Y-%m-%dT%H:%i'), '') AS admitCardLookupScheduleEndAt,
           COALESCE(DATE_FORMAT(schedule.created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
@@ -1776,12 +1749,15 @@ function createApplicantService({
           track_name AS trackName,
           admission_code AS admissionCode,
           admission_name AS admissionName,
+          admission_name_en AS admissionNameEn,
           series_code AS seriesCode,
           series_name AS seriesName,
           unit_code AS unitCode,
           unit_name AS unitName,
+          unit_name_en AS unitNameEn,
           major_code AS majorCode,
           major_name AS majorName,
+          major_name_en AS majorNameEn,
           sort_order AS sortOrder,
           COALESCE(DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
           COALESCE(DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), '') AS updatedAt
@@ -1800,8 +1776,15 @@ function createApplicantService({
     return unit.id ? unit : null;
   }
 
+  async function resolveScheduleTemplates(schedule) {
+    schedule.applicationTemplateId = await formTemplates.resolve('application', schedule.applicationTemplateId);
+    schedule.documentTemplateId = await formTemplates.resolve('documents', schedule.documentTemplateId);
+  }
+
   async function saveApplicantSchedule(payload = {}) {
-    const normalizedPayload = normalizeApplicantSchedulePayload(payload);
+    const existingSchedule = findApplicantScheduleRecord(await getApplicantSchedules(), payload) || {};
+    const normalizedPayload = normalizeApplicantSchedulePayload(payload, existingSchedule);
+    await resolveScheduleTemplates(normalizedPayload);
     const matchingUnits = await query(
       `
         SELECT id
@@ -1821,33 +1804,57 @@ function createApplicantService({
     await query(
       `
         INSERT INTO app_schedule (
+          application_template_id,
+          document_template_id,
           track_name,
           admission_code,
           admission_name,
+          applicant_schedule_enabled,
           applicant_schedule_start_at,
           applicant_schedule_end_at,
+          document_submission_schedule_enabled,
+          document_review_schedule_enabled,
           document_submission_schedule_start_at,
+          document_review_schedule_start_at,
           document_submission_schedule_end_at,
+          document_review_schedule_end_at,
+          admit_card_lookup_schedule_enabled,
           admit_card_lookup_schedule_start_at,
           admit_card_lookup_schedule_end_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
+          application_template_id = VALUES(application_template_id),
+          document_template_id = VALUES(document_template_id),
+          applicant_schedule_enabled = VALUES(applicant_schedule_enabled),
           applicant_schedule_start_at = VALUES(applicant_schedule_start_at),
           applicant_schedule_end_at = VALUES(applicant_schedule_end_at),
+          document_submission_schedule_enabled = VALUES(document_submission_schedule_enabled),
+          document_review_schedule_enabled = VALUES(document_review_schedule_enabled),
           document_submission_schedule_start_at = VALUES(document_submission_schedule_start_at),
+          document_review_schedule_start_at = VALUES(document_review_schedule_start_at),
           document_submission_schedule_end_at = VALUES(document_submission_schedule_end_at),
+          document_review_schedule_end_at = VALUES(document_review_schedule_end_at),
+          admit_card_lookup_schedule_enabled = VALUES(admit_card_lookup_schedule_enabled),
           admit_card_lookup_schedule_start_at = VALUES(admit_card_lookup_schedule_start_at),
           admit_card_lookup_schedule_end_at = VALUES(admit_card_lookup_schedule_end_at)
       `,
       [
+        normalizedPayload.applicationTemplateId,
+        normalizedPayload.documentTemplateId,
         normalizedPayload.trackName,
         normalizedPayload.admissionCode,
         normalizedPayload.admissionName,
+        normalizedPayload.applicantScheduleEnabled ? 1 : 0,
         normalizedPayload.applicantScheduleStartAt || null,
         normalizedPayload.applicantScheduleEndAt || null,
+        normalizedPayload.documentSubmissionScheduleEnabled ? 1 : 0,
+        normalizedPayload.documentReviewScheduleEnabled ? 1 : 0,
         normalizedPayload.documentSubmissionScheduleStartAt || null,
+        normalizedPayload.documentReviewScheduleStartAt || null,
         normalizedPayload.documentSubmissionScheduleEndAt || null,
+        normalizedPayload.documentReviewScheduleEndAt || null,
+        normalizedPayload.admitCardLookupScheduleEnabled ? 1 : 0,
         normalizedPayload.admitCardLookupScheduleStartAt || null,
         normalizedPayload.admitCardLookupScheduleEndAt || null,
       ],
@@ -1870,8 +1877,9 @@ function createApplicantService({
     const normalizedSchedules = [];
     const handledScheduleKeys = new Set();
 
+    const existingSchedules = await getApplicantSchedules();
     schedulePayloads.forEach((schedulePayload) => {
-      const normalizedSchedule = normalizeApplicantSchedulePayload(schedulePayload);
+      const normalizedSchedule = normalizeApplicantSchedulePayload(schedulePayload, findApplicantScheduleRecord(existingSchedules, schedulePayload) || {});
       const scheduleKey = buildApplicantAdmissionScheduleKey(
         normalizedSchedule.trackName,
         normalizedSchedule.admissionCode,
@@ -1886,6 +1894,7 @@ function createApplicantService({
       normalizedSchedules.push(normalizedSchedule);
     });
 
+    for (const schedule of normalizedSchedules) await resolveScheduleTemplates(schedule);
     const connection = await getPool().getConnection();
 
     try {
@@ -1919,33 +1928,57 @@ function createApplicantService({
         await connection.query(
           `
             INSERT INTO app_schedule (
+              application_template_id,
+              document_template_id,
               track_name,
               admission_code,
               admission_name,
+              applicant_schedule_enabled,
               applicant_schedule_start_at,
               applicant_schedule_end_at,
+              document_submission_schedule_enabled,
+              document_review_schedule_enabled,
               document_submission_schedule_start_at,
+              document_review_schedule_start_at,
               document_submission_schedule_end_at,
+              document_review_schedule_end_at,
+              admit_card_lookup_schedule_enabled,
               admit_card_lookup_schedule_start_at,
               admit_card_lookup_schedule_end_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
+              application_template_id = VALUES(application_template_id),
+              document_template_id = VALUES(document_template_id),
+              applicant_schedule_enabled = VALUES(applicant_schedule_enabled),
               applicant_schedule_start_at = VALUES(applicant_schedule_start_at),
               applicant_schedule_end_at = VALUES(applicant_schedule_end_at),
+              document_submission_schedule_enabled = VALUES(document_submission_schedule_enabled),
+              document_review_schedule_enabled = VALUES(document_review_schedule_enabled),
               document_submission_schedule_start_at = VALUES(document_submission_schedule_start_at),
+              document_review_schedule_start_at = VALUES(document_review_schedule_start_at),
               document_submission_schedule_end_at = VALUES(document_submission_schedule_end_at),
+              document_review_schedule_end_at = VALUES(document_review_schedule_end_at),
+              admit_card_lookup_schedule_enabled = VALUES(admit_card_lookup_schedule_enabled),
               admit_card_lookup_schedule_start_at = VALUES(admit_card_lookup_schedule_start_at),
               admit_card_lookup_schedule_end_at = VALUES(admit_card_lookup_schedule_end_at)
           `,
           [
+            normalizedSchedule.applicationTemplateId,
+            normalizedSchedule.documentTemplateId,
             normalizedSchedule.trackName,
             normalizedSchedule.admissionCode,
             normalizedSchedule.admissionName,
+            normalizedSchedule.applicantScheduleEnabled ? 1 : 0,
             normalizedSchedule.applicantScheduleStartAt || null,
             normalizedSchedule.applicantScheduleEndAt || null,
+            normalizedSchedule.documentSubmissionScheduleEnabled ? 1 : 0,
+            normalizedSchedule.documentReviewScheduleEnabled ? 1 : 0,
             normalizedSchedule.documentSubmissionScheduleStartAt || null,
+            normalizedSchedule.documentReviewScheduleStartAt || null,
             normalizedSchedule.documentSubmissionScheduleEndAt || null,
+            normalizedSchedule.documentReviewScheduleEndAt || null,
+            normalizedSchedule.admitCardLookupScheduleEnabled ? 1 : 0,
             normalizedSchedule.admitCardLookupScheduleStartAt || null,
             normalizedSchedule.admitCardLookupScheduleEndAt || null,
           ],
@@ -2020,7 +2053,7 @@ function createApplicantService({
     }
   }
 
-  async function validateUniqueApplicantSystemField(systemFieldKey = "", excludeId = 0) {
+  async function validateUniqueApplicantSystemField(systemFieldKey = "", excludeId = 0, templateId) {
     const normalizedSystemFieldKey = String(systemFieldKey || "").trim();
 
     if (!normalizedSystemFieldKey) {
@@ -2032,11 +2065,12 @@ function createApplicantService({
         SELECT id
         FROM app_form
         WHERE system_field_key = ?
+          AND COALESCE(template_id, (SELECT id FROM app_form_template WHERE form_scope = app_form.form_scope AND is_default = 1)) = ?
           AND active = 1
           AND id <> ?
         LIMIT 1
       `,
-      [normalizedSystemFieldKey, Number(excludeId || 0)],
+      [normalizedSystemFieldKey, templateId, Number(excludeId || 0)],
     );
 
     if (rows.length > 0) {
@@ -2062,6 +2096,12 @@ function createApplicantService({
         errorCode: "APPLICANT_FIELD_DESCRIPTION_INVALID",
       },
     );
+    const questionTextEn = normalizeApplicantText(payload.questionTextEn ?? existingField.questionTextEn, "질문 제목 (영어)", {
+      maxLength: 255, required: false, errorCode: "APPLICANT_FIELD_QUESTION_INVALID",
+    });
+    const questionDescriptionEn = normalizeApplicantText(payload.questionDescriptionEn ?? existingField.questionDescriptionEn, "질문 설명 (영어)", {
+      maxLength: 500, required: false, errorCode: "APPLICANT_FIELD_DESCRIPTION_INVALID",
+    });
     const inputType = String(payload.inputType ?? existingField.inputType ?? "text").trim();
     const systemFieldKey = String(payload.systemFieldKey ?? existingField.systemFieldKey ?? "").trim();
     if (formScope === 'documents' && (systemFieldKey || ['photo', 'birthdate'].includes(inputType))) {
@@ -2069,9 +2109,10 @@ function createApplicantService({
     }
     const required = payload.required ?? existingField.required ?? false;
     const options = normalizeApplicantOptionValues(payload, existingField);
+    const optionsEn = applicantFormConfig.normalizeChoiceTranslations(options, payload.optionsEn ?? existingField.optionsEn);
     const customOptionLabel = normalizeApplicantCustomOptionLabel(payload, existingField);
     const allowCustomOption = normalizeApplicantAllowCustomOption(payload, existingField) || Boolean(customOptionLabel);
-    const fieldKey = String(existingField.fieldKey || payload.fieldKey || buildApplicantFieldKey(questionText)).trim();
+    const fieldKey = String(existingField.fieldKey || payload.fieldKey || `${buildApplicantFieldKey(questionText).slice(0, 45)}-${randomUUID().slice(0, 8)}`).trim();
     let fileSettings = { fileNamePattern: "", allowedExtensions: [] };
     if (inputType === "file") {
       try { fileSettings = normalizeFileUploadSettings({ ...existingField, ...payload }); }
@@ -2085,17 +2126,22 @@ function createApplicantService({
       throw createHttpError(400, '생년월일은 회원가입에서 받습니다. 다른 날짜 질문은 날짜 유형을 사용하세요.', 'APPLICANT_MEMBER_FIELD_DUPLICATE');
     }
 
-    if (inputType === "select" && options.length === 0 && allowCustomOption !== true) {
+    if (applicantFormConfig.isChoiceInputType(inputType) && options.length === 0 && (inputType === 'multiselect' || allowCustomOption !== true)) {
       throw createHttpError(400, "선택지 항목은 최소 1개 이상의 선택지를 입력해야 합니다.", "APPLICANT_FIELD_OPTIONS_REQUIRED");
     }
+    if (options.length > 100 || options.some(option => option.length > 200)) {
+      throw createHttpError(400, "선택지는 100개 이하, 항목당 200자 이하로 입력하세요.", "APPLICANT_FIELD_OPTIONS_INVALID");
+    }
 
-    if (inputType === "select" && customOptionLabel && !options.includes(customOptionLabel)) {
+    if (applicantFormConfig.isChoiceInputType(inputType) && customOptionLabel && !options.includes(customOptionLabel)) {
       throw createHttpError(400, "직접 입력 항목은 선택지 목록에 등록된 항목이어야 합니다.", "APPLICANT_FIELD_CUSTOM_OPTION_INVALID");
     }
 
-    if (inputType !== "select" && (options.length > 0 || allowCustomOption === true || customOptionLabel)) {
+    if (!applicantFormConfig.isChoiceInputType(inputType) && (options.length > 0 || allowCustomOption === true || customOptionLabel)) {
       throw createHttpError(400, "선택지 항목에서만 옵션을 입력할 수 있습니다.", "APPLICANT_FIELD_OPTIONS_INVALID");
     }
+
+    if (inputType === "multiselect" && systemFieldKey) throw createHttpError(400, "복수 선택은 일반 항목으로 등록하세요.", "APPLICANT_FIELD_MAPPING_INVALID");
 
     if (inputType === "photo" && systemFieldKey && systemFieldKey !== "photo") {
       throw createHttpError(400, "사진 업로드 항목은 수험생 사진 시스템 항목에만 연결할 수 있습니다.", "APPLICANT_FIELD_PHOTO_MAPPING_INVALID");
@@ -2114,10 +2160,13 @@ function createApplicantService({
       formScope,
       questionText,
       questionDescription,
+      questionTextEn,
+      questionDescriptionEn,
       inputType,
       ...fileSettings,
       systemFieldKey,
       options,
+      optionsEn,
       allowCustomOption,
       customOptionLabel,
       required: required === true || required === "true" || Number(required) === 1,
@@ -2126,19 +2175,23 @@ function createApplicantService({
 
   async function createApplicantFormField(payload = {}) {
     const normalizedPayload = normalizeApplicantFormFieldPayload(payload);
-    const existingFields = await getApplicantFormFields({ formScope: normalizedPayload.formScope });
+    normalizedPayload.templateId = await formTemplates.resolve(normalizedPayload.formScope, payload.templateId);
+    const existingFields = await getApplicantFormFields({ formScope: normalizedPayload.formScope, templateId: normalizedPayload.templateId });
     const nextSortOrder = existingFields.length === 0 ? 1 : Math.max(...existingFields.map((field) => field.sortOrder || 0)) + 1;
 
     await validateUniqueApplicantFieldKey(normalizedPayload.fieldKey);
-    await validateUniqueApplicantSystemField(normalizedPayload.systemFieldKey);
+    await validateUniqueApplicantSystemField(normalizedPayload.systemFieldKey, 0, normalizedPayload.templateId);
 
     await query(
       `
         INSERT INTO app_form (
+          template_id,
           form_scope,
           field_key,
           question_text,
           question_description,
+          question_text_en,
+          question_description_en,
           input_type,
           system_field_key,
           options_json,
@@ -2146,17 +2199,21 @@ function createApplicantService({
           sort_order,
           active
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
       `,
       [
+        normalizedPayload.templateId,
         normalizedPayload.formScope,
         normalizedPayload.fieldKey,
         normalizedPayload.questionText,
         normalizedPayload.questionDescription,
+        normalizedPayload.questionTextEn,
+        normalizedPayload.questionDescriptionEn,
         normalizedPayload.inputType,
         normalizedPayload.systemFieldKey,
         JSON.stringify({
           items: normalizedPayload.options,
+          optionsEn: normalizedPayload.optionsEn,
           allowCustomOption: normalizedPayload.allowCustomOption === true,
           customOptionLabel: normalizedPayload.customOptionLabel,
           fileNamePattern: normalizedPayload.fileNamePattern,
@@ -2179,7 +2236,7 @@ function createApplicantService({
     }
 
     await validateUniqueApplicantFieldKey(normalizedPayload.fieldKey, existingField.id);
-    await validateUniqueApplicantSystemField(normalizedPayload.systemFieldKey, existingField.id);
+    await validateUniqueApplicantSystemField(normalizedPayload.systemFieldKey, existingField.id, existingField.templateId);
 
     await query(
       `
@@ -2188,6 +2245,8 @@ function createApplicantService({
           field_key = ?,
           question_text = ?,
           question_description = ?,
+          question_text_en = ?,
+          question_description_en = ?,
           input_type = ?,
           system_field_key = ?,
           options_json = ?,
@@ -2198,10 +2257,13 @@ function createApplicantService({
         normalizedPayload.fieldKey,
         normalizedPayload.questionText,
         normalizedPayload.questionDescription,
+        normalizedPayload.questionTextEn,
+        normalizedPayload.questionDescriptionEn,
         normalizedPayload.inputType,
         normalizedPayload.systemFieldKey,
         JSON.stringify({
           items: normalizedPayload.options,
+          optionsEn: normalizedPayload.optionsEn,
           allowCustomOption: normalizedPayload.allowCustomOption === true,
           customOptionLabel: normalizedPayload.customOptionLabel,
           fileNamePattern: normalizedPayload.fileNamePattern,
@@ -2230,7 +2292,7 @@ function createApplicantService({
 
     try {
       await connection.beginTransaction();
-      const fields = await getApplicantFormFields({ formScope: existingField.formScope });
+      const fields = await getApplicantFormFields({ formScope: existingField.formScope, templateId: existingField.templateId });
       await resequenceApplicantFormFields(connection, fields);
       await connection.commit();
     } catch (error) {
@@ -2252,7 +2314,7 @@ function createApplicantService({
         : moveOptions || {};
     const normalizedFieldId = Number(fieldId);
     const sourceField = await getApplicantFormFieldById(normalizedFieldId);
-    const fields = await getApplicantFormFields({ formScope: sourceField.formScope });
+    const fields = await getApplicantFormFields({ formScope: sourceField.formScope, templateId: sourceField.templateId });
     const fieldIndex = fields.findIndex((field) => field.id === normalizedFieldId);
 
     if (fieldIndex < 0) {
@@ -2330,26 +2392,32 @@ function createApplicantService({
           track_name,
           admission_code,
           admission_name,
+          admission_name_en,
           series_code,
           series_name,
           unit_code,
           unit_name,
+          unit_name_en,
           major_code,
           major_name,
+          major_name_en,
           sort_order
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         normalizedPayload.trackName,
         normalizedPayload.admissionCode,
         normalizedPayload.admissionName,
+        normalizedPayload.admissionNameEn,
         normalizedPayload.seriesCode,
         normalizedPayload.seriesName,
         normalizedPayload.unitCode,
         normalizedPayload.unitName,
+        normalizedPayload.unitNameEn,
         normalizedPayload.majorCode,
         normalizedPayload.majorName,
+        normalizedPayload.majorNameEn,
         nextSortOrder,
       ],
     );
@@ -2370,24 +2438,30 @@ function createApplicantService({
           track_name = ?,
           admission_code = ?,
           admission_name = ?,
+          admission_name_en = ?,
           series_code = ?,
           series_name = ?,
           unit_code = ?,
           unit_name = ?,
+          unit_name_en = ?,
           major_code = ?,
-          major_name = ?
+          major_name = ?,
+          major_name_en = ?
         WHERE id = ?
       `,
       [
         normalizedPayload.trackName,
         normalizedPayload.admissionCode,
         normalizedPayload.admissionName,
+        normalizedPayload.admissionNameEn,
         normalizedPayload.seriesCode,
         normalizedPayload.seriesName,
         normalizedPayload.unitCode,
         normalizedPayload.unitName,
+        normalizedPayload.unitNameEn,
         normalizedPayload.majorCode,
         normalizedPayload.majorName,
+        normalizedPayload.majorNameEn,
         existingUnit.id,
       ],
     );
@@ -2397,14 +2471,23 @@ function createApplicantService({
 
   async function deleteApplicantRecruitmentUnit(unitId) {
     const existingUnit = await getApplicantRecruitmentUnitById(unitId);
-
-    await query(`DELETE FROM app_unit WHERE id = ?`, [existingUnit.id]);
-
     const connection = await getPool().getConnection();
 
     try {
       await connection.beginTransaction();
-      const units = await getApplicantRecruitmentUnits();
+      await connection.query(`DELETE FROM app_unit WHERE id = ?`, [existingUnit.id]);
+      await connection.query(`
+        UPDATE app_schedule schedule
+        SET application_template_id = NULL, document_template_id = NULL
+        WHERE track_name = ? AND admission_code = ? AND admission_name = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM app_unit unit
+            WHERE unit.track_name = schedule.track_name
+              AND unit.admission_code = schedule.admission_code
+              AND unit.admission_name = schedule.admission_name
+          )
+      `, [existingUnit.trackName, existingUnit.admissionCode, existingUnit.admissionName]);
+      const units = await getApplicantRecruitmentUnits({ queryable: connection.query.bind(connection) });
       await resequenceApplicantRecruitmentUnits(connection, units);
       await connection.commit();
     } catch (error) {
@@ -2431,7 +2514,7 @@ function createApplicantService({
 
     const currentUnits = await getApplicantRecruitmentUnits();
     validateApplicantRecruitmentUnitImportRows(sourceRows, currentUnits);
-    const normalizedRows = sourceRows.map((row) => normalizeApplicantRecruitmentUnitPayload(row));
+    const normalizedRows = normalizeRecruitmentImportRows(sourceRows, currentUnits);
     const existingDataPolicy = normalizeApplicantImportExistingDataPolicy(payload.existingDataPolicy);
     const selectedRows = classifyApplicantRecruitmentUnitImportRows(normalizedRows, currentUnits)
       .filter((entry) => shouldProcessApplicantImportOperation(entry.operation, existingDataPolicy))
@@ -2460,35 +2543,44 @@ function createApplicantService({
               track_name,
               admission_code,
               admission_name,
+              admission_name_en,
               series_code,
               series_name,
               unit_code,
               unit_name,
+              unit_name_en,
               major_code,
               major_name,
+              major_name_en,
               sort_order
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
               track_name = VALUES(track_name),
               admission_name = VALUES(admission_name),
+              admission_name_en = VALUES(admission_name_en),
               series_code = VALUES(series_code),
               series_name = VALUES(series_name),
               unit_code = VALUES(unit_code),
               unit_name = VALUES(unit_name),
+              unit_name_en = VALUES(unit_name_en),
               major_code = VALUES(major_code),
-              major_name = VALUES(major_name)
+              major_name = VALUES(major_name),
+              major_name_en = VALUES(major_name_en)
           `,
           [
             row.trackName,
             row.admissionCode,
             row.admissionName,
+            row.admissionNameEn,
             row.seriesCode,
             row.seriesName,
             row.unitCode,
             row.unitName,
+            row.unitNameEn,
             row.majorCode,
             row.majorName,
+            row.majorNameEn,
             nextSortOrder,
           ],
         );
@@ -2581,6 +2673,7 @@ function createApplicantService({
       return {
         fieldKey,
         questionText: String(syntheticSelectionField?.questionText || row.questionText || fieldKey).trim(),
+        questionTextEn: String(row.questionTextEn || "").trim(),
         inputType,
         systemFieldKey: String(syntheticSelectionField?.systemFieldKey || row.systemFieldKey || "").trim(),
         value: {
@@ -2606,6 +2699,7 @@ function createApplicantService({
       return {
         fieldKey,
         questionText: String(syntheticSelectionField?.questionText || row.questionText || fieldKey).trim(),
+        questionTextEn: String(row.questionTextEn || "").trim(),
         inputType,
         systemFieldKey: String(syntheticSelectionField?.systemFieldKey || row.systemFieldKey || "").trim(),
         value: {
@@ -2626,9 +2720,10 @@ function createApplicantService({
     return {
       fieldKey,
       questionText: String(syntheticSelectionField?.questionText || row.questionText || fieldKey).trim(),
+      questionTextEn: String(row.questionTextEn || "").trim(),
       inputType: syntheticSelectionField ? "text" : inputType,
       systemFieldKey: String(syntheticSelectionField?.systemFieldKey || row.systemFieldKey || "").trim(),
-      value: String(row.answerData ?? "").trim(),
+      value: inputType === "multiselect" ? applicantFormConfig.parseMultiSelectValue(row.answerData) : String(row.answerData ?? "").trim(),
     };
   }
 
@@ -2645,6 +2740,7 @@ function createApplicantService({
           return {
             fieldKey: String(answerItem.fieldKey || "").trim(),
             questionText: String(answerItem.questionText || answerItem.fieldKey || "").trim(),
+            questionTextEn: String(answerItem.questionTextEn || "").trim(),
             inputType: "photo",
             systemFieldKey: String(answerItem.systemFieldKey || "").trim(),
             value: {
@@ -2661,6 +2757,7 @@ function createApplicantService({
           return {
             fieldKey: String(answerItem.fieldKey || "").trim(),
             questionText: String(answerItem.questionText || answerItem.fieldKey || "").trim(),
+            questionTextEn: String(answerItem.questionTextEn || "").trim(),
             inputType: "file",
             systemFieldKey: String(answerItem.systemFieldKey || "").trim(),
             value: {
@@ -2674,9 +2771,10 @@ function createApplicantService({
         return {
           fieldKey: String(answerItem.fieldKey || "").trim(),
           questionText: String(answerItem.questionText || answerItem.fieldKey || "").trim(),
+          questionTextEn: String(answerItem.questionTextEn || "").trim(),
           inputType: String(answerItem.inputType || "text").trim(),
           systemFieldKey: String(answerItem.systemFieldKey || "").trim(),
-          value: String(answerItem.value ?? "").trim(),
+          value: answerItem.inputType === "multiselect" ? applicantFormConfig.parseMultiSelectValue(answerItem.value) : String(answerItem.value ?? "").trim(),
         };
       })
       .filter((answerItem) => answerItem?.fieldKey);
@@ -2804,6 +2902,7 @@ function createApplicantService({
           s.field_key AS fieldKey,
           s.answer_data AS answerData,
           COALESCE(ff.question_text, s.field_key) AS questionText,
+          COALESCE(ff.question_text_en, '') AS questionTextEn,
           COALESCE(ff.input_type, 'text') AS inputType,
           COALESCE(ff.system_field_key, '') AS systemFieldKey,
           COALESCE(meta.examinee_no, '') AS examineeNo,
@@ -2852,6 +2951,7 @@ function createApplicantService({
           s.field_key AS fieldKey,
           s.answer_data AS answerData,
           COALESCE(ff.question_text, s.field_key) AS questionText,
+          COALESCE(ff.question_text_en, '') AS questionTextEn,
           COALESCE(ff.input_type, 'text') AS inputType,
           COALESCE(ff.system_field_key, '') AS systemFieldKey,
           COALESCE(meta.examinee_no, '') AS examineeNo,
@@ -2994,6 +3094,7 @@ function createApplicantService({
           s.field_key AS fieldKey,
           s.answer_data AS answerData,
           COALESCE(ff.question_text, s.field_key) AS questionText,
+          COALESCE(ff.question_text_en, '') AS questionTextEn,
           COALESCE(ff.input_type, 'text') AS inputType,
           COALESCE(ff.system_field_key, '') AS systemFieldKey,
           COALESCE(meta.examinee_no, '') AS examineeNo,
@@ -3303,6 +3404,11 @@ function createApplicantService({
       });
     }
 
+    if (field.inputType === "multiselect") {
+      try { return applicantFormConfig.validateMultiSelectAnswer(field, rawValue, field.questionText); }
+      catch (error) { throw createHttpError(400, error.message, "APPLICANT_SELECT_VALUE_INVALID"); }
+    }
+
     if (field.inputType === "select") {
       const normalizedValue = normalizeApplicantText(rawValue, field.questionText, {
         required: field.required,
@@ -3370,6 +3476,7 @@ function createApplicantService({
         answerItems.push({
           fieldKey: field.fieldKey,
           questionText: field.questionText,
+          questionTextEn: field.questionTextEn || "",
           inputType: field.inputType,
           systemFieldKey: field.systemFieldKey,
           value: {
@@ -3400,6 +3507,7 @@ function createApplicantService({
         answerItems.push({
           fieldKey: field.fieldKey,
           questionText: field.questionText,
+          questionTextEn: field.questionTextEn || "",
           inputType: field.inputType,
           systemFieldKey: field.systemFieldKey,
           value: {
@@ -3417,6 +3525,7 @@ function createApplicantService({
           fileUploads.push({
             fieldKey: field.fieldKey,
             questionText: field.questionText,
+            questionTextEn: field.questionTextEn || "",
             fileNamePattern: field.fileNamePattern,
             allowedExtensions: field.allowedExtensions,
             ...normalizedFileValue,
@@ -3430,13 +3539,14 @@ function createApplicantService({
       answerItems.push({
         fieldKey: field.fieldKey,
         questionText: field.questionText,
+        questionTextEn: field.questionTextEn || "",
         inputType: field.inputType,
           systemFieldKey: field.systemFieldKey,
           value: normalizedValue,
       });
       answerRows.push({
         fieldKey: field.fieldKey,
-        answerData: String(normalizedValue ?? "").trim(),
+        answerData: field.inputType === "multiselect" ? JSON.stringify(normalizedValue) : String(normalizedValue ?? "").trim(),
       });
     });
 
@@ -3741,6 +3851,21 @@ function createApplicantService({
 
   async function prepareApplicantSubmissionExamNo(connection, submission = {}, settings = {}, options = {}) {
     const applicationRecord = buildApplicantSystemRecord(submission);
+    if (!submission.examineeNo && settings.components?.includes('nationalityCode') && !applicationRecord.nationality && submission.memberId) {
+      const [rows] = await connection.query(`
+        SELECT member.profile_json AS profileJson, settings.setting_value AS signupSettingsJson
+        FROM applicant_members member
+        LEFT JOIN system_set settings ON settings.setting_key = 'applicantSignupSettings'
+        WHERE member.id = ?
+      `, [submission.memberId]);
+      const profile = JSON.parse(rows[0]?.profileJson || '{}');
+      const signupSettings = JSON.parse(rows[0]?.signupSettingsJson || '{}');
+      const questions = signupSettings.questions || signupSettings.extraFields || [];
+      const values = questions.filter(question => question.inputType === 'nationality').map(question => profile[question.key]);
+      // Older signup settings may have stored the standard nationality key directly.
+      values.push(profile.nationality);
+      applicationRecord.nationality = values.map(value => typeof value === 'string' ? findApplicantNationalityOption(value) : null).find(Boolean)?.code || '';
+    }
     const recruitmentUnits = await getApplicantRecruitmentUnits({
       queryable: connection.query.bind(connection),
     });
@@ -4053,10 +4178,15 @@ function createApplicantService({
     }
     const applicantName = normalizeApplicantText(accessRecord.name, "이름", { maxLength: 100 });
     const email = normalizeApplicantEmail(accessRecord.email);
-    const [formFields, recruitmentUnits] = await Promise.all([
-      getApplicantFormFields({ activeOnly: true, formScope: 'application' }),
-      getApplicantRecruitmentUnits(),
-    ]);
+    const recruitmentUnits = await getApplicantRecruitmentUnits();
+    const normalizedRecruitmentSelection = normalizeApplicantRecruitmentSelection(payload.selectionAnswers, recruitmentUnits);
+    const schedule = findApplicantScheduleRecord(await getApplicantSchedules(), normalizedRecruitmentSelection.selection);
+    const templateId = await formTemplates.resolve('application', schedule?.applicationTemplateId);
+    const formFields = await getApplicantFormFields({ activeOnly: true, formScope: 'application', templateId });
+    const allowedFieldKeys = new Set(formFields.map(field => field.fieldKey));
+    if (Object.keys(payload.answers || {}).some(key => !allowedFieldKeys.has(key))) {
+      throw createHttpError(400, '선택한 전형의 원서접수 질문만 저장할 수 있습니다.', 'APPLICATION_ANSWER_SCOPE_INVALID');
+    }
 
     if (formFields.length === 0) {
       throw createHttpError(409, "관리자가 접수 양식을 아직 설정하지 않았습니다.", "APPLICANT_FORM_NOT_CONFIGURED");
@@ -4076,7 +4206,6 @@ function createApplicantService({
       existingSubmission = latestSubmission.id ? await getApplicantSubmissionById(latestSubmission.id, { includeInternal: true }) : null;
     }
 
-    const normalizedRecruitmentSelection = normalizeApplicantRecruitmentSelection(payload.selectionAnswers, recruitmentUnits);
     await assertApplicantSubmissionEntryIsOpen(normalizedRecruitmentSelection.selection);
     const submissionArtifacts = buildApplicantSubmissionArtifacts(
       formFields,
@@ -4344,21 +4473,51 @@ function createApplicantService({
       memberId: member.id, name: member.name, email: member.email, birthDate: member.birthDate || member.profile?.birth || '',
       submissionId: submission?.id || 0,
     });
-    const schedule = submission ? findApplicantScheduleRecord(await getApplicantSchedules(), buildApplicantSystemRecord(submission)) : null;
+    const schedules = await getApplicantSchedules();
+    const schedule = submission ? findApplicantScheduleRecord(schedules, buildApplicantSystemRecord(submission)) : null;
+    const visible = type => submission ? applicantFormConfig.isApplicantScheduleEnabled(schedule, type)
+      : !schedules.length || schedules.some(item => applicantFormConfig.isApplicantScheduleEnabled(item, type));
     const window = (start, end) => ({
       startAt: Number.isFinite(getApplicantScheduleTimestamp(start)) ? getApplicantScheduleTimestamp(start) : null,
       endAt: Number.isFinite(getApplicantScheduleTimestamp(end, { inclusiveEndMinute: true })) ? getApplicantScheduleTimestamp(end, { inclusiveEndMinute: true }) : null,
     });
-    return { accessToken, submission, serverTime: Date.now(), menuWindows: {
+    return { accessToken, submission, serverTime: Date.now(), menuVisibility: {
+      apply: visible('submission'), documents: visible('documents'), 'document-status': visible('document-status'), ticket: visible('lookup'),
+    }, menuWindows: {
       ticket: window(schedule?.admitCardLookupScheduleStartAt, schedule?.admitCardLookupScheduleEndAt),
       documents: window(schedule?.documentSubmissionScheduleStartAt, schedule?.documentSubmissionScheduleEndAt),
+      "document-status": window(schedule?.documentReviewScheduleStartAt, schedule?.documentReviewScheduleEndAt),
     } };
+  }
+
+  async function getMemberDocumentStatus(member) {
+    const { submission } = await getMemberApplicationContext(member);
+    if (!submission?.id) throw createHttpError(409, '접수 완료 후 이용할 수 있습니다.');
+    const schedule = findApplicantScheduleRecord(await getApplicantSchedules(), buildApplicantSystemRecord(submission));
+    if (!applicantFormConfig.getApplicantDocumentReviewScheduleState(schedule).isOpen) {
+      throw createHttpError(409, '현재는 서류 제출 확인 기간이 아닙니다.', 'DOCUMENT_REVIEW_SCHEDULE_CLOSED');
+    }
+    const result = await documentStatusService.detail(submission.id);
+    return { documents: result.documents };
+  }
+
+  async function getDocumentTemplateContext() {
+    const [schedules, templates] = await Promise.all([getApplicantSchedules(), formTemplates.list()]);
+    return { schedules, defaultId: templates.find(item => item.formScope === 'documents' && item.isDefault)?.id };
+  }
+
+  async function getDocumentFieldsForSubmission(submission, configuredFields = null, context = null) {
+    context ||= await getDocumentTemplateContext();
+    const schedule = findApplicantScheduleRecord(context.schedules, buildApplicantSystemRecord(submission));
+    const templateId = schedule?.documentTemplateId || context.defaultId;
+    const fields = configuredFields || await getApplicantFormFields({ activeOnly: true, formScope: 'documents', templateId });
+    return fields.filter(field => field.templateId === templateId);
   }
 
   async function saveMemberDocuments(member, payload = {}) {
     const { submission } = await getMemberApplicationContext(member);
     if (!submission?.id) throw createHttpError(409, "접수를 완료한 후 서류를 제출하세요.");
-    const fields = await getApplicantFormFields({ activeOnly: true, formScope: 'documents' });
+    const fields = await getDocumentFieldsForSubmission(submission);
     const selection = buildApplicantSystemRecord(submission);
     const schedule = findApplicantScheduleRecord(await getApplicantSchedules(), selection);
     const scheduleState = getApplicantDocumentSubmissionScheduleState(schedule);
@@ -4391,7 +4550,11 @@ function createApplicantService({
       const [answerRows] = await connection.query("SELECT applicant_name, email, password_hash, status, created_at FROM app_subm WHERE id = ? LIMIT 1", [submission.id]);
       const original = answerRows[0];
       if (!original) throw createHttpError(404, "접수 정보를 찾을 수 없습니다.");
-      for (const record of records) await persistApplicantFile(record);
+      for (const record of records) {
+        await persistApplicantFile(record);
+        // A replacement upload supersedes the review of the previous file.
+        await connection.query('DELETE ds FROM app_document_status ds INNER JOIN app_form f ON f.id = ds.field_id WHERE ds.submission_id = ? AND f.field_key = ?', [submission.id, record.fieldKey]);
+      }
       for (const answer of artifacts.answerRows) {
         await connection.query("INSERT INTO app_subm (id,applicant_name,email,password_hash,status,field_key,answer_data,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,NOW()) ON DUPLICATE KEY UPDATE answer_data = VALUES(answer_data), updated_at = NOW()", [submission.id, original.applicant_name, original.email, original.password_hash, original.status, answer.fieldKey, storedFiles.get(answer.fieldKey) ?? answer.answerData, original.created_at]);
       }
@@ -4414,9 +4577,10 @@ function createApplicantService({
     return {
       fields: fields.filter(field => field.formScope === 'application'),
       documentFields: fields.filter(field => field.formScope === 'documents'),
+      formTemplates: await formTemplates.list(),
       settings,
       systemSettings,
-      noticeHtml,
+      ...noticeHtml,
       recruitmentUnits,
       schedules,
     };
@@ -4462,6 +4626,8 @@ function createApplicantService({
     buildApplicantAdmitCardRecordFromSubmission,
     getApplicantSubmissionsByIds,
     getMemberApplicationContext,
+    getMemberDocumentStatus,
+    documentStatusService,
     saveMemberDocuments,
 
     buildApplicantAdmitCardPdfForAccessToken,
@@ -4478,6 +4644,9 @@ function createApplicantService({
     deleteApplicantRecruitmentUnit,
     deleteApplicantFormField,
 
+    getApplicantFormTemplates: formTemplates.list,
+    saveApplicantFormTemplate: formTemplates.save,
+    deleteApplicantFormTemplate: formTemplates.remove,
     getApplicantFormFields,
     getApplicantPublicForm,
     getApplicantRecruitmentUnits,

@@ -46,6 +46,8 @@
 .common-login-stage .login-stage-brand-copy strong { font-size: 20px; }
 .common-login-stage .login-stage-form { width: 100%; }
 .common-login-stage .login-stage-form h3 { font-size: 24px; }
+.common-login-stage .login-field-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.common-login-stage .login-stage-form .login-field-heading h3 { margin: 0; text-align: right; }
 .common-login-stage .login-stage-description { font-size: 14px; }
 .common-login-stage :is(input, .primary-button, .ghost-button) { min-width: 0; min-height: 48px; font-size: 16px; }
 .common-login-stage .common-login-signup { display: flex; align-items: center; justify-content: center; text-decoration: none; }

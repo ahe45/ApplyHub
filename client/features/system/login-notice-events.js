@@ -46,14 +46,36 @@
       return state.currentView === "loginNoticeSettings";
     }
 
+    function activateNoticeCanvas(target) {
+      const canvas = target?.closest?.('[data-notice-canvas]');
+      const language = canvas?.dataset.noticeCanvas;
+      if (!language || language === state.noticeManagement.activeLanguage) return;
+      syncLoginNoticeEditorDraft();
+      clearLoginNoticeSelectedImage?.();
+      setNoticeManagementScope(state.noticeManagement.activeScope, language);
+      document.querySelectorAll('[data-notice-canvas]').forEach(element => {
+        element.classList.toggle('is-active', element === canvas);
+      });
+      const activeLabel = document.querySelector('[data-notice-active-label]');
+      if (activeLabel) activeLabel.textContent = `${language === 'en' ? '영어' : '한국어'} 서식 편집`;
+      setLoginNoticeTableInsertPanelVisibility(false);
+      setLoginNoticeCellSplitPanelVisibility(false);
+      updateLoginNoticeFormattingControls();
+    }
+
+    function handleFocusIn(event) {
+      if (isLoginNoticeViewActive()) activateNoticeCanvas(event.target);
+    }
+
     async function handleClick(event) {
       if (!isLoginNoticeViewActive()) {
         return false;
       }
 
+      activateNoticeCanvas(event.target);
       const noticeEditor = getLoginNoticeEditorElement?.();
-      const noticeEditorImage = event.target.closest("#loginNoticeEditor img");
-      const noticeEditorLink = event.target.closest("#loginNoticeEditor a[href]");
+      const noticeEditorImage = event.target.closest("[data-notice-editor-language] img");
+      const noticeEditorLink = event.target.closest("[data-notice-editor-language] a[href]");
       const noticeScopeTrigger = event.target.closest("[data-notice-scope]");
       const noticeCommandTrigger = event.target.closest(".login-notice-editor-shell button[data-notice-command]");
       const noticeActionTrigger = event.target.closest(".login-notice-editor-shell button[data-notice-action]");
@@ -84,6 +106,7 @@
       }
 
       if (noticeScopeTrigger) {
+        syncLoginNoticeEditorDraft();
         setNoticeManagementScope?.(noticeScopeTrigger.dataset.noticeScope);
         renderView?.();
         return true;
@@ -168,6 +191,7 @@
         return false;
       }
 
+      activateNoticeCanvas(event.target);
       const noticeToolbarTrigger = event.target.closest(
         ".login-notice-editor-shell button[data-notice-command], .login-notice-editor-shell button[data-notice-action], .login-notice-editor-shell button[data-notice-insert], .login-notice-editor-shell button[data-notice-table-action], .login-notice-editor-shell button[data-notice-open-image], .login-notice-editor-shell [data-template-cell-split-step], .login-notice-editor-shell [data-template-cell-split-toggle], .login-notice-editor-shell [data-template-cell-split-confirm], .login-notice-editor-shell button[data-editor-color-preset], .login-notice-editor-shell button[data-editor-color-apply], .login-notice-editor-shell button[data-editor-color-toggle], .login-notice-editor-shell button[data-editor-color-direct]",
       );
@@ -197,6 +221,7 @@
         return false;
       }
 
+      activateNoticeCanvas(event.target);
       const loginNoticeEditor = getLoginNoticeEditorElement?.();
       const loginNoticeTableInsertPanel = document.getElementById("loginNoticeTableInsertPanel");
       const loginNoticeCellSplitPanel = getLoginNoticeCellSplitPanelElement?.();
@@ -305,6 +330,7 @@
         return false;
       }
 
+      activateNoticeCanvas(event.target);
       const loginNoticeEditor = getLoginNoticeEditorElement?.();
 
       if (loginNoticeEditor && (event.target === loginNoticeEditor || loginNoticeEditor.contains(event.target))) {
@@ -331,11 +357,12 @@
         return false;
       }
 
-      const noticeEditor = getLoginNoticeEditorElement?.();
       const selection = window.getSelection();
       const anchorNode = selection?.anchorNode || null;
       const baseElement =
         anchorNode?.nodeType === Node.ELEMENT_NODE ? anchorNode : anchorNode?.parentElement instanceof Element ? anchorNode.parentElement : null;
+      activateNoticeCanvas(baseElement);
+      const noticeEditor = getLoginNoticeEditorElement?.();
 
       const selectionImage =
         (baseElement instanceof Element ? baseElement.closest("img") || baseElement.querySelector("img") : null) || null;
@@ -369,6 +396,7 @@
     }
 
     return Object.freeze({
+      handleFocusIn,
       handleChange,
       handleClick,
       handleInput,

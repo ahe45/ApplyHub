@@ -80,6 +80,7 @@ function createAuthRoutes(deps) {
       async ({ response }) =>
         deps.sendJson(response, 200, {
           html: await deps.getLoginNoticeHtml(),
+          htmlEn: await deps.getLoginNoticeHtml("login", "en"),
           superAdminSettings: await deps.getPublicSuperAdminSettings(),
           admissionHomepageUrl: (await deps.getSystemSettings()).admissionHomepageUrl,
         }),

@@ -170,6 +170,8 @@
       });
       applyLoginNoticePayload(payload.loginNoticeHtml, { scope: "login" });
       applyLoginNoticePayload(payload.applicantNoticeHtml, { scope: "applicant" });
+      applyLoginNoticePayload(payload.loginNoticeHtmlEn || "", { scope: "login", language: "en" });
+      applyLoginNoticePayload(payload.applicantNoticeHtmlEn || "", { scope: "applicant", language: "en" });
       const nextExamineeRows = Array.isArray(payload.examinees) ? payload.examinees.map(normalizeExamineeRecord) : [];
       const nextPrintHistoryRows = Array.isArray(payload.printHistory) ? payload.printHistory.map(normalizeExamineeRecord) : [];
       const nextAccountRows = Array.isArray(payload.accounts) ? payload.accounts.map(normalizeAccountRecord) : [];
@@ -180,6 +182,7 @@
       setTemplateCards(Array.isArray(payload.templates) ? payload.templates : []);
       state.applicantManager = {
         ...state.applicantManager,
+        formTemplates: payload.applicantManager?.formTemplates || [],
         fields: Array.isArray(payload.applicantManager?.fields) ? payload.applicantManager.fields : [],
         recruitmentUnits: Array.isArray(payload.applicantManager?.recruitmentUnits) ? payload.applicantManager.recruitmentUnits : [],
         schedules: Array.isArray(payload.applicantManager?.schedules) ? payload.applicantManager.schedules : [],

@@ -171,6 +171,8 @@ const loginNoticeEventHandlers = createLoginNoticeEventHandlers({
   updateLoginNoticeFormattingControls,
 });
 
+document.addEventListener("focusin", loginNoticeEventHandlers.handleFocusIn);
+
 const templateEditorEventHandlers = createTemplateEditorEventHandlers({
   addTemplateCard,
   applyEditorToolbarBorderSelectOption,
@@ -183,6 +185,7 @@ const templateEditorEventHandlers = createTemplateEditorEventHandlers({
   clearTemplateEditorTableHoverState,
   clearTemplateEditorTableSelection,
   closeTemplateCardMetaEditor,
+  copyTemplateCard,
   deleteTemplateCard,
   getTemplateEditorCellSplitConfig: () => getTemplateEditorCellSplitConfig(),
   getTemplateEditorCellSplitCountInput: () => templateEditorCellSplitCount,

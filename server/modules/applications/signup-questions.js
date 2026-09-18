@@ -1,3 +1,4 @@
+const { isChoiceInputType, normalizeChoiceTranslations, validateMultiSelectAnswer } = require('../../../shared/domain/applicant-form');
 const { answerTypeOptions, nationalityOptions } = require('../../../shared/domain/applicant-form');
 const { normalizeFileUploadSettings, isAllowedUploadExtension, formatUploadFileBaseName } = require('../../../shared/domain/applicant-form');
 const coreQuestions = [
@@ -22,12 +23,15 @@ function normalizeQuestions(value, legacy) {
     const label = String(q.label || q.questionText || '').trim().slice(0, 100);
     if (!label) throw new Error('질문 제목을 입력하세요.');
     const options = [...new Set((Array.isArray(q.options) ? q.options : []).map(v => String(v).trim().slice(0, 200)).filter(Boolean))];
-    if (options.length > 100 || (inputType === 'select' && !options.length)) throw new Error('선택지를 1~100개 등록하세요.');
+    if (options.length > 100 || (isChoiceInputType(inputType) && !options.length)) throw new Error('선택지를 1~100개 등록하세요.');
     const customOptionLabel = String(q.customOptionLabel || '').trim();
     if (customOptionLabel && !options.includes(customOptionLabel)) throw new Error('직접 입력 항목을 선택지에 추가하세요.');
-    return { key, label, description: String(q.description || q.questionDescription || '').slice(0, 1000), inputType,
+    return { key, label, labelEn: String(q.labelEn || q.questionTextEn || '').trim().slice(0, 100),
+      description: String(q.description || q.questionDescription || '').slice(0, 1000),
+      descriptionEn: String(q.descriptionEn || q.questionDescriptionEn || '').trim().slice(0, 1000), inputType,
       ...(inputType === 'file' ? normalizeFileUploadSettings(q, 'signup') : {}),
-      required: core ? true : q.required === true, options: inputType === 'select' ? options : [], customOptionLabel: inputType === 'select' ? customOptionLabel : '' };
+      optionsEn: isChoiceInputType(inputType) ? normalizeChoiceTranslations(options, q.optionsEn) : {},
+      required: core ? true : q.required === true, options: isChoiceInputType(inputType) ? options : [], customOptionLabel: isChoiceInputType(inputType) ? customOptionLabel : '' };
   });
   if (new Set(questions.map(q => q.key)).size !== questions.length) throw new Error('질문 식별자가 중복됩니다.');
   for (const core of coreQuestions) if (!questions.some(q => q.key === core.key)) throw new Error('비밀번호·이름·이메일은 삭제할 수 없습니다.');
@@ -58,6 +62,7 @@ function validateAnswers(questions, payload, context = {}) {
       profile[q.key] = { base64: bytes.toString('base64'), mimeType: detectedMime || 'application/octet-stream', fileName };
       continue;
     }
+    if (q.inputType === 'multiselect') { profile[q.key] = validateMultiSelectAnswer(q, raw, q.label); continue; }
     const rawText = String(raw ?? '').trim();
     const value = q.inputType === 'phone' ? rawText.replace(/\D+/g, '') : rawText;
     if (q.required && !value) throw new Error(`${q.label} 항목을 입력하세요.`);

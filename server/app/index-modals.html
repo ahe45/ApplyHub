@@ -60,7 +60,7 @@
         <div class="modal-header">
           <div>
             <h3 id="applicantRecruitmentUnitModalTitle">전형 관리 상세정보</h3>
-            <p class="template-modal-meta">선택한 전형 관리 항목의 모집시기, 전형, 계열, 모집단위, 전공 정보를 수정합니다.</p>
+            <p class="template-modal-meta">전형·모집단위·전공의 한국어명과 영어명을 각각 입력합니다. 영어명이 없으면 한국어명을 표시합니다.</p>
           </div>
           <div class="toolbar-actions">
             <button
@@ -104,16 +104,22 @@
                 />
               </label>
 
+              <div class="applicant-recruitment-name-pair">
               <label class="field" for="applicantRecruitmentAdmissionName">
-                <span>전형</span>
+                <span>전형명(한글)</span>
                 <input
                   id="applicantRecruitmentAdmissionName"
                   data-applicant-recruitment-input="admissionName"
-                  type="text"
+                  type="text" maxlength="100"
                   placeholder="예: 수시"
                   autocomplete="off"
                 />
               </label>
+              <label class="field" for="applicantRecruitmentAdmissionNameEn">
+                <span>전형명(영어)</span>
+                <input id="applicantRecruitmentAdmissionNameEn" data-applicant-recruitment-input="admissionNameEn" type="text" maxlength="200" placeholder="예: Early admission" autocomplete="off" />
+              </label>
+              </div>
 
               <label class="field" for="applicantRecruitmentSeriesCode">
                 <span>계열코드</span>
@@ -148,16 +154,22 @@
                 />
               </label>
 
+              <div class="applicant-recruitment-name-pair">
               <label class="field" for="applicantRecruitmentUnitName">
-                <span>모집단위</span>
+                <span>모집단위명(한글)</span>
                 <input
                   id="applicantRecruitmentUnitName"
                   data-applicant-recruitment-input="unitName"
-                  type="text"
+                  type="text" maxlength="100"
                   placeholder="예: 컴퓨터공학부"
                   autocomplete="off"
                 />
               </label>
+              <label class="field" for="applicantRecruitmentUnitNameEn">
+                <span>모집단위명(영어)</span>
+                <input id="applicantRecruitmentUnitNameEn" data-applicant-recruitment-input="unitNameEn" type="text" maxlength="200" placeholder="예: Computer Science" autocomplete="off" />
+              </label>
+              </div>
 
               <label class="field" for="applicantRecruitmentMajorCode">
                 <span>전공코드</span>
@@ -170,16 +182,22 @@
                 />
               </label>
 
+              <div class="applicant-recruitment-name-pair">
               <label class="field" for="applicantRecruitmentMajorName">
-                <span>전공</span>
+                <span>전공명(한글)</span>
                 <input
                   id="applicantRecruitmentMajorName"
                   data-applicant-recruitment-input="majorName"
-                  type="text"
+                  type="text" maxlength="100"
                   placeholder="예: 소프트웨어전공"
                   autocomplete="off"
                 />
               </label>
+              <label class="field" for="applicantRecruitmentMajorNameEn">
+                <span>전공명(영어)</span>
+                <input id="applicantRecruitmentMajorNameEn" data-applicant-recruitment-input="majorNameEn" type="text" maxlength="200" placeholder="예: Software Engineering" autocomplete="off" />
+              </label>
+              </div>
             </div>
           </form>
         </div>
@@ -191,7 +209,7 @@
     <div class="modal hidden" id="applicantScheduleModal" aria-hidden="true">
       <div class="modal-backdrop" data-close-modal="true"></div>
       <section
-        class="modal-sheet applicant-recruitment-modal-sheet"
+        class="modal-sheet applicant-recruitment-modal-sheet applicant-schedule-modal-sheet"
         role="dialog"
         aria-modal="true"
         aria-labelledby="applicantScheduleModalTitle"
@@ -199,7 +217,7 @@
         <div class="modal-header">
           <div>
             <h3 id="applicantScheduleModalTitle">일정 상세정보</h3>
-            <p class="template-modal-meta" id="applicantScheduleModalDescription">모집시기와 전형별 접수, 서류 제출, 수험표 조회 기간을 설정합니다.</p>
+            <p class="template-modal-meta" id="applicantScheduleModalDescription">모집시기와 전형별 접수, 서류 제출, 서류 제출 확인, 수험표 조회 기간을 설정합니다.</p>
           </div>
           <div class="toolbar-actions">
             <button class="primary-button" id="applicantScheduleModalSaveButton" form="applicantScheduleForm" type="submit" disabled>
@@ -214,35 +232,73 @@
             <div class="applicant-schedule-bulk-summary hidden" id="applicantScheduleBulkSummary" aria-hidden="true">
               <strong id="applicantScheduleBulkSummaryCount">선택한 0개 전형</strong>
               <p id="applicantScheduleBulkSummaryTargets"></p>
-              <p class="applicant-schedule-bulk-warning">입력한 일정으로 선택 항목을 모두 덮어씁니다. 비워 둔 기간은 일정이 해제됩니다.</p>
+              <p class="applicant-schedule-bulk-warning">입력한 기간을 선택 항목에 적용합니다. 비워 둔 기간은 해제되며, 혼합된 사용 여부는 스위치를 변경하지 않으면 유지됩니다.</p>
             </div>
-            <div class="applicant-recruitment-modal-grid">
-              <label class="field" for="applicantScheduleStartAt">
-                <span>접수 시작</span>
-                <input id="applicantScheduleStartAt" data-applicant-schedule-input="applicantScheduleStartAt" type="datetime-local" />
-              </label>
-              <label class="field" for="applicantScheduleEndAt">
-                <span>접수 종료</span>
-                <input id="applicantScheduleEndAt" data-applicant-schedule-input="applicantScheduleEndAt" type="datetime-local" />
-              </label>
-              <label class="field" for="documentSubmissionScheduleStartAt">
-                <span>서류 제출 시작</span>
-                <input id="documentSubmissionScheduleStartAt" data-applicant-schedule-input="documentSubmissionScheduleStartAt" type="datetime-local" />
-              </label>
-              <label class="field" for="documentSubmissionScheduleEndAt">
-                <span>서류 제출 종료</span>
-                <input id="documentSubmissionScheduleEndAt" data-applicant-schedule-input="documentSubmissionScheduleEndAt" type="datetime-local" />
-              </label>
-              <label class="field" for="applicantScheduleLookupStartAt">
-                <span>수험표 조회 시작</span>
-                <input id="applicantScheduleLookupStartAt" data-applicant-schedule-input="admitCardLookupScheduleStartAt" type="datetime-local" />
-              </label>
-              <label class="field" for="applicantScheduleLookupEndAt">
-                <span>수험표 조회 종료</span>
-                <input id="applicantScheduleLookupEndAt" data-applicant-schedule-input="admitCardLookupScheduleEndAt" type="datetime-local" />
-              </label>
-            </div>
-            <p class="template-modal-meta">서류 제출 기간은 접수 기간과 별도로 적용됩니다. 비워 두면 서류를 제출할 수 없습니다.</p>
+            <section class="applicant-schedule-templates">
+              <h4>적용 템플릿</h4>
+              <div class="applicant-schedule-template-grid">
+                <label class="field">원서접수 템플릿<select data-applicant-schedule-input="applicationTemplateId" aria-label="원서접수 템플릿"></select></label>
+                <label class="field">서류제출 템플릿<select data-applicant-schedule-input="documentTemplateId" aria-label="서류제출 템플릿"></select></label>
+              </div>
+              <p class="muted">가입 접수 설정에서 만든 템플릿을 선택하세요. 서류 제출 확인에도 같은 서류제출 템플릿이 적용됩니다.</p>
+            </section>
+            <section class="applicant-schedule-period" data-schedule-period="applicantSchedule">
+              <div class="applicant-schedule-period-header">
+                <h4>접수 기간</h4>
+                <label class="applicant-schedule-use-switch">
+                  <input type="checkbox" role="switch" data-applicant-schedule-input="applicantScheduleEnabled" aria-label="접수 사용 여부" checked />
+                  <span class="applicant-schedule-switch-track" aria-hidden="true"></span>
+                  <span data-schedule-enabled-label>사용</span>
+                </label>
+              </div>
+              <div class="applicant-schedule-period-dates">
+                <label class="field" for="applicantScheduleStartAt"><span>시작 일시</span><input id="applicantScheduleStartAt" data-applicant-schedule-input="applicantScheduleStartAt" type="datetime-local" /></label>
+                <label class="field" for="applicantScheduleEndAt"><span>종료 일시</span><input id="applicantScheduleEndAt" data-applicant-schedule-input="applicantScheduleEndAt" type="datetime-local" /></label>
+              </div>
+            </section>
+            <section class="applicant-schedule-period" data-schedule-period="documentSubmissionSchedule">
+              <div class="applicant-schedule-period-header">
+                <h4>서류 제출 기간</h4>
+                <label class="applicant-schedule-use-switch">
+                  <input type="checkbox" role="switch" data-applicant-schedule-input="documentSubmissionScheduleEnabled" aria-label="서류 제출 사용 여부" checked />
+                  <span class="applicant-schedule-switch-track" aria-hidden="true"></span>
+                  <span data-schedule-enabled-label>사용</span>
+                </label>
+              </div>
+              <div class="applicant-schedule-period-dates">
+                <label class="field" for="documentSubmissionScheduleStartAt"><span>시작 일시</span><input id="documentSubmissionScheduleStartAt" data-applicant-schedule-input="documentSubmissionScheduleStartAt" type="datetime-local" /></label>
+                <label class="field" for="documentSubmissionScheduleEndAt"><span>종료 일시</span><input id="documentSubmissionScheduleEndAt" data-applicant-schedule-input="documentSubmissionScheduleEndAt" type="datetime-local" /></label>
+              </div>
+            </section>
+            <section class="applicant-schedule-period" data-schedule-period="documentReviewSchedule">
+              <div class="applicant-schedule-period-header">
+                <h4>서류 제출 확인 기간</h4>
+                <label class="applicant-schedule-use-switch">
+                  <input type="checkbox" role="switch" data-applicant-schedule-input="documentReviewScheduleEnabled" aria-label="서류 제출 확인 사용 여부" checked />
+                  <span class="applicant-schedule-switch-track" aria-hidden="true"></span>
+                  <span data-schedule-enabled-label>사용</span>
+                </label>
+              </div>
+              <div class="applicant-schedule-period-dates">
+                <label class="field" for="documentReviewScheduleStartAt"><span>시작 일시</span><input id="documentReviewScheduleStartAt" data-applicant-schedule-input="documentReviewScheduleStartAt" type="datetime-local" /></label>
+                <label class="field" for="documentReviewScheduleEndAt"><span>종료 일시</span><input id="documentReviewScheduleEndAt" data-applicant-schedule-input="documentReviewScheduleEndAt" type="datetime-local" /></label>
+              </div>
+            </section>
+            <section class="applicant-schedule-period" data-schedule-period="admitCardLookupSchedule">
+              <div class="applicant-schedule-period-header">
+                <h4>수험표 조회 기간</h4>
+                <label class="applicant-schedule-use-switch">
+                  <input type="checkbox" role="switch" data-applicant-schedule-input="admitCardLookupScheduleEnabled" aria-label="수험표 조회 사용 여부" checked />
+                  <span class="applicant-schedule-switch-track" aria-hidden="true"></span>
+                  <span data-schedule-enabled-label>사용</span>
+                </label>
+              </div>
+              <div class="applicant-schedule-period-dates">
+                <label class="field" for="applicantScheduleLookupStartAt"><span>시작 일시</span><input id="applicantScheduleLookupStartAt" data-applicant-schedule-input="admitCardLookupScheduleStartAt" type="datetime-local" /></label>
+                <label class="field" for="applicantScheduleLookupEndAt"><span>종료 일시</span><input id="applicantScheduleLookupEndAt" data-applicant-schedule-input="admitCardLookupScheduleEndAt" type="datetime-local" /></label>
+              </div>
+            </section>
+            <p class="template-modal-meta">미사용으로 설정하면 사용자 화면에서 해당 버튼이 숨겨집니다. 입력한 기간은 유지됩니다.</p>
           </form>
         </div>
       </section>
@@ -397,26 +453,37 @@
         role="dialog"
         aria-modal="true"
         aria-labelledby="applicantSubmissionDownloadTitle"
+        aria-describedby="applicantSubmissionDownloadDescription"
       >
         <div class="modal-header">
           <div>
             <h3 id="applicantSubmissionDownloadTitle">접수 이력 다운로드</h3>
+            <p class="template-modal-meta" id="applicantSubmissionDownloadDescription">현재 필터링된 접수 이력을 다운로드합니다.</p>
           </div>
-          <div class="toolbar-actions">
-            <button class="icon-button" data-close-modal="true" type="button" aria-label="닫기">×</button>
-          </div>
+          <button class="icon-button" data-close-modal="true" type="button" aria-label="닫기">×</button>
         </div>
 
         <div class="modal-body applicant-submission-download-modal-body">
-          <p class="muted">현재 필터링된 접수 이력 기준으로 다운로드합니다.</p>
           <div class="applicant-submission-download-actions">
             <button class="outline-button applicant-submission-download-button" data-download-applicant-submission-data="true" type="button">
+              <svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+                <path d="M4 9h16M4 14h16M10 9v11"></path>
+              </svg>
               <span>접수 이력 데이터</span>
             </button>
             <button class="outline-button applicant-submission-download-button" data-applicant-archive-kind="photos" type="button">
+              <svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+                <circle cx="9" cy="9" r="1.5"></circle>
+                <path d="m4 17 5-5 4 4 3-3 4 4"></path>
+              </svg>
               <span>수험생 사진</span>
             </button>
             <button class="outline-button applicant-submission-download-button" data-applicant-archive-kind="documents" type="button">
+              <svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 12h6M9 16h6"></path>
+              </svg>
               <span>제출 서류</span>
             </button>
           </div>

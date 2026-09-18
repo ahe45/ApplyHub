@@ -10,13 +10,6 @@
   const superAdminView = "superAdminManagement";
   const defaultLoginBrandMarkPath = "/client/assets/logo.png";
   const defaultLoginBackgroundImagePath = "/client/assets/bg.png";
-  const recruitmentManagedViews = Object.freeze([
-    "applicantRecruitmentManagement",
-    "applicantScheduleManagement",
-    "applicantQuestionTemplateManagement",
-
-    "applicantHistory",
-  ]);
   const accountRoleOptions = Object.freeze([superAdminRole, "관리자", "운영자", "조회용"]);
   const defaultView = "dashboard";
   const loginRoutePath = "/login";
@@ -27,6 +20,7 @@
     applicantScheduleManagement: "일정 관리",
     applicantQuestionTemplateManagement: "가입·접수 설정",
     applicantHistory: "접수 이력",
+    applicantDocumentManagement: "서류 제출 관리",
     applicantMembers: "회원 목록",
 
     admitCardLookup: "수험표 출력",
@@ -43,7 +37,7 @@
     Object.freeze({
       key: "application-management",
       title: "접수 및 등록",
-      views: Object.freeze(["applicantRecruitmentManagement", "applicantScheduleManagement", "applicantQuestionTemplateManagement", "applicantMembers", "applicantHistory"]),
+      views: Object.freeze(["applicantRecruitmentManagement", "applicantScheduleManagement", "applicantQuestionTemplateManagement", "applicantMembers", "applicantHistory", "applicantDocumentManagement"]),
     }),
     Object.freeze({
       key: "admit-card-management",
@@ -89,7 +83,6 @@
     }, []),
   );
   const sidebarMenuViewSet = new Set(sidebarMenuViews);
-  const recruitmentManagedViewSet = new Set(recruitmentManagedViews);
   const viewRouteDefinitions = Object.freeze([
     Object.freeze({ view: defaultView, path: "/dashboard", title: pageTitles.dashboard }),
     Object.freeze({
@@ -108,6 +101,7 @@
       title: pageTitles.applicantQuestionTemplateManagement,
     }),
     Object.freeze({ view: "applicantHistory", path: "/applicant-history", title: pageTitles.applicantHistory }),
+    Object.freeze({ view: "applicantDocumentManagement", path: "/applicant-documents", title: pageTitles.applicantDocumentManagement }),
     Object.freeze({ view: "applicantMembers", path: "/applicant-members", title: pageTitles.applicantMembers }),
 
     Object.freeze({ view: "admitCardLookup", path: "/admit-cards", title: pageTitles.admitCardLookup }),
@@ -130,6 +124,7 @@
       "applicantQuestionTemplateManagement",
 
       "applicantHistory",
+      "applicantDocumentManagement",
 
       "admitCardLookup",
       "printHistory",
@@ -144,6 +139,7 @@
       "applicantQuestionTemplateManagement",
 
       "applicantHistory",
+      "applicantDocumentManagement",
 
       "admitCardLookup",
       "printHistory",
@@ -235,20 +231,13 @@
     normalizeSuperAdminSettings(settings).logoImageUrl || defaultLoginBrandMarkPath;
   const resolveSuperAdminBackgroundImageUrl = (settings = {}) =>
     normalizeSuperAdminSettings(settings).backgroundImageUrl || defaultLoginBackgroundImagePath;
-  const buildRoleMenuVisibilityFromSuperAdminSettings = (settings = {}) => {
-    const normalizedSettings = normalizeSuperAdminSettings(settings);
+  const buildDefaultRoleMenuVisibility = () => {
     const nextRoleMenuViews = {
       [superAdminRole]: [...(roleMenuViews[superAdminRole] || [])],
       관리자: [...(roleMenuViews.관리자 || [])],
       운영자: [...(roleMenuViews.운영자 || [])],
       조회용: [...(roleMenuViews.조회용 || [])],
     };
-
-    if (!normalizedSettings.recruitmentEnabled) {
-      ["관리자", "운영자"].forEach((role) => {
-        nextRoleMenuViews[role] = nextRoleMenuViews[role].filter((view) => !recruitmentManagedViewSet.has(view));
-      });
-    }
 
     return normalizeRoleMenuVisibilitySettings(nextRoleMenuViews);
   };
@@ -332,7 +321,7 @@
     templateRenderTagDefinitions,
     accountRoleOptions,
     availableViews,
-    buildRoleMenuVisibilityFromSuperAdminSettings,
+    buildDefaultRoleMenuVisibility,
     defaultLoginBackgroundImagePath,
     defaultView,
     defaultLoginBrandMarkPath,
@@ -349,7 +338,6 @@
     normalizeRoleMenuVisibilitySettings,
     normalizeRoutePath,
     pageTitles,
-    recruitmentManagedViews,
     roleDefaultViews,
     roleMenuViews,
     resolveSuperAdminBackgroundImageUrl,

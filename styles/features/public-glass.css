@@ -73,7 +73,7 @@ public-school-header { display: block; width: 100%; min-width: 0; }
 .applicant-public-body .applicant-public-ticket-viewer-copy { width: 100%; min-width: 0; }
 .applicant-ticket-number-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .applicant-ticket-number-row p { min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.applicant-public-body .applicant-ticket-download { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; padding: 10px 14px; text-decoration: none; white-space: nowrap; font-size: 14px; }
+.applicant-public-body .applicant-ticket-download { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 ticket-pdf-viewer { display: grid; width: 100%; min-width: 0; gap: 12px; }
 ticket-pdf-viewer canvas { display: block; width: 100%; height: auto; background: #fff; }
 ticket-pdf-viewer canvas[hidden] { display: none; }
@@ -117,7 +117,7 @@ ticket-pdf-viewer canvas[hidden] { display: none; }
 .common-login-stage .login-stage-form h3 { margin: 0 0 18px; color: var(--glass-ink); font-size: 18px; font-weight: 700; }
 .common-login-stage .login-stage-description { color: var(--glass-muted); font-size: 13px; }
 .common-login-stage .login-field { display: grid; gap: 8px; margin-bottom: 16px; }
-.common-login-stage .login-field > span { color: var(--glass-muted); font-size: 12px; font-weight: 400; }
+.common-login-stage .login-field span { color: var(--glass-muted); font-size: 12px; font-weight: 400; }
 .common-login-stage .login-field input { height: 48px; min-height: 48px; padding: 0 13px; font-weight: 400; }
 .common-login-stage :is(.login-submit-button, .common-login-signup, .login-stage-form-preview > .ghost-button) { width: 100%; padding: 10px; font-size: 14px; font-weight: 700; }
 .common-login-stage :is(.common-login-signup, .login-stage-form-preview > .ghost-button) { margin-top: 9px; }

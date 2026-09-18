@@ -184,13 +184,16 @@ const applicantHistoryGridColumns = Object.freeze([
 const applicantRecruitmentGridColumns = Object.freeze([
   Object.freeze({ key: "trackName", label: "모집시기", sortable: true, filterable: true }),
   Object.freeze({ key: "admissionCode", label: "전형코드", sortable: true, filterable: true }),
-  Object.freeze({ key: "admissionName", label: "전형", sortable: true, filterable: true }),
+  Object.freeze({ key: "admissionName", label: "전형명(한글)", sortable: true, filterable: true }),
+  Object.freeze({ key: "admissionNameEn", label: "전형명(영어)", sortable: true, filterable: true }),
   Object.freeze({ key: "seriesCode", label: "계열코드", sortable: true, filterable: true }),
   Object.freeze({ key: "seriesName", label: "계열", sortable: true, filterable: true }),
   Object.freeze({ key: "unitCode", label: "모집단위코드", sortable: true, filterable: true }),
-  Object.freeze({ key: "unitName", label: "모집단위", sortable: true, filterable: true }),
+  Object.freeze({ key: "unitName", label: "모집단위명(한글)", sortable: true, filterable: true }),
+  Object.freeze({ key: "unitNameEn", label: "모집단위명(영어)", sortable: true, filterable: true }),
   Object.freeze({ key: "majorCode", label: "전공코드", sortable: true, filterable: true }),
-  Object.freeze({ key: "majorName", label: "전공", sortable: true, filterable: true }),
+  Object.freeze({ key: "majorName", label: "전공명(한글)", sortable: true, filterable: true }),
+  Object.freeze({ key: "majorNameEn", label: "전공명(영어)", sortable: true, filterable: true }),
 ]);
 
 const applicantScheduleGridColumns = Object.freeze([
@@ -200,6 +203,8 @@ const applicantScheduleGridColumns = Object.freeze([
   Object.freeze({ key: "applicantScheduleEndAtLabel", label: "접수 종료", sortable: true, filterable: true }),
   Object.freeze({ key: "documentSubmissionScheduleStartAtLabel", label: "서류 제출 시작", sortable: true, filterable: true }),
   Object.freeze({ key: "documentSubmissionScheduleEndAtLabel", label: "서류 제출 종료", sortable: true, filterable: true }),
+  Object.freeze({ key: "documentReviewScheduleStartAtLabel", label: "서류 제출 확인 시작", sortable: true, filterable: true }),
+  Object.freeze({ key: "documentReviewScheduleEndAtLabel", label: "서류 제출 확인 종료", sortable: true, filterable: true }),
   Object.freeze({ key: "admitCardLookupScheduleStartAtLabel", label: "수험표 조회 시작", sortable: true, filterable: true }),
   Object.freeze({ key: "admitCardLookupScheduleEndAtLabel", label: "수험표 조회 종료", sortable: true, filterable: true }),
 ]);
@@ -580,6 +585,7 @@ const { renderDashboard } = dashboardRendererController;
 const renderers = {
   dashboard: renderDashboard,
   applicantHistory: renderApplicantHistory,
+  applicantDocumentManagement: () => globalThis.AdmitCardDocumentManagement.render(() => renderView(), state.auth.currentUser?.id),
   applicantMembers: () => globalThis.AdmitCardMemberList.render(() => renderView(), state.auth.currentUser?.id),
   applicantRecruitmentManagement: renderApplicantRecruitmentManagement,
   applicantQuestionTemplateManagement: () => globalThis.AdmitCardSignupSettings.renderQuestionManagement(

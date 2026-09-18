@@ -544,12 +544,13 @@
     const editorState = config.editorState || state.applicantManager?.fieldEditor || {};
     const isEditorActive = editorState.isActive === true;
     const isDocumentScope = config.fileUploadScope === 'documents';
+    const isLegacySignupUpload = config.fileUploadScope === 'signup' && ['photo', 'file'].includes(editorState.inputType);
     const isLegacyBirth = config.fileUploadScope !== 'signup' && editorState.inputType === 'birthdate';
     const answerTypeDescriptions = applicantFormConfig?.answerTypeDescriptions || {};
     const answerTypeDescription = isLegacyBirth ? '생년월일은 회원가입에서 받습니다. 기존 항목과 답변은 보존하며, 회원정보가 있으면 자동 연동합니다.' : config.lockedCore ? '회원가입 기본 항목입니다. 답변 종류는 변경할 수 없습니다.' : isEditorActive
       ? answerTypeDescriptions[editorState.inputType || "text"] || "선택한 종류에 맞는 답변을 받습니다."
       : "질문을 추가하거나 선택하면 답변 데이터 종류에 대한 안내가 표시됩니다.";
-    const fixedTypes = ['email', 'password', 'name', ...(config.fileUploadScope === 'signup' ? [] : ['birthdate'])];
+    const fixedTypes = ['email', 'password', 'name', ...(config.fileUploadScope === 'signup' ? ['photo', 'file'] : ['birthdate'])];
     const inputTypeOptions = [...(config.inputTypeOptions || applicantFormConfig?.applicationAnswerTypeOptions || [])].filter(option => !fixedTypes.includes(option.key));
     const editorOptions = Array.isArray(editorState.options) ? editorState.options : [];
     const allowCustomOption = editorState.allowCustomOption === true;
@@ -587,7 +588,7 @@
 
             <form class="applicant-field-editor-form" data-applicant-field-form="true">
               <label class="field">
-                <span>제목</span>
+                <span>제목 (한국어)</span>
                 <input
                   data-applicant-field-input="questionText"
                   type="text"
@@ -598,7 +599,14 @@
               </label>
 
               <label class="field">
-                <span>설명</span>
+                <span>제목 (영어)</span>
+                <input data-applicant-field-input="questionTextEn" type="text" lang="en"
+                  value="${escapeAttribute(editorState.questionTextEn || '')}" maxlength="${config.fileUploadScope === 'signup' ? 100 : 255}"
+                  placeholder="예: Graduation certificate" ${isEditorActive ? '' : 'disabled'} />
+              </label>
+
+              <label class="field">
+                <span>설명 (한국어)</span>
                 <input
                   data-applicant-field-input="questionDescription"
                   type="text"
@@ -608,7 +616,15 @@
                 />
               </label>
 
-              ${isDocumentScope ? '' : config.lockedCore || isLegacyBirth ? `<div class="field"><span>입력 항목</span><input type="text" value="${isLegacyBirth ? '생년월일 · 회원정보 연동' : '회원가입 고정 항목'}" readonly /></div>` : `<label class="field select-field">
+              <label class="field">
+                <span>설명 (영어)</span>
+                <input data-applicant-field-input="questionDescriptionEn" type="text" lang="en"
+                  value="${escapeAttribute(editorState.questionDescriptionEn || '')}" maxlength="${config.fileUploadScope === 'signup' ? 1000 : 500}"
+                  placeholder="예: Upload your graduation certificate as a PDF." ${isEditorActive ? '' : 'disabled'} />
+              </label>
+              <p class="muted applicant-answer-type-help">영어 모드에서는 영어 제목과 설명을 표시합니다. 비워 둔 항목은 한국어로 표시됩니다.</p>
+
+              ${isDocumentScope ? '' : config.lockedCore || isLegacyBirth || isLegacySignupUpload ? `<div class="field"><span>입력 항목</span><input type="text" value="${isLegacySignupUpload ? getApplicantAnswerTypeLabel(editorState.inputType) + ' · 기존 항목' : isLegacyBirth ? '생년월일 · 회원정보 연동' : '회원가입 고정 항목'}" readonly /></div>` : `<label class="field select-field">
                 <span>답변 데이터 종류</span>
                 <select data-applicant-field-input="inputType" aria-describedby="applicant-answer-type-help" ${isEditorActive && !config.lockedCore ? "" : "disabled"}>
                   ${inputTypeOptions
@@ -624,19 +640,20 @@
               </label>`}
 
               ${
-                editorState.inputType === "select"
+                ["select", "multiselect"].includes(editorState.inputType)
                   ? `
                     <div class="field applicant-option-editor">
                       <span>선택지 목록</span>
                       <div class="applicant-option-editor-row">
-                        <input
+                        <div class="applicant-option-language-fields"><label class="field"><span>선택지 (한국어)</span><input
                           data-applicant-field-input="optionDraft"
                           data-applicant-field-option-draft="true"
                           type="text"
                           value="${escapeAttribute(editorState.optionDraft || "")}"
-                          placeholder="예: 오전반"
+                          placeholder="예: 오전반" maxlength="200"
                           ${isEditorActive ? "" : "disabled"}
                         />
+                        </label><label class="field"><span>선택지 (영어)</span><input data-applicant-field-input="optionDraftEn" data-applicant-field-option-draft="true" type="text" lang="en" maxlength="200" value="${escapeAttribute(editorState.optionDraftEn || '')}" placeholder="예: Morning class" ${isEditorActive ? '' : 'disabled'} /></label></div>
                         <label class="checkbox-field applicant-option-custom-toggle">
                           <input
                             data-applicant-field-input="allowCustomOption"
@@ -648,7 +665,7 @@
                         </label>
                         <button class="ghost-button applicant-option-add-button" data-applicant-field-option-add="true" type="button" ${isEditorActive ? "" : "disabled"}>항목 추가</button>
                       </div>
-                      <span class="muted applicant-option-editor-help">항목을 하나씩 추가하여 수험생 선택지를 구성합니다.</span>
+                      <span class="muted applicant-option-editor-help">한국어와 영어를 함께 입력해 추가하세요. 영어를 비우면 한국어로 표시됩니다.</span>
                       ${
                         editorOptions.length > 0
                           ? `
@@ -658,13 +675,9 @@
                                   (option, index) => `
                                     <div class="applicant-option-editor-item">
                                       <div class="applicant-option-editor-item-main">
-                                        <span>${escapeHtml(option)}</span>
-                                        ${
-                                          customOptionLabel && customOptionLabel === option
-                                            ? `<em class="applicant-option-editor-badge">직접 입력</em>`
-                                            : ""
-                                        }
-                                      </div>
+                                        <div class="applicant-option-language-fields">
+                                        <label class="field"><span>선택지 (한국어)</span><input data-applicant-field-input="optionKorean:${index}" type="text" lang="ko" maxlength="200" required value="${escapeAttribute(editorState.optionKoreanEdits?.[index] ?? option)}" placeholder="예: 오전반" ${isEditorActive ? '' : 'disabled'} /></label>
+                                        <div class="field"><span id="choice-option-english-label-${index}">선택지 (영어)</span><div class="applicant-option-input-actions"><input aria-labelledby="choice-option-english-label-${index}" data-applicant-field-input="optionEnglish:${index}" type="text" lang="en" maxlength="200" value="${escapeAttribute(editorState.optionsEn?.[option] || '')}" placeholder="예: Morning class" ${isEditorActive ? '' : 'disabled'} />
                                       <button
                                         class="icon-button danger-button applicant-option-remove-button"
                                         data-applicant-field-option-remove="${index}"
@@ -681,6 +694,14 @@
                                           <path d="M14 11v5.5"></path>
                                         </svg>
                                       </button>
+                                        </div></div></div>
+                                        ${
+                                          customOptionLabel && customOptionLabel === option
+                                            ? `<em class="applicant-option-editor-badge">직접 입력</em>`
+                                            : ""
+                                        }
+                                      </div>
+
                                     </div>
                                   `,
                                 )
@@ -754,14 +775,104 @@
   function renderApplicantQuestionTemplateManagement(formScope = 'application') {
     formScope = formScope === 'documents' ? 'documents' : 'application';
     const documentScope = formScope === 'documents';
+    const scopeLabel = documentScope ? '서류제출' : '원서접수';
+    const manager = state.applicantManager;
+    const templates = (manager.formTemplates || []).filter(item => item.formScope === formScope);
+    const selected = templates.find(item => item.id === Number(manager.selectedFormTemplates?.[formScope])) || templates[0];
+    manager.selectedFormTemplates ||= {};
+    manager.selectedFormTemplates[formScope] = selected?.id || 0;
+    const templateEditor = manager.formTemplateEditor?.formScope === formScope ? manager.formTemplateEditor : null;
+    const busy = manager.formTemplateBusy === true;
+    const editing = manager.formTemplateEditingScope === formScope && selected;
+    const fieldsFor = template => (manager.fields || []).filter(field => field.formScope === formScope && Number(field.templateId) === template.id);
+    const previewUrl = template => `${documentScope ? '/applicant/documents' : '/applicant/form'}?preview=1&templateId=${template.id}`;
+    const actionLabels = { create: '새 템플릿', copy: '복사', rename: '이름 변경', delete: '삭제' };
+    const actionButton = (action, template = selected, className = 'ghost-button') => `<button class="${className}" type="button" data-form-template-action="${action}" data-form-template-id="${template?.id || ''}" ${busy || (action === 'delete' && template?.isDefault) ? 'disabled' : ''}>${actionLabels[action]}</button>`;
+    function renderMetadataEditor() {
+      if (!editing && templateEditor?.action === 'rename') return '';
+      return templateEditor ? `<form data-form-template-form class="form-template-editor">
+        <label class="field">템플릿 이름<input data-form-template-name name="name" value="${escapeAttribute(templateEditor.name || '')}" maxlength="100" required ${busy ? 'disabled' : ''} /></label>
+        <div class="inline-actions"><button type="button" class="ghost-button" data-form-template-action="cancel" ${busy ? 'disabled' : ''}>취소</button><button class="primary-button" type="submit" ${busy ? 'disabled' : ''}>${busy ? '저장 중…' : '저장'}</button></div>
+      </form>` : '';
+    }
+    function renderFormTemplateToolbar() {
+      return `<article class="form-card form-template-toolbar">
+        <div class="form-template-toolbar-row">
+          <div class="form-template-edit-heading"><button class="ghost-button" type="button" data-form-template-list ${busy ? 'disabled' : ''}>← 템플릿 목록</button><div><h3>${escapeHtml(selected.name)}</h3><p class="muted">${scopeLabel} · 질문 ${fieldsFor(selected).length}개</p></div></div>
+          <div class="inline-actions">${actionButton('rename')}${actionButton('copy')}${actionButton('delete', selected, 'ghost-button danger-button')}</div>
+        </div>
+        ${renderMetadataEditor()}
+      </article>`;
+    }
+    if (!editing) {
+      return `<section class="view-stack form-template-gallery">
+        <article class="form-card form-template-toolbar">
+          <div class="section-header">
+            ${renderMenuSectionCopy(`${scopeLabel} 템플릿`, '미리보기 카드를 선택해 질문을 수정하고, 일정 상세정보에서 전형별로 적용하세요.')}
+            ${actionButton('create', null, 'primary-button')}
+          </div>${renderMetadataEditor()}
+        </article>
+        <div class="template-grid form-template-grid">
+          ${templates.map(template => {
+            const fields = fieldsFor(template);
+            const scheduleKey = documentScope ? 'documentTemplateId' : 'applicationTemplateId';
+            const appliedCount = (manager.schedules || []).filter(schedule => Number(schedule[scheduleKey]) === template.id).length;
+            return `<article class="template-card form-template-card" data-form-template-card="${template.id}">
+              <div class="section-header template-card-header">
+                <div class="template-card-heading">
+                  ${templateEditor?.action === 'rename' && templateEditor.templateId === template.id ? `
+                    <form data-form-template-form class="template-card-meta-editor template-card-meta-editor-name">
+                      <label class="sr-only" for="form-template-name-${template.id}">양식 제목 수정</label>
+                      <input id="form-template-name-${template.id}" class="template-card-meta-input" data-form-template-name name="name" type="text" maxlength="100" required value="${escapeAttribute(templateEditor.name || '')}" ${busy ? 'disabled' : ''} />
+                      <div class="template-card-meta-editor-actions">
+                        <button class="icon-button template-card-meta-action-button template-card-meta-save-button" type="submit" aria-label="저장" title="저장" ${busy ? 'disabled' : ''}><svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5 9.2 16.7 19 7.5"></path></svg></button>
+                        <button class="icon-button template-card-meta-action-button template-card-meta-cancel-button" type="button" data-form-template-action="cancel" aria-label="취소" title="취소" ${busy ? 'disabled' : ''}><svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 7 10 10"></path><path d="M17 7 7 17"></path></svg></button>
+                      </div>
+                    </form>` : `
+                    <div class="template-card-meta-row template-card-meta-row-name">
+                      <h3>${escapeHtml(template.name)}</h3>
+                      <button class="icon-button template-card-meta-edit-button" data-form-template-action="rename" data-form-template-id="${template.id}" type="button" aria-label="양식 제목 수정" title="양식 제목 수정" ${busy ? 'disabled' : ''}>
+                        <svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5.5A1.5 1.5 0 0 1 6.5 4H13"></path><path d="M18.5 11V18A1.5 1.5 0 0 1 17 19.5H6.5A1.5 1.5 0 0 1 5 18V5.5"></path><path d="m10 14 7.5-7.5 2 2L12 16l-3 .5z"></path></svg>
+                      </button>
+                    </div>`}
+                  <p class="muted">질문 ${fields.length}개 · ${appliedCount ? `${appliedCount}개 전형 적용` : '적용된 전형 없음'}</p>
+                </div>
+                <div class="template-card-header-tools">
+                  <span class="badge ${appliedCount ? 'green' : 'gray'}">${appliedCount ? '사용중' : '사용 안 함'}</span>
+                  <button class="icon-button template-card-copy-button" type="button" data-form-template-action="copy" data-form-template-id="${template.id}" aria-label="양식 복사" title="양식 복사" ${busy ? 'disabled' : ''}>
+                    <svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg>
+                  </button>
+                  <button class="icon-button template-card-delete-button danger-button" data-form-template-action="delete" data-form-template-id="${template.id}" type="button" aria-label="양식 삭제" title="${appliedCount ? '사용 중 양식은 삭제할 수 없습니다.' : template.isDefault ? '기본 템플릿은 삭제할 수 없습니다.' : '양식 삭제'}" ${busy || appliedCount || template.isDefault ? 'disabled' : ''}>
+                    <svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16"></path><path d="M9.5 3.5h5"></path><path d="M8 7v11a1.5 1.5 0 0 0 1.5 1.5h5A1.5 1.5 0 0 0 16 18V7"></path><path d="M10 10.5v5"></path><path d="M14 10.5v5"></path></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="template-preview form-template-thumbnail">
+                <iframe src="${previewUrl(template)}&thumbnail=1" title="${escapeAttribute(template.name)} 미리보기 썸네일" loading="lazy" tabindex="-1" aria-hidden="true" inert></iframe>
+                <button type="button" class="form-template-thumbnail-open" data-form-template-open="${template.id}" aria-label="${escapeAttribute(template.name)} 수정" ${busy ? 'disabled' : ''}></button>
+              </div>
+              <div class="template-card-actions form-template-card-actions">
+                <a class="outline-button template-card-action-button" href="${previewUrl(template)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeAttribute(template.name)} 전체 미리보기 (새 창)">
+                  <svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path><circle cx="12" cy="12" r="3"></circle></svg><span>미리보기</span>
+                </a>
+                <button class="primary-button template-card-action-button" type="button" data-form-template-open="${template.id}" ${busy ? 'disabled' : ''}>
+                  <svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20h4.5L19 9.5 14.5 5 4 15.5V20Z"></path><path d="m12.5 7 4.5 4.5"></path></svg><span>수정</span>
+                </button>
+              </div>
+            </article>`;
+          }).join('') || '<article class="form-card"><p>등록된 템플릿이 없습니다. 새 템플릿을 만들어 질문을 구성하세요.</p></article>'}
+        </div>
+      </section>`;
+    }
     const editor = state.applicantManager.fieldEditor || {};
     return `
-      <section class="view-stack applicant-form-settings-view table-view-stack is-field-settings">
+      <section class="view-stack applicant-form-settings-view table-view-stack is-field-settings form-template-management" data-form-template-editing="${selected.id}">
+        ${renderFormTemplateToolbar()}
         ${renderApplicantFieldSettingsPanel({
           title: documentScope ? '서류제출' : '원서접수',
           description: documentScope ? '수험생 서류제출 화면에 표시할 질문을 관리합니다.' : '이름·이메일·생년월일은 회원정보에서 불러오며, 그 외 접수 질문을 관리합니다.',
-          fields: (state.applicantManager.fields || []).filter(field => (field.formScope || 'application') === formScope),
-          editorState: (editor.formScope || 'application') === formScope ? editor : {},
+          fields: (state.applicantManager.fields || []).filter(field => (field.formScope || 'application') === formScope && Number(field.templateId) === selected?.id),
+          editorState: (editor.formScope || 'application') === formScope && Number(editor.templateId) === selected?.id ? editor : {},
           fileUploadScope: documentScope ? 'documents' : 'application',
         })}
       </section>

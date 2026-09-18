@@ -69,8 +69,16 @@ async function runAdminMenuChecks({ services, query, base, call }) {
   assert.equal((await call('/api/accounts/ordinary-test', {}, adminCookie, 'DELETE')).status, 200);
   assert.equal((await call('/api/accounts/' + ids[0], { name: '슈퍼관리자 테스트' }, superCookie, 'PUT')).status, 200);
 
-  const branding = { ...(await services.systemService.getSuperAdminSettings()), schoolName: '보존대학교', logoImageUrl: '/client/assets/logo.png' };
+  const branding = { ...(await services.systemService.getSuperAdminSettings()), schoolName: '보존대학교', logoImageUrl: '/client/assets/logo.png', recruitmentEnabled: false };
   assert.equal((await call('/api/super-admin/settings', branding, superCookie, 'PUT')).status, 200);
+  const roleMenuVisibility = await services.systemService.getRoleMenuVisibilitySettings();
+  for (const role of ['관리자', '운영자']) {
+    for (const view of ['applicantRecruitmentManagement', 'applicantScheduleManagement', 'applicantQuestionTemplateManagement', 'applicantHistory', 'applicantDocumentManagement']) {
+      assert(config.isViewAccessibleForRole(view, role, { roleMenuVisibility }), `${role}: hiding the user application button preserves ${view}`);
+      const response = await fetch(base + config.getViewRoutePath(view), { headers: { Cookie: cookies[role] }, redirect: 'manual' });
+      assert.equal(response.status, 200, `${role}: direct navigation to ${view} stays accessible`);
+    }
+  }
   assert.equal((await call('/api/super-admin/settings', { ...branding, schoolName: '변경 시도' }, adminCookie, 'PUT')).status, 403);
   const settings = await services.systemService.getSystemSettings();
   assert.equal(Object.hasOwn(settings, 'schoolName'), false);

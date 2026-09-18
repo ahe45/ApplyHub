@@ -1,0 +1,16 @@
+.public-language-row { display: flex; justify-content: flex-end; width: 100%; min-width: 0; }
+applyhub-language-toggle { display: inline-flex; flex-shrink: 0; }
+.public-language-toggle { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--glass-line, #d7dce2); border-radius: 999px; background: var(--glass-surface, #fff); }
+.public-language-toggle button { appearance: none; cursor: pointer; border: 0; border-radius: 999px; padding: 8px 14px; min-height: 40px; font: inherit; font-size: 13px; font-weight: 600; color: var(--glass-muted, #526070); background: transparent; white-space: nowrap; }
+.public-language-toggle button[aria-pressed="true"] { color: var(--glass-primary-contrast, #fff); background: var(--glass-primary, #2563eb); }
+.public-language-toggle button:focus-visible { outline: 2px solid var(--glass-primary, #2563eb); outline-offset: 3px; }
+.public-language-toggle button:disabled { cursor: default; opacity: .65; }
+.common-login-stage .public-language-toggle button { min-height: 40px; font-size: 13px; }
+.common-login-stage > .public-language-row { margin-bottom: 18px; }
+public-school-header > .public-language-row { margin-top: 10px; }
+html[data-public-language="en"] .applicant-member-tile :is(strong, small) { overflow-wrap: break-word; }
+html[data-public-language="en"] .applicant-public-actions { flex-wrap: wrap; }
+.applicant-public-field { position: relative; }
+.applicant-public-field .public-localized-file-input { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); }
+.public-file-choose { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; cursor: pointer; }
+.public-localized-file-input:focus-visible + .public-file-choose { outline: 2px solid var(--glass-primary, #2563eb); outline-offset: 3px; }

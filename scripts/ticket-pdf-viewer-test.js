@@ -89,10 +89,12 @@ async function run() {
           }))));
           return;
         }
-        assert.equal(await page.$('ticket-pdf-viewer iframe, .applicant-public-ticket-slab [data-applicant-action="edit-application"], .applicant-public-ticket-slab [data-applicant-action="back-home"]'), null);
-        assert(await page.$eval('.applicant-ticket-number-row', row => {
-          const number = row.querySelector('p').getBoundingClientRect(), download = row.querySelector('a').getBoundingClientRect();
-          return row.textContent.includes('00123456') && number.right <= download.left && Math.abs(number.top + number.height / 2 - download.top - download.height / 2) < 1;
+        assert.equal(await page.$('ticket-pdf-viewer iframe, .applicant-public-ticket-slab [data-applicant-action="edit-application"], .applicant-ticket-number-row a'), null);
+        assert((await page.$eval('.applicant-ticket-number-row', row => row.textContent)).includes('00123456'));
+        assert(await page.$eval('.applicant-public-ticket-slab .applicant-public-actions', row => {
+          const back = row.querySelector('[data-applicant-action="back-home"]').getBoundingClientRect(), download = row.querySelector('a').getBoundingClientRect();
+          const viewer = document.querySelector('ticket-pdf-viewer').getBoundingClientRect();
+          return Math.abs(back.left - row.getBoundingClientRect().left) < 1 && back.right <= download.left && Math.abs(back.top - download.top) < 1 && Math.abs(back.width - download.width) < 1 && back.top >= viewer.bottom;
         }));
         assert(await page.$$eval('ticket-pdf-viewer canvas', canvases => canvases.every(canvas => {
           const pixel = canvas.getContext('2d').getImageData(5, 5, 1, 1).data;
@@ -103,7 +105,7 @@ async function run() {
         await page.setViewport({ width: 844, height: 390, isMobile: true, hasTouch: true });
         await ready();
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-        console.log(`PASS: ${theme} ${width}px: two rendered pages, toolbar-free, number/download row, rotation`);
+        console.log(`PASS: ${theme} ${width}px: two rendered pages, toolbar-free, back/download footer, rotation`);
       }
     }
     pdfDelay = 200;

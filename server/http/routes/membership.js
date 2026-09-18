@@ -62,6 +62,7 @@ function createMembershipRoutes(deps) {
     }),
     publicRoute("POST", "/api/public/members/login", async ({ request, response }) => members.login(await body(request), request, response)),
     publicRoute("POST", "/api/public/members/logout", ({ request, response }) => members.logout(request, response)),
+    publicRoute("GET", "/api/public/members/document-status", async ({ request }) => applicants.getMemberDocumentStatus(await members.requireMember(request))),
     publicRoute("GET", "/api/public/members/application", ({ request }) => context(request)),
     publicRoute("POST", "/api/public/applications", async ({ request }) => {
       const member = await members.requireMember(request);

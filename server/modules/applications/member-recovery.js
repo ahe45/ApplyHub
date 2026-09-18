@@ -22,7 +22,7 @@ function createMemberRecovery({ query, getPool, fail, throttle, normalizeEmail, 
     const id = randomBytes(24).toString('hex'), code = String(randomInt(100000, 1000000));
     // Send the same verification message even when details do not match, so this
     // endpoint (including delivery failures) does not disclose account existence.
-    await sendEmail({ applicantName: '이용자', email, codeValue: code, expiresAt: new Date(Date.now() + 600000), purposeLabel: '비밀번호 재설정' });
+    await sendEmail({ applicantName: '이용자', email, codeValue: code, expiresAt: new Date(Date.now() + 600000), purposeLabel: '비밀번호 재설정', language: payload.language === 'en' ? 'en' : 'ko' });
     await query('DELETE FROM applicant_member_recovery WHERE email = ? OR expires_at <= NOW()', [email]);
     await query('INSERT INTO applicant_member_recovery (id, member_id, email, purpose, code_hash, expires_at) VALUES (?,?,?,?,?,DATE_ADD(NOW(), INTERVAL 10 MINUTE))', [id, member?.id || null, email, mode, digest(id + code)]);
     return { recoveryId: id, expiresInSeconds: 600, message: '인증번호를 발송했습니다. 가입 정보가 일치해야 계정을 찾을 수 있습니다.' };

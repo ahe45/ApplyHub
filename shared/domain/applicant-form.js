@@ -90,7 +90,8 @@
     Object.freeze({ key: "text", label: "텍스트" }),
     Object.freeze({ key: "phone", label: "전화번호" }),
     Object.freeze({ key: "nationality", label: "국적" }),
-    Object.freeze({ key: "select", label: "선택지" }),
+    Object.freeze({ key: "select", label: "단일 선택" }),
+    Object.freeze({ key: "multiselect", label: "복수 선택" }),
     Object.freeze({ key: "birthdate", label: "생년월일" }),
     Object.freeze({ key: "photo", label: "사진 업로드" }),
     Object.freeze({ key: "file", label: "파일 업로드" }),
@@ -102,6 +103,7 @@
     phone: '전화번호를 숫자로 입력합니다.',
     nationality: '국가명을 검색한 뒤 목록에서 선택합니다.',
     select: '등록한 선택지 중 하나를 선택합니다. 직접 입력 항목도 추가할 수 있습니다.',
+    multiselect: '등록한 선택지 중 여러 항목을 선택합니다. 직접 입력 항목도 추가할 수 있습니다.',
     date: '연도, 월, 일을 선택합니다.',
     birthdate: '생년월일의 연도, 월, 일을 선택합니다.',
     time: '시간과 분을 입력합니다.',
@@ -110,6 +112,27 @@
   });
 
   const applicationAnswerTypeOptions = Object.freeze(answerTypeOptions.filter(option => option.key !== 'birthdate'));
+  const signupAnswerTypeOptions = Object.freeze(answerTypeOptions.filter(option => !['photo', 'file'].includes(option.key)));
+  const isChoiceInputType = type => ['select', 'multiselect'].includes(type);
+  function normalizeChoiceTranslations(options = [], translations = {}) {
+    return Object.fromEntries(options.map(option => [option, Object.hasOwn(translations || {}, option) ? String(translations[option] || '').trim().slice(0, 200) : '']));
+  }
+  function parseMultiSelectValue(value) {
+    if (Array.isArray(value)) return value.filter(item => typeof item === 'string');
+    if (!value) return [];
+    try { const parsed = JSON.parse(value); if (Array.isArray(parsed)) return parsed.filter(item => typeof item === 'string'); } catch {}
+    return [String(value)];
+  }
+  function validateMultiSelectAnswer(field, raw, label) {
+    const values = raw == null || raw === '' ? [] : raw;
+    if (!Array.isArray(values) || values.length > 100 || values.some(value => typeof value !== 'string' || !value.trim() || value.length > 255)) throw new Error(`${label} 선택값이 올바르지 않습니다.`);
+    const unique = [...new Set(values.map(value => value.trim()))];
+    if (field.required && !unique.length) throw new Error(`${label} 항목을 선택하세요.`);
+    const custom = field.customOptionLabel;
+    if (unique.some(value => !field.options.includes(value) && !(custom && value.startsWith(custom + ': ') && value.slice(custom.length + 2).trim()))) throw new Error(`${label} 선택값이 올바르지 않습니다.`);
+    if (custom && unique.includes(custom)) throw new Error(`${label} 직접 입력 내용을 작성하세요.`);
+    return unique;
+  }
   function getMemberBirthDate(member, questions = []) {
     const profile = member?.profile || {};
     if (typeof profile.birth === 'string' && profile.birth.trim()) return profile.birth.trim();
@@ -314,6 +337,17 @@
     };
   }
 
+  function isApplicantScheduleEnabled(schedule = {}, type = 'submission') {
+    const key = { submission: 'applicantScheduleEnabled', documents: 'documentSubmissionScheduleEnabled', 'document-status': 'documentReviewScheduleEnabled', lookup: 'admitCardLookupScheduleEnabled' }[type];
+    const value = schedule?.[key];
+    return value !== false && value !== 0 && value !== '0';
+  }
+
+  function getScheduleEnabledState(schedule, type) {
+    const enabled = isApplicantScheduleEnabled(schedule, type);
+    return enabled ? { enabled: true } : { enabled: false, isOpen: false, reason: 'disabled' };
+  }
+
   function getApplicantSubmissionScheduleState(schedule = {}, referenceDate = new Date()) {
     const applicantScheduleStartAt = normalizeApplicantScheduleDateTime(schedule?.applicantScheduleStartAt);
     const applicantScheduleEndAt = normalizeApplicantScheduleDateTime(schedule?.applicantScheduleEndAt);
@@ -322,6 +356,7 @@
       applicantScheduleStartAt,
       applicantScheduleEndAt,
       ...buildApplicantScheduleWindowState(applicantScheduleStartAt, applicantScheduleEndAt, referenceDate),
+      ...getScheduleEnabledState(schedule, 'submission'),
     };
   }
 
@@ -332,6 +367,18 @@
       documentSubmissionScheduleStartAt,
       documentSubmissionScheduleEndAt,
       ...buildApplicantScheduleWindowState(documentSubmissionScheduleStartAt, documentSubmissionScheduleEndAt, referenceDate),
+      ...getScheduleEnabledState(schedule, 'documents'),
+    };
+  }
+
+  function getApplicantDocumentReviewScheduleState(schedule = {}, referenceDate = new Date()) {
+    const documentReviewScheduleStartAt = normalizeApplicantScheduleDateTime(schedule?.documentReviewScheduleStartAt);
+    const documentReviewScheduleEndAt = normalizeApplicantScheduleDateTime(schedule?.documentReviewScheduleEndAt);
+    return {
+      documentReviewScheduleStartAt,
+      documentReviewScheduleEndAt,
+      ...buildApplicantScheduleWindowState(documentReviewScheduleStartAt, documentReviewScheduleEndAt, referenceDate),
+      ...getScheduleEnabledState(schedule, 'document-status'),
     };
   }
 
@@ -343,13 +390,16 @@
       admitCardLookupScheduleStartAt,
       admitCardLookupScheduleEndAt,
       ...buildApplicantScheduleWindowState(admitCardLookupScheduleStartAt, admitCardLookupScheduleEndAt, referenceDate),
+      ...getScheduleEnabledState(schedule, 'lookup'),
     };
   }
 
   function getApplicantAggregateScheduleState(schedules = [], scheduleType = "submission", referenceDate = new Date()) {
-    const normalizedSchedules = Array.isArray(schedules) ? schedules : [];
+    const allSchedules = Array.isArray(schedules) ? schedules : [];
+    const normalizedSchedules = allSchedules.filter(schedule => isApplicantScheduleEnabled(schedule, scheduleType));
     const scheduleStateResolver =
       scheduleType === "lookup" ? getApplicantAdmitCardLookupScheduleState : getApplicantSubmissionScheduleState;
+    if (allSchedules.length && !normalizedSchedules.length) return { ...scheduleStateResolver({}, referenceDate), enabled: false, reason: 'disabled' };
     const configuredStates = normalizedSchedules
       .map((schedule) => scheduleStateResolver(schedule, referenceDate))
       .filter((scheduleState) => scheduleState.isConfigured);
@@ -448,6 +498,19 @@
     return isScheduleOpen ? "접수 중" : applicantStatusLabelMap.submitted || "접수 완료";
   }
 
+  function resolveChoiceOptionEdits(editor = {}) {
+    const original = Array.isArray(editor.options) ? editor.options : [];
+    const options = original.map((option, index) => String(editor.optionKoreanEdits?.[index] ?? option).trim());
+    if (options.some(option => !option)) throw new Error('선택지의 한국어 내용을 입력하세요.');
+    if (new Set(options).size !== options.length) throw new Error('같은 선택지 항목이 이미 있습니다.');
+    return {
+      options,
+      optionsEn: Object.fromEntries(original.map((option, index) => [options[index], String(editor.optionsEn?.[option] || '').trim()])),
+      customOptionLabel: options[original.indexOf(editor.customOptionLabel)] || '',
+      optionKoreanEdits: {},
+    };
+  }
+
   function normalizeFileUploadSettings(value = {}, scope = "application") {
     const fileNamePattern = String(value.fileNamePattern || "").trim();
     const tokens = scope === "signup" ? ["ID", "질문제목", "원본파일명"] : ["수험번호", "질문제목", "원본파일명"];
@@ -473,6 +536,13 @@
   }
 
   return Object.freeze({
+    isApplicantScheduleEnabled,
+    signupAnswerTypeOptions,
+    isChoiceInputType,
+    normalizeChoiceTranslations,
+    resolveChoiceOptionEdits,
+    parseMultiSelectValue,
+    validateMultiSelectAnswer,
     normalizeFileUploadSettings,
     isAllowedUploadExtension,
     formatUploadFileBaseName,
@@ -488,6 +558,7 @@
     findApplicantScheduleRecord,
     getApplicantAdmitCardLookupScheduleState,
     getApplicantDocumentSubmissionScheduleState,
+    getApplicantDocumentReviewScheduleState,
     getApplicantAggregateScheduleState,
     getApplicantAnswerTypeLabel,
     getApplicantScheduleTimestamp,

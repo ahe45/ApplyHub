@@ -4,7 +4,7 @@ function createApplicantSchemaBootstrap({
   hasTable,
   query,
 }) {
-  const applicantFieldInputTypeSql = "ENUM('text', 'textarea', 'select', 'date', 'birthdate', 'time', 'photo', 'file', 'phone', 'nationality')";
+  const applicantFieldInputTypeSql = "ENUM('text', 'textarea', 'select', 'date', 'birthdate', 'time', 'photo', 'file', 'phone', 'nationality', 'multiselect')";
   const applicantSubmissionStatusSql = "ENUM('submitted', 'promoted')";
 
   async function renameLegacyTableIfNeeded(legacyTableName, nextTableName) {
@@ -55,12 +55,15 @@ function createApplicantSchemaBootstrap({
         track_name VARCHAR(100) NOT NULL DEFAULT '',
         admission_code VARCHAR(30) NOT NULL,
         admission_name VARCHAR(100) NOT NULL,
+        admission_name_en VARCHAR(200) NOT NULL DEFAULT '',
         series_code VARCHAR(30) NOT NULL DEFAULT '',
         series_name VARCHAR(100) NOT NULL DEFAULT '',
         unit_code VARCHAR(30) NOT NULL,
         unit_name VARCHAR(100) NOT NULL,
+        unit_name_en VARCHAR(200) NOT NULL DEFAULT '',
         major_code VARCHAR(30) NOT NULL DEFAULT '',
         major_name VARCHAR(100) NOT NULL DEFAULT '',
+        major_name_en VARCHAR(200) NOT NULL DEFAULT '',
         sort_order INT NOT NULL DEFAULT 0,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -81,10 +84,16 @@ function createApplicantSchemaBootstrap({
         admission_name VARCHAR(100) NOT NULL,
         applicant_schedule_start_at DATETIME NULL,
         applicant_schedule_end_at DATETIME NULL,
+        applicant_schedule_enabled TINYINT(1) NOT NULL DEFAULT 1,
         admit_card_lookup_schedule_start_at DATETIME NULL,
         admit_card_lookup_schedule_end_at DATETIME NULL,
+        admit_card_lookup_schedule_enabled TINYINT(1) NOT NULL DEFAULT 1,
         document_submission_schedule_start_at DATETIME NULL,
         document_submission_schedule_end_at DATETIME NULL,
+        document_submission_schedule_enabled TINYINT(1) NOT NULL DEFAULT 1,
+        document_review_schedule_start_at DATETIME NULL,
+        document_review_schedule_end_at DATETIME NULL,
+        document_review_schedule_enabled TINYINT(1) NOT NULL DEFAULT 1,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
@@ -222,6 +231,11 @@ function createApplicantSchemaBootstrap({
     await createApplicantRecruitmentUnitTable();
 
     const applicantUnitColumns = await getTableColumns("app_unit");
+    for (const column of ["admission_name_en", "unit_name_en", "major_name_en"]) {
+      if (!hasColumn(applicantUnitColumns, column)) {
+        await query(`ALTER TABLE app_unit ADD COLUMN ${column} VARCHAR(200) NOT NULL DEFAULT ''`);
+      }
+    }
     const hadLegacyTrackCodeColumn = hasColumn(applicantUnitColumns, "track_code");
     const hadTrackNameColumn = hasColumn(applicantUnitColumns, "track_name");
     const hadSeriesCodeColumn = hasColumn(applicantUnitColumns, "series_code");
@@ -323,13 +337,16 @@ function createApplicantSchemaBootstrap({
       MODIFY COLUMN track_name VARCHAR(100) NOT NULL DEFAULT '' AFTER id,
       MODIFY COLUMN admission_code VARCHAR(30) NOT NULL AFTER track_name,
       MODIFY COLUMN admission_name VARCHAR(100) NOT NULL AFTER admission_code,
-      MODIFY COLUMN series_code VARCHAR(30) NOT NULL DEFAULT '' AFTER admission_name,
+      MODIFY COLUMN admission_name_en VARCHAR(200) NOT NULL DEFAULT '' AFTER admission_name,
+      MODIFY COLUMN series_code VARCHAR(30) NOT NULL DEFAULT '' AFTER admission_name_en,
       MODIFY COLUMN series_name VARCHAR(100) NOT NULL DEFAULT '' AFTER series_code,
       MODIFY COLUMN unit_code VARCHAR(30) NOT NULL AFTER series_name,
       MODIFY COLUMN unit_name VARCHAR(100) NOT NULL AFTER unit_code,
-      MODIFY COLUMN major_code VARCHAR(30) NOT NULL DEFAULT '' AFTER unit_name,
+      MODIFY COLUMN unit_name_en VARCHAR(200) NOT NULL DEFAULT '' AFTER unit_name,
+      MODIFY COLUMN major_code VARCHAR(30) NOT NULL DEFAULT '' AFTER unit_name_en,
       MODIFY COLUMN major_name VARCHAR(100) NOT NULL DEFAULT '' AFTER major_code,
-      MODIFY COLUMN sort_order INT NOT NULL DEFAULT 0 AFTER major_name
+      MODIFY COLUMN major_name_en VARCHAR(200) NOT NULL DEFAULT '' AFTER major_name,
+      MODIFY COLUMN sort_order INT NOT NULL DEFAULT 0 AFTER major_name_en
     `);
   }
 
@@ -379,6 +396,17 @@ function createApplicantSchemaBootstrap({
       await query(`ALTER TABLE app_schedule ADD COLUMN document_submission_schedule_end_at DATETIME NULL`);
     }
 
+    for (const suffix of ['start_at', 'end_at']) {
+      if (!columnExists('document_review_schedule_' + suffix)) {
+        await query(`ALTER TABLE app_schedule ADD COLUMN document_review_schedule_${suffix} DATETIME NULL`);
+      }
+    }
+    for (const prefix of ['applicant', 'document_submission', 'document_review', 'admit_card_lookup']) {
+      if (!columnExists(prefix + '_schedule_enabled')) {
+        await query(`ALTER TABLE app_schedule ADD COLUMN ${prefix}_schedule_enabled TINYINT(1) NOT NULL DEFAULT 1 AFTER ${prefix}_schedule_end_at`);
+      }
+    }
+
     const refreshedIndexes = await query(`SHOW INDEX FROM app_schedule`);
     const hasTrackAdmissionIndex = refreshedIndexes.some((index) => String(index.Key_name || "") === "uniq_app_schedule_track_admission");
     const hasTrackNameIndex = refreshedIndexes.some((index) => String(index.Key_name || "") === "idx_app_schedule_track_name");
@@ -405,6 +433,8 @@ function createApplicantSchemaBootstrap({
         field_key VARCHAR(60) NOT NULL,
         question_text VARCHAR(255) NOT NULL,
         question_description VARCHAR(500) NOT NULL DEFAULT '',
+        question_text_en VARCHAR(255) NOT NULL DEFAULT '',
+        question_description_en VARCHAR(500) NOT NULL DEFAULT '',
         input_type ${applicantFieldInputTypeSql} NOT NULL DEFAULT 'text',
         system_field_key VARCHAR(40) NOT NULL DEFAULT '',
         options_json TEXT NULL,
@@ -418,6 +448,12 @@ function createApplicantSchemaBootstrap({
         KEY idx_app_form_sort_order (sort_order)
       )
     `);
+
+    // Additive migration keeps existing questions and answers intact.
+    for (const [name, length] of [['question_text_en', 255], ['question_description_en', 500]]) {
+      const [column] = await query(`SHOW COLUMNS FROM app_form LIKE '${name}'`);
+      if (!column) await query(`ALTER TABLE app_form ADD COLUMN ${name} VARCHAR(${length}) NOT NULL DEFAULT ''`);
+    }
 
     if (typeof getTableColumns === "function" && typeof hasColumn === "function") {
       const applicantFieldColumns = await getTableColumns("app_form");
@@ -433,7 +469,8 @@ function createApplicantSchemaBootstrap({
       if (
         !String(inputTypeColumn?.Type || "").includes("'phone'") ||
         !String(inputTypeColumn?.Type || "").includes("'nationality'") ||
-        !String(inputTypeColumn?.Type || "").includes("'file'")
+        !String(inputTypeColumn?.Type || "").includes("'file'") ||
+        !String(inputTypeColumn?.Type || "").includes("'multiselect'")
       ) {
         await query(`ALTER TABLE app_form MODIFY COLUMN input_type ${applicantFieldInputTypeSql} NOT NULL DEFAULT 'text'`);
       }
@@ -452,7 +489,8 @@ function createApplicantSchemaBootstrap({
       if (
         !String(inputTypeColumn?.Type || "").includes("'phone'") ||
         !String(inputTypeColumn?.Type || "").includes("'nationality'") ||
-        !String(inputTypeColumn?.Type || "").includes("'file'")
+        !String(inputTypeColumn?.Type || "").includes("'file'") ||
+        !String(inputTypeColumn?.Type || "").includes("'multiselect'")
       ) {
         await query(`ALTER TABLE app_form MODIFY COLUMN input_type ${applicantFieldInputTypeSql} NOT NULL DEFAULT 'text'`);
       }
@@ -522,6 +560,29 @@ function createApplicantSchemaBootstrap({
     }
   }
 
+  async function ensureApplicantFormTemplateSchema() {
+    await query(`CREATE TABLE IF NOT EXISTS app_form_template (
+      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      form_scope ENUM('application', 'documents') NOT NULL,
+      name VARCHAR(100) NOT NULL,
+      is_default TINYINT(1) NOT NULL DEFAULT 0,
+      UNIQUE KEY uniq_form_template_name (form_scope, name)
+    )`);
+    for (const [scope, name] of [['application', '기본 원서접수'], ['documents', '기본 서류제출']]) {
+      await query(`INSERT INTO app_form_template (form_scope, name, is_default)
+        SELECT ?, ?, 1 WHERE NOT EXISTS (SELECT 1 FROM app_form_template WHERE form_scope = ? AND is_default = 1)`, [scope, name, scope]);
+    }
+    const [fieldColumn] = await query("SHOW COLUMNS FROM app_form LIKE 'template_id'");
+    if (!fieldColumn) {
+      await query('ALTER TABLE app_form ADD COLUMN template_id BIGINT UNSIGNED NULL, ADD KEY idx_form_template (template_id)');
+      await query('UPDATE app_form f JOIN app_form_template t ON t.form_scope = f.form_scope AND t.is_default = 1 SET f.template_id = t.id');
+    }
+    for (const column of ['application_template_id', 'document_template_id']) {
+      const [existing] = await query(`SHOW COLUMNS FROM app_schedule LIKE '${column}'`);
+      if (!existing) await query(`ALTER TABLE app_schedule ADD COLUMN ${column} BIGINT UNSIGNED NULL`);
+    }
+  }
+
   async function ensureApplicantSchema() {
     await renameLegacyTableIfNeeded("applicant_form_fields", "app_form");
     await renameLegacyTableIfNeeded("applicant_submission_meta", "app_meta");
@@ -533,6 +594,17 @@ function createApplicantSchemaBootstrap({
     await ensureApplicantUnitSchema();
     await ensureApplicantScheduleSchema();
     await ensureApplicantSubmissionSchema();
+    await ensureApplicantFormTemplateSchema();
+    await query(`CREATE TABLE IF NOT EXISTS app_document_status (
+        submission_id BIGINT UNSIGNED NOT NULL,
+        field_id BIGINT UNSIGNED NOT NULL,
+        status ENUM('submitted', 'missing', 'incomplete') NOT NULL DEFAULT 'missing',
+        updated_by VARCHAR(255) NOT NULL DEFAULT '',
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (submission_id, field_id),
+        CONSTRAINT fk_document_status_submission FOREIGN KEY (submission_id) REFERENCES app_meta(id) ON DELETE CASCADE,
+        CONSTRAINT fk_document_status_field FOREIGN KEY (field_id) REFERENCES app_form(id) ON DELETE CASCADE
+      )`);
 
     await query(`
       CREATE TABLE IF NOT EXISTS app_email_log (

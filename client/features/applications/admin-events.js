@@ -202,7 +202,7 @@
       }
 
       if (target.dataset.applicantScheduleInput) {
-        deps.updateApplicantScheduleEditorField?.(target.dataset.applicantScheduleInput, target.value);
+        deps.updateApplicantScheduleEditorField?.(target.dataset.applicantScheduleInput, target.type === "checkbox" ? target.checked : target.value);
         return true;
       }
 

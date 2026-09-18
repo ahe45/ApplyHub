@@ -19,7 +19,7 @@ const config = require("../shared/app-config");
 
 async function run() {
   const developmentMode = process.argv.includes('--development-code');
-  const database = `admitcard_membership_test_${Date.now()}`;
+  const database = `admitcard_membership_test_${Date.now()}_${process.pid}`;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "admitcard-member-test-"));
   const admin = await mysql.createConnection(getDbConfig(false));
   let pool, server, browser;
@@ -31,10 +31,11 @@ async function run() {
     await services.initializeApplicationData();
     // Simulate an existing database before separate document questions were introduced.
     const legacyFields = await query('SELECT id, field_key, question_text, input_type FROM app_form ORDER BY id');
-    await query('ALTER TABLE app_form DROP COLUMN form_scope');
+    await query('ALTER TABLE app_form DROP COLUMN form_scope, DROP COLUMN question_text_en, DROP COLUMN question_description_en');
     await services.initializeApplicationData();
     assert.deepEqual(await query('SELECT id, field_key, question_text, input_type FROM app_form ORDER BY id'), legacyFields);
     assert((await query('SELECT form_scope FROM app_form')).every(field => field.form_scope === 'application'));
+    assert((await query('SELECT question_text_en, question_description_en FROM app_form')).every(field => field.question_text_en === '' && field.question_description_en === ''), 'Existing questions migrate with empty English fields');
     let deliveredCode = "";
     const members = createApplicantMembershipService({ query, getPool: () => pool, createHttpError: services.createHttpError,
       env: { NODE_ENV: developmentMode ? 'development' : 'production', APPLICANT_SIGNUP_CODE_PREVIEW: 'true' },
@@ -145,6 +146,10 @@ async function run() {
     await query("INSERT INTO app_unit (track_name, admission_code, admission_name, series_code, series_name, unit_code, unit_name) VALUES ('수시','1','일반','2','인문','3','문학')");
     await query("INSERT INTO app_schedule (track_name, admission_code, admission_name, applicant_schedule_start_at, applicant_schedule_end_at, admit_card_lookup_schedule_start_at, admit_card_lookup_schedule_end_at) VALUES ('수시','1','일반',DATE_SUB(NOW(), INTERVAL 1 DAY),DATE_ADD(NOW(), INTERVAL 1 DAY),DATE_SUB(NOW(), INTERVAL 1 DAY),DATE_ADD(NOW(), INTERVAL 1 DAY))");
     await query("UPDATE app_form SET required = 0 WHERE system_field_key <> 'name'");
+    if (process.argv.includes('--nationality-code')) {
+      await require('./member-nationality-checks').runMemberNationalityChecks({ services, members, query, call, memberCookie: login.cookie, signup });
+      return;
+    }
     await services.applicantService.createApplicantFormField({ formScope: 'documents', fieldKey: "document", questionText: "졸업증명서", inputType: "file", required: false });
     await services.applicantService.createApplicantFormField({ formScope: 'documents', fieldKey: 'document-note', questionText: '제출 확인사항', inputType: 'text', required: true });
     const application = { selectionAnswers: { track: "수시", admission: "일반", series: "인문", unit: "문학", major: "" }, answers: { "applicant-name": signup.name, birth: "1900-01-01" } };
@@ -232,6 +237,30 @@ async function run() {
     }
     if (process.argv.includes('--submission-tickets')) {
       await require('./submission-ticket-test').verifySubmissionTickets({ services, call, base, query, submissionId: submission.id, memberCookie: login.cookie });
+      return;
+    }
+    if (process.argv.includes('--form-templates')) {
+      await require('./form-template-checks').runFormTemplateChecks({ services, query, base, call, memberCookie: login.cookie, submissionId: submission.id });
+      return;
+    }
+    if (process.argv.includes('--terms-language')) {
+      await require('./terms-language-checks').runTermsLanguageChecks({ services, members, query, base, call });
+      return;
+    }
+    if (process.argv.includes('--document-status')) {
+      await require('./document-status-checks').runDocumentStatusChecks({ services, members, query, base, call, memberCookie: login.cookie, submissionId: submission.id });
+      return;
+    }
+    if (process.argv.includes('--schedule-settings')) {
+      await require('./schedule-settings-checks').runScheduleSettingsChecks({ services, members, query, base, call, memberCookie: login.cookie, submissionId: submission.id });
+      return;
+    }
+    if (process.argv.includes('--choice-settings')) {
+      await require('./choice-settings-checks').runChoiceSettingsChecks({ services, members, query, base, call, memberCookie: login.cookie, submissionId: submission.id });
+      return;
+    }
+    if (process.argv.includes('--public-language')) {
+      await require('./public-language-checks').runPublicLanguageChecks({ services, members, query, base, call, memberCookie: login.cookie, submissionId: submission.id });
       return;
     }
     await members.saveSettings({ emailVerification: false, birth: "hidden", phone: "hidden" });
@@ -446,7 +475,7 @@ async function run() {
     await submitLoginWithoutFlash();
     await page.waitForSelector(".applicant-member-tile");
     await checkMobileLayout('member home');
-    assert.equal(await page.$$eval(".applicant-member-tile", (tiles) => tiles.length), 4);
+    assert.equal(await page.$$eval(".applicant-member-tile", (tiles) => tiles.length), 5);
     assert.equal(await page.$eval(".applicant-member-menu", (el) => getComputedStyle(el).gridTemplateColumns.split(" ").length), 2);
     const artifacts = path.resolve(__dirname, "../.tmp-membership-check");
     fs.mkdirSync(artifacts, { recursive: true });
@@ -482,6 +511,17 @@ async function run() {
     await checkMobileLayout('ticket');
     await page.goto(base + "/applicant", { waitUntil: "networkidle2" });
     await page.waitForSelector(".applicant-member-tile");
+    const savedSuperAdminSettings = await services.systemService.getSuperAdminSettings();
+    assert(await page.$('[data-applicant-action="member-apply"]'));
+    await services.systemService.updateSuperAdminSettings({ ...savedSuperAdminSettings, recruitmentEnabled: false });
+    await page.reload({ waitUntil: 'networkidle2' });
+    assert.equal(await page.$('[data-applicant-action="member-apply"]'), null, 'Hidden application button is absent from the user home');
+    for (const action of ['documents', 'summary', 'ticket']) assert(await page.$(`[data-applicant-action="member-${action}"]`));
+    await checkMobileLayout('home with application button hidden');
+    await services.systemService.updateSuperAdminSettings({ ...savedSuperAdminSettings, recruitmentEnabled: true });
+    await page.reload({ waitUntil: 'networkidle2' });
+    assert(await page.$('[data-applicant-action="member-apply"]'), 'Enabling the setting restores the application button');
+    await services.systemService.updateSuperAdminSettings(savedSuperAdminSettings);
     await page.setViewport({ width: 390, height: 844 });
     await page.screenshot({ path: path.join(artifacts, "member-mobile.png"), fullPage: true });
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
@@ -814,7 +854,7 @@ async function run() {
     ]);
     await page.click('[data-notice-scope=applicant]');
     await page.waitForSelector('.applicant-member-tile');
-    assert.equal((await page.$$('.applicant-member-tile')).length, 4);
+    assert.equal((await page.$('.applicant-member-tile')).length, 5);
     await page.evaluate(() => fetch('/api/auth/logout', { method: 'POST' }));
     await page.goto(base + '/login', { waitUntil: 'networkidle2' });
     assert((await page.content()).includes('공통 로그인 안내 테스트'));

@@ -540,3 +540,20 @@
   }
 
 }
+
+.applicant-multiple-choice { display: grid; gap: 10px; min-width: 0; }
+.applicant-public-field .applicant-multiple-choice-option { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--glass-line); border-radius: 12px; background: var(--glass-bg); cursor: pointer; }
+.applicant-multiple-choice-option input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; flex-shrink: 0; margin: 0; }
+.applicant-multiple-choice-option span { overflow-wrap: anywhere; }
+.applicant-multiple-choice-option:has(input:checked) { background: var(--glass-tint); border-color: var(--glass-primary); }
+
+.applicant-document-status-list { display: grid; gap: 12px; margin-block: 24px; }
+.applicant-document-status-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px; border: 1px solid var(--glass-line, #e2e8f0); border-radius: 14px; }
+.applicant-document-status-row > div { min-width: 0; overflow-wrap: anywhere; }
+.applicant-document-status-row p { margin: 8px 0 0; font-size: 13px; color: var(--glass-muted, #64748b); }
+.applicant-document-status-badge { flex-shrink: 0; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700; background: #f1f5f9; color: #475569; }
+.applicant-document-status-badge.is-submitted { background: #e9f7ef; color: #166534; }
+.applicant-document-status-badge.is-incomplete { background: #fff3dc; color: #92400e; }
+@media (max-width: 480px) {
+  .applicant-document-status-row { align-items: flex-start; flex-direction: column; gap: 12px; padding: 14px; }
+}

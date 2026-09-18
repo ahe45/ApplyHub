@@ -101,6 +101,7 @@
     const {
       addTemplateCard,
       applyTemplateCard,
+      copyTemplateCard,
       deleteTemplateCard,
       updateTemplateCard,
     } = templateLifecycleActionController;
@@ -159,6 +160,7 @@
     return Object.freeze({
       addTemplateCard,
       applyTemplateCard,
+      copyTemplateCard,
       deleteTemplateCard,
       findTemplateCard,
       getDefaultTemplateContent,

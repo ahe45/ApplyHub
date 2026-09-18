@@ -46,6 +46,7 @@
 
   function renderLoginStage({
     noticeHtml,
+    noticeHtmlEn = "",
     heading,
     description,
     submitLabel,
@@ -65,7 +66,7 @@
     const logoImageUrl = resolveSuperAdminLogoImageUrl(state.superAdmin || {});
     const schoolName = String(state.superAdmin?.schoolName || '').trim() || '원서접수시스템';
     let admissionHomepageUrl = '';
-    const configuredHomepage = String((interactive ? state.loginNotice?.admissionHomepageUrl : state.systemSettings?.admissionHomepageUrl) || '').trim();
+    const configuredHomepage = String((interactive ? state.noticeManagement?.scopes.login.admissionHomepageUrl : state.systemSettings?.admissionHomepageUrl) || '').trim();
     if (configuredHomepage) {
       try {
         const url = new URL(configuredHomepage, window.location.origin);
@@ -82,10 +83,12 @@
     const formBody = interactive
       ? `
           <form class="login-form login-stage-form" id="loginForm">
-            <h3>${escapeHtml(heading)}</h3>
             ${window.location.search.includes("registered=1") ? '<p class="login-stage-description">회원가입이 완료되었습니다. 이메일로 로그인해 주세요.</p>' : ''}
-            <label class="field login-field" for="loginAccountId">
-              <span>이메일</span>
+            <div class="field login-field">
+              <div class="login-field-heading">
+                <label for="loginAccountId"><span>이메일</span></label>
+                <h3>${escapeHtml(heading)}</h3>
+              </div>
               <input
                 id="loginAccountId"
                 required
@@ -99,7 +102,7 @@
                 placeholder="이메일을 입력하세요"
                 ${isDisabled ? "disabled" : ""}
               />
-            </label>
+            </div>
             <label class="field login-field" for="loginPassword">
               <span>비밀번호</span>
               <input
@@ -124,11 +127,13 @@
         `
       : `
           <div class="login-form login-stage-form login-stage-form-preview">
-            <h3>${escapeHtml(heading)}</h3>
-            <label class="field login-field">
-              <span>이메일</span>
-              <input type="text" value="${escapeAttribute(accountIdValue)}" readonly tabindex="-1" />
-            </label>
+            <div class="field login-field">
+              <div class="login-field-heading">
+                <span>이메일</span>
+                <h3>${escapeHtml(heading)}</h3>
+              </div>
+              <input type="text" aria-label="이메일" value="${escapeAttribute(accountIdValue)}" readonly tabindex="-1" />
+            </div>
             <label class="field login-field">
               <span>비밀번호</span>
               <input type="password" value="${escapeAttribute(passwordValue)}" readonly tabindex="-1" />
@@ -145,11 +150,12 @@
           ${homepageLink}
           <div class="login-stage-brand">
             <img class="login-stage-brand-mark" src="${escapeAttribute(logoImageUrl)}" alt="" width="48" height="48" />
-            <div class="login-stage-brand-copy"><strong title="${escapeAttribute(schoolName)}">${escapeHtml(schoolName)}</strong></div>
+            <div class="login-stage-brand-copy"><strong ${state.superAdmin?.schoolName ? 'translate="no"' : ''} title="${escapeAttribute(schoolName)}">${escapeHtml(schoolName)}</strong></div>
           </div>
           <applyhub-theme-toggle ${interactive ? '' : 'disabled'}></applyhub-theme-toggle>
         </header>
-        ${publicRenderingHelpersModule.renderCompactNotice({ html: noticeContentMarkup, cardClassName: noticeCardClassName, contentClassName: noticeContentClassName, contentId: noticeContentId, contentAttributes: noticeContentAttributes, editing: useEditorMarkup })}
+        ${interactive ? '<div class="public-language-row"><applyhub-language-toggle></applyhub-language-toggle></div>' : ''}
+        ${publicRenderingHelpersModule.renderCompactNotice({ html: noticeContentMarkup, htmlEn: noticeHtmlEn.trim() ? getLoginNoticeMarkup(noticeHtmlEn) : '', userContent: Boolean(String(noticeHtml || '').trim()), cardClassName: noticeCardClassName, contentClassName: noticeContentClassName, contentId: noticeContentId, contentAttributes: noticeContentAttributes, editing: useEditorMarkup })}
 
         <article class="${panelClassNames}">
           <div class="login-stage-panel-inner">${formBody}</div>
@@ -171,7 +177,8 @@
         : "계정 관리에 등록된 계정 ID와 비밀번호로 로그인합니다.";
 
     return `${renderAuthBackgroundMedia(superAdminSettings)}${renderLoginStage({
-      noticeHtml: state.loginNotice.savedHtml,
+      noticeHtml: state.noticeManagement.scopes.login.savedHtml,
+      noticeHtmlEn: state.noticeManagement.englishScopes.login.savedHtml,
       heading,
       description,
       submitLabel: state.auth.isSubmittingLogin ? "로그인 중..." : "로그인",

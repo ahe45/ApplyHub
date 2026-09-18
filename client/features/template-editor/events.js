@@ -28,6 +28,7 @@
     clearTemplateEditorTableHoverState,
     clearTemplateEditorTableSelection,
     closeTemplateCardMetaEditor,
+    copyTemplateCard,
     deleteTemplateCard,
     getTemplateEditorCellSplitConfig,
     getTemplateEditorCellSplitCountInput,
@@ -82,6 +83,7 @@
       const templateCardCancelTrigger = event.target.closest("[data-template-card-cancel]");
       const templateEditTrigger = event.target.closest("[data-template-edit]");
       const templateDeleteTrigger = event.target.closest("[data-template-delete]");
+      const templateCopyTrigger = event.target.closest("[data-template-copy]");
       const templateCommandTrigger = event.target.closest("[data-template-command]");
       const templateBlockTrigger = event.target.closest("[data-template-block]");
       const templateCellSplitStepTrigger = event.target.closest("[data-template-cell-split-step]");
@@ -224,6 +226,16 @@
 
       if (templateEditTrigger) {
         openTemplateEditor(templateEditTrigger.dataset.templateEdit);
+        return true;
+      }
+
+      if (templateCopyTrigger) {
+        if (!templateCopyTrigger.disabled) {
+          templateCopyTrigger.disabled = true;
+          void copyTemplateCard(templateCopyTrigger.dataset.templateCopy).finally(() => {
+            templateCopyTrigger.disabled = false;
+          });
+        }
         return true;
       }
 

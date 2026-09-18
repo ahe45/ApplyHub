@@ -8,6 +8,7 @@
 - 서버 실행: `npm start`
 - 회귀 테스트: `npm test`, `npm run test:membership`
 - 전체 UI: **Quiet Glass** — [화면 스타일 기준](docs/PUBLIC_UI.md)
+- 사용자 화면 언어: 로그인 화면의 **한국어 / English**로 전환 — [번역 범위와 검증](docs/PUBLIC_LANGUAGE.md)
 
 기본 데이터베이스명은 `applyhub`입니다. 기존 설치에서는 `.env`에 지정한 `DB_NAME`을 사용합니다.
 세션/쿠키/저장소 키와 `AdmitCard*` 내부 모듈 식별자는 호환성을 위해 유지합니다.

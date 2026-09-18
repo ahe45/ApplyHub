@@ -1,5 +1,6 @@
 const fs = require("fs");
 const os = require("os");
+const path = require("path");
 
 const AdmZip = require("adm-zip");
 const { PDFDocument } = require("pdf-lib");
@@ -29,7 +30,7 @@ const ADMIT_CARD_PDF_RENDER_ROOT_ID = "admit-card-pdf-render-root";
 function createAdmitCardPdfService({
   createHttpError,
   createTemplateExamineeRenderer,
-  edgeExecutablePaths,
+  browserExecutablePaths,
   escapeHtml,
   getActiveTemplate,
   getExamineeByNo,
@@ -37,14 +38,18 @@ function createAdmitCardPdfService({
   normalizeExamineeNoList,
   renderTemplateWithExaminee,
 }) {
-  function getPdfExecutablePath() {
-    const executablePath = edgeExecutablePaths.find((possiblePath) => fs.existsSync(possiblePath));
+  let preferredBrowserPath = "";
+  const browserProfiles = new WeakMap();
 
-    if (!executablePath) {
-      throw createHttpError(500, "PDF 생성을 위한 Microsoft Edge 실행 파일을 찾을 수 없습니다.");
+  async function removeBrowserProfile(directory) {
+    const resolved = path.resolve(directory);
+    if (path.dirname(resolved) !== path.resolve(os.tmpdir()) || !path.basename(resolved).startsWith('applyhub-pdf-')) return;
+    try {
+      await fs.promises.rm(resolved, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch (error) {
+      // Windows may briefly retain a browser lock; cleanup must not terminate the server.
+      console.warn('PDF browser temporary profile cleanup deferred:', error.code);
     }
-
-    return executablePath;
   }
 
   function createBatchAdmitCardCancelledError() {
@@ -68,6 +73,10 @@ function createAdmitCardPdfService({
     try {
       await browser.close();
     } catch (error) {
+    } finally {
+      const directory = browserProfiles.get(browser);
+      browserProfiles.delete(browser);
+      if (directory) await removeBrowserProfile(directory);
     }
   }
 
@@ -425,11 +434,27 @@ function createAdmitCardPdfService({
   }
 
   async function openPdfBrowser() {
-    return puppeteer.launch({
-      executablePath: getPdfExecutablePath(),
-      headless: "new",
-      args: PDF_BROWSER_LAUNCH_ARGS,
-    });
+    const candidates = [...new Set([preferredBrowserPath, ...browserExecutablePaths])].filter(candidate => candidate && fs.existsSync(candidate));
+    if (!candidates.length) {
+      throw createHttpError(500, "PDF 생성을 위한 Microsoft Edge 또는 Google Chrome 실행 파일을 찾을 수 없습니다.", "ADMIT_CARD_PDF_BROWSER_NOT_FOUND");
+    }
+    let lastError;
+    for (const executablePath of candidates) {
+      const userDataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'applyhub-pdf-'));
+      try {
+        const browser = await puppeteer.launch({ executablePath, userDataDir, headless: true, args: PDF_BROWSER_LAUNCH_ARGS });
+        browserProfiles.set(browser, userDataDir);
+        preferredBrowserPath = executablePath;
+        return browser;
+      } catch (error) {
+        lastError = error;
+        if (preferredBrowserPath === executablePath) preferredBrowserPath = "";
+        await removeBrowserProfile(userDataDir);
+      }
+    }
+    const error = createHttpError(500, "수험표 PDF 변환 프로그램을 실행하지 못했습니다. 관리자에게 문의해 주세요.", "ADMIT_CARD_PDF_BROWSER_UNAVAILABLE");
+    error.cause = lastError;
+    throw error;
   }
 
   async function initializePdfBrowserPage(page) {
@@ -454,12 +479,13 @@ function createAdmitCardPdfService({
 
   async function openPdfBrowserPage() {
     const browser = await openPdfBrowser();
-    const page = await createPdfBrowserPage(browser);
-
-    return {
-      browser,
-      page,
-    };
+    try {
+      const page = await createPdfBrowserPage(browser);
+      return { browser, page };
+    } catch (error) {
+      await closePdfBrowser(browser);
+      throw error;
+    }
   }
 
   async function waitForTemplateDocumentReady(page) {

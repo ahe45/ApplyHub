@@ -23,10 +23,15 @@
       "applicantScheduleStartAt",
       "applicantScheduleEndAt",
       "documentSubmissionScheduleStartAt",
+      "documentReviewScheduleStartAt",
       "documentSubmissionScheduleEndAt",
+      "documentReviewScheduleEndAt",
       "admitCardLookupScheduleStartAt",
       "admitCardLookupScheduleEndAt",
     ]);
+
+    const scheduleTemplateFieldNames = ["applicationTemplateId", "documentTemplateId"];
+    const scheduleEnabledFieldNames = Object.freeze(["applicantScheduleEnabled", "documentSubmissionScheduleEnabled", "documentReviewScheduleEnabled", "admitCardLookupScheduleEnabled"]);
 
     function isFormControlElement(element) {
       return (
@@ -95,14 +100,30 @@
       const targetSchedules = isBulk ? getApplicantSchedulesByKeys(editorState.targetScheduleKeys) : [];
 
       if (modalForm) {
+        for (const [key, scope] of [['applicationTemplateId', 'application'], ['documentTemplateId', 'documents']]) {
+          const select = modalForm.querySelector('[data-applicant-schedule-input="' + key + '"]');
+          if (!select) continue;
+          select.replaceChildren();
+          if (isBulk) select.add(new Option('기존 템플릿 유지', ''));
+          for (const template of state.applicantManager.formTemplates || []) {
+            if (template.formScope === scope) select.add(new Option(template.name + (template.isDefault ? ' (기본)' : ''), String(template.id)));
+          }
+        }
         modalForm.querySelectorAll("[data-applicant-schedule-input]").forEach((inputElement) => {
           if (!isFormControlElement(inputElement)) {
             return;
           }
 
           const fieldName = String(inputElement.dataset.applicantScheduleInput || "").trim();
-          inputElement.value = fieldName ? String(editorState[fieldName] || "") : "";
-          inputElement.disabled = !isEditorActive || isSaving;
+          if (inputElement.type === 'checkbox') {
+            inputElement.checked = editorState[fieldName] !== false && editorState[fieldName] !== null;
+            inputElement.indeterminate = isBulk && editorState[fieldName] === null;
+            inputElement.closest('label').querySelector('[data-schedule-enabled-label]').textContent = inputElement.indeterminate ? '혼합 · 유지' : inputElement.checked ? '사용' : '미사용';
+          } else inputElement.value = fieldName ? String(editorState[fieldName] || "") : "";
+          const period = inputElement.closest('[data-schedule-period]');
+          const periodDisabled = period && editorState[period.dataset.schedulePeriod + 'Enabled'] === false;
+          inputElement.disabled = !isEditorActive || isSaving || (inputElement.type !== 'checkbox' && periodDisabled);
+          period?.classList.toggle('is-disabled', periodDisabled);
         });
       }
 
@@ -117,8 +138,8 @@
 
       if (modalDescription) {
         modalDescription.textContent = isBulk
-          ? "선택한 전형에 동일한 접수, 서류 제출, 수험표 조회 기간을 적용합니다."
-          : "모집시기와 전형별 접수, 서류 제출, 수험표 조회 기간을 설정합니다.";
+          ? "선택한 전형에 동일한 접수, 서류 제출, 서류 제출 확인, 수험표 조회 기간을 적용합니다."
+          : "모집시기와 전형별 접수, 서류 제출, 서류 제출 확인, 수험표 조회 기간을 설정합니다.";
       }
 
       if (bulkSummary) {
@@ -165,10 +186,14 @@
         trackName: schedule.trackName || "",
         admissionCode: schedule.admissionCode || "",
         admissionName: schedule.admissionName || "",
+        ...Object.fromEntries(scheduleTemplateFieldNames.map(key => [key, schedule[key] || ""])),
+        ...Object.fromEntries(scheduleEnabledFieldNames.map(key => [key, schedule[key] !== false])),
         applicantScheduleStartAt: schedule.applicantScheduleStartAt || "",
         applicantScheduleEndAt: schedule.applicantScheduleEndAt || "",
         documentSubmissionScheduleStartAt: schedule.documentSubmissionScheduleStartAt || "",
+        documentReviewScheduleStartAt: schedule.documentReviewScheduleStartAt || "",
         documentSubmissionScheduleEndAt: schedule.documentSubmissionScheduleEndAt || "",
+        documentReviewScheduleEndAt: schedule.documentReviewScheduleEndAt || "",
         admitCardLookupScheduleStartAt: schedule.admitCardLookupScheduleStartAt || "",
         admitCardLookupScheduleEndAt: schedule.admitCardLookupScheduleEndAt || "",
       };
@@ -196,6 +221,8 @@
         isSaving: false,
         targetScheduleKeys: selectedSchedules.map((schedule) => getApplicantScheduleKey(schedule)),
         ...sharedScheduleValues,
+        ...Object.fromEntries(scheduleTemplateFieldNames.map(key => [key, getSharedApplicantScheduleValue(selectedSchedules, key)])),
+        ...Object.fromEntries(scheduleEnabledFieldNames.map(key => { const values = new Set(selectedSchedules.map(schedule => schedule[key] !== false)); return [key, values.size === 1 ? values.values().next().value : null]; })),
       };
       renderView();
       syncApplicantScheduleModalForm();
@@ -211,8 +238,9 @@
 
       state.applicantManager.scheduleEditor = {
         ...editorState,
-        [fieldName]: String(value ?? ""),
+        [fieldName]: scheduleEnabledFieldNames.includes(fieldName) ? value === true : String(value ?? ""),
       };
+      if (scheduleEnabledFieldNames.includes(fieldName)) syncApplicantScheduleModalForm();
     }
 
     async function saveApplicantSchedule() {
@@ -255,6 +283,8 @@
                 admissionCode: schedule.admissionCode,
                 admissionName: schedule.admissionName,
                 ...scheduleValues,
+                ...Object.fromEntries(scheduleTemplateFieldNames.map(key => [key, Number(editorState[key] || schedule[key])])),
+                ...Object.fromEntries(scheduleEnabledFieldNames.map(key => [key, editorState[key] === null ? schedule[key] !== false : editorState[key] !== false])),
               })),
             }),
           });
@@ -273,6 +303,8 @@
               admissionCode: editorState.admissionCode,
               admissionName: editorState.admissionName,
               ...scheduleValues,
+              ...Object.fromEntries(scheduleTemplateFieldNames.map(key => [key, Number(editorState[key])])),
+              ...Object.fromEntries(scheduleEnabledFieldNames.map(key => [key, editorState[key] !== false])),
             }),
           });
         }

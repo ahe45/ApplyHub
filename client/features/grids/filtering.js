@@ -115,7 +115,22 @@
       }
 
       if (gridKey === "applicantScheduleGrid") {
-        return Array.isArray(state.applicantManager?.schedules) ? state.applicantManager.schedules : [];
+        const schedules = Array.isArray(state.applicantManager?.schedules) ? state.applicantManager.schedules : [];
+        return schedules.map(schedule => {
+          const row = { ...schedule };
+          for (const [type, prefix] of [
+            ['submission', 'applicantSchedule'],
+            ['documents', 'documentSubmissionSchedule'],
+            ['document-status', 'documentReviewSchedule'],
+            ['lookup', 'admitCardLookupSchedule'],
+          ]) {
+            if (!applicantFormConfig.isApplicantScheduleEnabled(schedule, type)) {
+              row[`${prefix}StartAtLabel`] = '미사용';
+              row[`${prefix}EndAtLabel`] = '미사용';
+            }
+          }
+          return row;
+        });
       }
 
       return getHeaderFilteredRows(getExamineeGridRows());

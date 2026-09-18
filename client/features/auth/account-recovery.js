@@ -23,7 +23,7 @@
       <button class="primary-button" type="submit" id="recoverySubmit">인증번호 받기</button>
     </form>
     <div class="applicant-public-message is-success" id="recoverySuccess" role="status" hidden><span id="recoverySuccessText"></span></div>
-    <div class="applicant-public-actions"><a class="ghost-button" href="/login">로그인으로 돌아가기</a></div>
+    <div class="applicant-public-actions"><a class="ghost-button applicant-public-back-button" href="/login">이전</a></div>
     <div class="recovery-help"><p>수험생 회원 계정 찾기 기능입니다. 관리자 계정은 계정 관리 담당자에게 문의해 주세요.</p><p>이메일을 사용할 수 없는 경우에도 담당자에게 문의해 주세요.</p></div>
   </article>`;
   const form = document.getElementById('recoveryForm'), identity = document.getElementById('recoveryIdentity'), proof = document.getElementById('recoveryProof');
@@ -46,7 +46,7 @@
     busy = true; button.disabled = true; document.getElementById('recoveryRestart').disabled = true;
     const completing = Boolean(recoveryId);
     try {
-      const result = await globalThis.AdmitCardApiClient.apiRequest(`/api/public/members/recovery/${completing ? 'complete' : 'request'}`, { method: 'POST', body: JSON.stringify({ ...data, purpose: mode, recoveryId }) });
+      const result = await globalThis.AdmitCardApiClient.apiRequest(`/api/public/members/recovery/${completing ? 'complete' : 'request'}`, { method: 'POST', body: JSON.stringify({ ...data, purpose: mode, recoveryId, language: globalThis.ApplyHubPublicI18n?.language || 'ko' }) });
       if (!completing) {
         recoveryId = result.recoveryId; identity.querySelectorAll('input').forEach(input => input.readOnly = true);
         proof.hidden = false; proof.disabled = false; button.textContent = '비밀번호 재설정';

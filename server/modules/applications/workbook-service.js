@@ -157,10 +157,10 @@ function createApplicantWorkbookService(options = {}) {
         headerRow.actualCellCount === 0
           ? -1
           : Array.from({ length: Math.max(worksheet.columnCount, APPLICANT_UNIT_TEMPLATE_COLUMNS.length) }, (_, offset) => offset + 1).find(
-              (columnIndex) => getExcelCellText(headerRow.getCell(columnIndex)) === column.header,
+              (columnIndex) => [column.header, ...(column.aliases || [])].includes(getExcelCellText(headerRow.getCell(columnIndex))),
             ) ?? -1;
 
-      if (matchedColumnIndex === -1) {
+      if (matchedColumnIndex === -1 && !column.optional) {
         throw createHttpError(400, `XLSX 헤더에 '${column.header}' 컬럼이 없습니다.`);
       }
 
@@ -176,6 +176,7 @@ function createApplicantWorkbookService(options = {}) {
       let hasAnyValue = false;
 
       APPLICANT_UNIT_TEMPLATE_COLUMNS.forEach((column) => {
+        if (columnIndexes[column.key] === -1) return;
         const value = getExcelCellText(row.getCell(columnIndexes[column.key]));
         unit[column.key] = value;
         hasAnyValue = hasAnyValue || value !== "";

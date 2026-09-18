@@ -301,10 +301,12 @@ body.applicant-public-body {
   min-width: 260px;
   max-width: min(420px, calc(100vw - 32px));
   padding: 14px 16px;
+  border: 1px solid var(--glass-line);
   border-radius: 18px;
-  background: rgba(var(--glass-shadow-rgb), 0.94);
-  color: #fff;
+  background: var(--glass-surface);
+  color: var(--glass-ink);
   font-size: 14px;
+  font-weight: 500;
   line-height: 1.6;
   box-shadow: var(--glass-shadow);
   opacity: 0;
@@ -320,10 +322,14 @@ body.applicant-public-body {
 
 .applicant-public-toast-root.is-error {
   background: var(--glass-error-bg);
+  color: var(--glass-error);
+  border-color: var(--glass-error-line);
 }
 
 .applicant-public-toast-root.is-success {
   background: var(--glass-success-bg);
+  color: var(--glass-success);
+  border-color: var(--glass-success-line);
 }
 
 .applicant-public-dialog-layer {

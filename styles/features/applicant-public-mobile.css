@@ -31,6 +31,9 @@
 .applicant-public-body :is(.primary-button, .ghost-button) { min-height: 48px; font-size: 16px; white-space: normal; }
 .applicant-public-body .applicant-public-actions { gap: 10px; }
 .applicant-public-body .applicant-public-actions > :is(button, a) { flex: 1 1 140px; min-width: 0; }
+.applicant-public-body .applicant-public-actions:has(> .applicant-public-back-button) { flex-wrap: nowrap; justify-content: flex-start; }
+.applicant-public-body .applicant-public-actions:has(> .applicant-public-back-button) > :is(button, a) { flex: 1 1 0; }
+.applicant-public-body .applicant-public-actions > .applicant-public-back-button:only-child { flex: 0 1 calc((100% - 10px) / 2); }
 .applicant-public-body .applicant-public-date-select-grid { grid-template-columns: minmax(0, 1fr); }
 .applicant-public-body .applicant-member-birthdate .applicant-public-date-select-grid { grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)); gap: 8px; }
 .applicant-public-body .applicant-member-birthdate select { width: 100%; min-width: 0; padding-inline: 8px; }
@@ -52,3 +55,24 @@
 .applicant-public-body .applicant-public-pdf-viewer-head { display: grid; }
 .applicant-public-body :is(.applicant-public-pdf-frame, .applicant-public-pdf-frame iframe) { min-height: 60dvh; height: 60dvh; }
 .applicant-public-body .applicant-public-toast-root { left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); width: auto; min-width: 0; max-width: var(--applicant-page-width); margin-inline: auto; }
+
+/* A card embeds the same public form renderer without navigation or stored draft answers. */
+html.applicant-template-thumbnail, html.applicant-template-thumbnail body { min-height: 0; overflow: hidden; }
+.applicant-template-thumbnail .applicant-public-shell { min-height: 0; padding: 12px; display: block; }
+.applicant-template-thumbnail .applicant-public-frame,
+.applicant-template-thumbnail #applicantPageRoot { min-height: 0; display: block; }
+.applicant-template-thumbnail public-school-header,
+.applicant-template-thumbnail .applicant-public-preview-note,
+.applicant-template-thumbnail .applicant-public-selection-summary,
+.applicant-template-thumbnail .applicant-public-actions,
+.applicant-template-thumbnail .public-language-switch,
+.applicant-template-thumbnail .public-language-row { display: none !important; }
+.applicant-template-thumbnail .applicant-public-step { width: 100%; margin: 0; }
+.applicant-template-thumbnail .applicant-public-slab { padding: 22px; box-shadow: none; }
+.applicant-template-thumbnail .applicant-public-application-header { margin-top: 0; }
+html.applicant-template-thumbnail body.applicant-public-body .applicant-public-frame {
+  width: 100%;
+  min-height: 0;
+  height: auto;
+  align-content: start;
+}

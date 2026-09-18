@@ -22,9 +22,11 @@ function createSystemBackupService({
     Object.freeze({ tableName: "system_set", orderByColumns: ["setting_key"] }),
     Object.freeze({ tableName: "templates", orderByColumns: ["id"] }),
     Object.freeze({ tableName: "print_log", orderByColumns: ["id"] }),
+    Object.freeze({ tableName: "app_form_template", orderByColumns: ["id"] }),
     Object.freeze({ tableName: "app_form", orderByColumns: ["id"] }),
     Object.freeze({ tableName: "app_meta", orderByColumns: ["id"] }),
     Object.freeze({ tableName: "app_subm", orderByColumns: ["id", "field_key"] }),
+    Object.freeze({ tableName: "app_document_status", orderByColumns: ["submission_id", "field_id"] }),
     Object.freeze({ tableName: "app_unit", orderByColumns: ["id"] }),
     Object.freeze({ tableName: "app_schedule", orderByColumns: ["id"] }),
     Object.freeze({ tableName: "app_email_log", orderByColumns: ["id"] }),
@@ -37,6 +39,7 @@ function createSystemBackupService({
     "app_email_log",
     "print_log",
     "app_form",
+    "app_form_template",
   ]);
   const assetDefinitions = Object.freeze([
 
@@ -1069,7 +1072,17 @@ function createSystemBackupService({
     const tablePayloads = databaseIncluded
       ? tableDefinitions.map((tableDefinition) => {
           const tableName = String(tableDefinition.tableName || "").trim();
-          const tableRows = parseArchiveJson(
+          // Backups created before document status management have no status table.
+          const legacyDocumentStatuses = tableName === 'app_document_status'
+            && !zipArchive.getEntry('tables/app_document_status.json')
+            && !manifest.tables?.some(table => table.tableName === 'app_document_status');
+          const legacyFormTemplates = tableName === 'app_form_template'
+            && !zipArchive.getEntry('tables/app_form_template.json')
+            && !manifest.tables?.some(table => table.tableName === 'app_form_template');
+          const tableRows = legacyFormTemplates ? [
+            { id: 1, form_scope: 'application', name: '기본 원서접수', is_default: 1 },
+            { id: 2, form_scope: 'documents', name: '기본 서류제출', is_default: 1 },
+          ] : legacyDocumentStatuses ? [] : parseArchiveJson(
             zipArchive,
             `tables/${tableName}.json`,
             `${tableName} 데이터베이스 백업 데이터 형식이 올바르지 않습니다.`,

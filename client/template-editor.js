@@ -497,6 +497,10 @@ function deleteTemplateCard(...args) {
   return templateEditorLifecycleController.deleteTemplateCard(...args);
 }
 
+function copyTemplateCard(...args) {
+  return templateEditorLifecycleController.copyTemplateCard(...args);
+}
+
 function getDefaultTemplateContent(...args) {
   return templateEditorLifecycleController.getDefaultTemplateContent(...args);
 }

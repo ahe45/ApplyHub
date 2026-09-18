@@ -5,7 +5,7 @@ function createAdmitCardService({
   batchAdmitCardJobTtlMs,
   createHttpError,
   createTemplateExamineeRenderer,
-  edgeExecutablePaths,
+  browserExecutablePaths,
   escapeHtml,
   getActiveTemplate,
   getExamineeByNo,
@@ -17,7 +17,7 @@ function createAdmitCardService({
   const admitCardPdfService = createAdmitCardPdfService({
     createHttpError,
     createTemplateExamineeRenderer,
-    edgeExecutablePaths,
+    browserExecutablePaths,
     escapeHtml,
     getActiveTemplate,
     getExamineeByNo,

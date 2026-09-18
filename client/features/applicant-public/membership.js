@@ -1,5 +1,5 @@
 (function (scope) {
-  scope.createApplicantMembershipController = function ({ apiRequest, escapeHtml: esc, render, navigate, setMessage, openApplication, clearApplication, getApplyAvailability = () => ({ isAvailable: true }) }) {
+  scope.createApplicantMembershipController = function ({ apiRequest, escapeHtml: esc, render, navigate, setMessage, openApplication, clearApplication, getApplyAvailability = () => ({ isAvailable: true }), isApplyButtonVisible = () => true }) {
     const controls = scope.AdmitCardApplicantPublicRenderingHelpers;
     const feedback = scope.AdmitCardPublicFormFeedback;
     let member = null;
@@ -39,8 +39,10 @@
       return member;
     }
     function setApplicationContext(context) {
+      const previousVisibility = JSON.stringify(applicationContext?.menuVisibility);
       applicationContext = context; contextError = '';
       if (Number.isFinite(context.serverTime)) serverClockOffset = context.serverTime - Date.now();
+      if (document.querySelector('.applicant-member-menu') && previousVisibility !== JSON.stringify(context.menuVisibility)) render();
       syncMenuButtons();
     }
     function refreshApplication() {
@@ -53,20 +55,20 @@
     }
     function menuState(key) {
       const complete = Boolean(applicationContext?.submission?.id);
-      const label = { apply: complete ? '접수완료' : '원서접수', summary: '접수결과 조회', ticket: '수험표 조회', documents: '서류 제출' }[key];
-      let reason = contextError || (!applicationContext ? '접수 정보를 확인하는 중입니다.' : '');
+      const label = { apply: complete ? '접수완료' : '원서접수', summary: '접수결과 조회', ticket: '수험표 조회', documents: '서류 제출', 'document-status': '서류 제출 확인' }[key];
+      let reason = contextError || (!applicationContext ? '접수 정보를 확인하는 중입니다.' : '') || (applicationContext?.menuVisibility?.[key] === false ? '현재는 이용할 수 없습니다.' : '');
       if (!reason && key === 'apply') {
         const availability = getApplyAvailability();
         reason = complete ? '접수가 완료되었습니다.' : !availability.isAvailable ? availability.disabledMessage || '현재는 접수 기간이 아닙니다.' : '';
       } else if (!reason && !complete) reason = '접수 완료 후 이용할 수 있습니다.';
-      else if (!reason && (key === 'ticket' || key === 'documents')) {
+      else if (!reason && (key === 'ticket' || key === 'documents' || key === 'document-status')) {
         const window = applicationContext.menuWindows?.[key];
         const now = Date.now() + serverClockOffset;
         reason = !Number.isFinite(window?.startAt) || !Number.isFinite(window?.endAt) || window.startAt > window.endAt ? '기간이 아직 설정되지 않았습니다.'
           : now < window.startAt ? '아직 이용 기간이 아닙니다.' : now > window.endAt ? '이용 기간이 종료되었습니다.' : '';
       }
       return { label, isAvailable: !reason, disabled: busy || Boolean(reason), complete: key === 'apply' && complete,
-        description: reason || { apply: '접수 신청서 작성', summary: '나의 접수 내역 확인', ticket: '수험표 확인 및 출력', documents: '첨부 서류 업로드' }[key] };
+        description: reason || { apply: '접수 신청서 작성', summary: '나의 접수 내역 확인', ticket: '수험표 확인 및 출력', documents: '첨부 서류 업로드', 'document-status': '서류별 제출 상태 확인' }[key] };
     }
     function syncMenuButtons() {
       document.querySelectorAll('.applicant-member-menu [data-applicant-action]').forEach(button => {
@@ -90,9 +92,9 @@
     function home() {
       if (!settings) return `<p class="muted">로그인 정보를 불러오는 중입니다.</p>`;
       if (!member) return `<a class="primary-button" href="/login">공통 로그인으로 이동</a>`;
-      return `<div class="applicant-member-menu">${['apply', 'documents', 'summary', 'ticket'].map(key => {
+      return `<div class="applicant-member-menu">${['apply', 'documents', 'document-status', 'summary', 'ticket'].filter(key => (key !== 'apply' || isApplyButtonVisible()) && applicationContext?.menuVisibility?.[key] !== false).map(key => {
           const item = menuState(key);
-          return `<button type="button" class="ghost-button applicant-member-tile${item.complete ? ' is-complete' : ''}" data-applicant-action="member-${key}" ${item.disabled ? 'disabled' : ''}><span class="applicant-member-tile-number" aria-hidden="true">${controls.getApplicantHomeActionIconMarkup(key === 'documents' ? 'scan' : key)}</span><strong>${esc(item.label)}</strong><small>${esc(item.description)}</small></button>`;
+          return `<button type="button" class="ghost-button applicant-member-tile${item.complete ? ' is-complete' : ''}" data-applicant-action="member-${key}" ${item.disabled ? 'disabled' : ''}><span class="applicant-member-tile-number" aria-hidden="true">${controls.getApplicantHomeActionIconMarkup(key === 'documents' || key === 'document-status' ? 'scan' : key)}</span><strong>${esc(item.label)}</strong><small>${esc(item.description)}</small></button>`;
         }).join('')}</div>`;
     }
     function isValidSignupEmail(value) {
@@ -120,29 +122,34 @@
     window.addEventListener('pagehide', () => { clearInterval(resendTimer); resendTimer = null; });
     function signupQuestion(q) {
       const core = ['password', 'name', 'email'].includes(q.key);
+      const systemLabel = ({ password: '비밀번호', name: '이름', email: '이메일' })[q.key] === q.label;
       const name = core ? q.key : `profile.${q.key}`;
       const value = signup[name] || '';
-      const label = `${esc(q.label)}${feedback.badge(q.required)}`;
+      const label = `${systemLabel && !q.labelEn ? esc(q.label) : controls.renderAuthoredText(q.label, q.labelEn)}${feedback.badge(q.required)}`;
       const hint = q.key === 'email' ? '인증한 이메일을 로그인 ID로 사용합니다.' : q.key === 'password' ? '4~20자' : '';
-      const note = q.description || hint ? `<small class="muted">${esc([q.description, hint].filter(Boolean).join(' · '))}</small>` : '';
+      const noteParts = [(q.description || q.descriptionEn) ? controls.renderAuthoredText(q.description, q.descriptionEn) : '', hint ? `<span>${esc(hint)}</span>` : ''].filter(Boolean);
+      const note = noteParts.length ? `<small class="muted">${noteParts.join('<span aria-hidden="true"> · </span>')}</small>` : '';
+      const labelEn = q.labelEn || (systemLabel ? scope.ApplyHubPublicI18n?.translate(q.label, 'en') || q.label : q.label);
       let control;
       if (['file', 'photo'].includes(q.inputType)) {
         const extensions = q.inputType === 'photo' ? ['jpg', 'jpeg', 'png'] : q.allowedExtensions?.length ? q.allowedExtensions : ['pdf', 'jpg', 'jpeg', 'png'];
-        control = `<input type="file" aria-label="${esc(q.label)}" data-member-file="${esc(q.key)}" data-member-file-type="${q.inputType}" accept="${esc(extensions.map(e => '.' + e).join(','))}" ${q.required ? 'required' : ''} /><small>허용 확장자: ${esc(extensions.join(', '))} · 파일당 5MB, 전체 8MB 이하</small><span data-member-upload-preview="${esc(q.key)}"></span>`;
+        control = `<input class="public-localized-file-input" id="member-file-${esc(q.key)}" type="file" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" data-member-file="${esc(q.key)}" data-member-file-type="${q.inputType}" accept="${esc(extensions.map(e => '.' + e).join(','))}" ${q.required ? 'required' : ''} /><label class="ghost-button public-file-choose" for="member-file-${esc(q.key)}">파일 선택</label><small>허용 확장자: ${esc(extensions.join(', '))} · 파일당 5MB, 전체 8MB 이하</small><span data-member-upload-preview="${esc(q.key)}"></span>`;
       } else if (q.inputType === 'textarea') {
-        control = `<textarea name="${esc(name)}" aria-label="${esc(q.label)}" rows="4" maxlength="10000" ${q.required ? 'required' : ''}>${esc(value)}</textarea>`;
+        control = `<textarea name="${esc(name)}" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" rows="4" maxlength="10000" ${q.required ? 'required' : ''}>${esc(value)}</textarea>`;
       } else if (['date', 'birthdate'].includes(q.inputType)) {
         const [year = '', month = '', day = ''] = value.split('-');
-        control = `<div ${q.inputType === 'birthdate' ? 'class="applicant-member-birthdate"' : ''}>${controls.renderDateSelectControls({ fieldKey: q.key, inputType: q.inputType, parts: { year, month, day }, prefix: 'member', label: q.label, required: q.required })}</div><input type="hidden" name="${esc(name)}" data-member-date-value="${esc(q.key)}" value="${esc(value)}" />`;
+        control = `<div ${q.inputType === 'birthdate' ? 'class="applicant-member-birthdate"' : ''}>${controls.renderDateSelectControls({ fieldKey: q.key, inputType: q.inputType, parts: { year, month, day }, prefix: 'member', label: q.label, labelEn: q.labelEn, required: q.required })}</div><input type="hidden" name="${esc(name)}" data-member-date-value="${esc(q.key)}" value="${esc(value)}" />`;
       } else if (q.inputType === 'nationality') {
         const selected = scope.AdmitCardApplicantFormConfig.findApplicantNationalityOption(value);
-        control = `<div class="applicant-public-nationality-combobox"><input type="search" data-member-nationality-search="${esc(q.key)}" aria-label="${esc(q.label)}" value="${esc(selected?.label || '')}" placeholder="국가를 검색하세요" autocomplete="off" spellcheck="false" ${q.required ? 'required' : ''} /><input type="hidden" name="${esc(name)}" value="${esc(selected?.code || '')}" /><div class="applicant-public-nationality-picker" data-member-nationality-picker="${esc(q.key)}"></div></div><small class="applicant-public-file-note">국가명을 검색한 뒤 목록에서 선택하세요.</small>`;
+        control = `<div class="applicant-public-nationality-combobox"><input type="search" data-member-nationality-search="${esc(q.key)}" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" value="${esc(controls.formatNationalitySelection(selected))}" placeholder="국가를 검색하세요" autocomplete="off" spellcheck="false" ${q.required ? 'required' : ''} /><input type="hidden" name="${esc(name)}" value="${esc(selected?.code || '')}" /><div class="applicant-public-nationality-picker" data-member-nationality-picker="${esc(q.key)}"></div></div><small class="applicant-public-file-note">국가명을 검색한 뒤 목록에서 선택하세요.</small>`;
+      } else if (q.inputType === 'multiselect') {
+        control = controls.renderMultiSelect(q, value, { prefix: 'member' });
       } else if (q.inputType === 'select') {
         const options = q.options.map(v => [v, v]);
-        control = `<select name="${esc(name)}" aria-label="${esc(q.label)}" data-member-select="${esc(q.key)}" ${q.required ? 'required' : ''}><option value="">선택하세요</option>${options.map(([key, text]) => `<option value="${esc(key)}" ${key === value ? 'selected' : ''}>${esc(text)}</option>`).join('')}</select>${q.customOptionLabel ? `<input type="text" name="custom.${esc(q.key)}" data-member-custom="${esc(q.key)}" aria-label="${esc(q.label)} 직접 입력" placeholder="직접 입력하세요" maxlength="200" hidden />` : ''}`;
+        control = `<select name="${esc(name)}" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" data-member-select="${esc(q.key)}" ${q.required ? 'required' : ''}><option value="">선택하세요</option>${options.map(([key, text]) => `<option translate="no" data-i18n-ko="${esc(text)}" data-i18n-en="${esc(q.optionsEn?.[key] || text)}" value="${esc(key)}" ${key === value ? 'selected' : ''}>${esc(text)}</option>`).join('')}</select>${q.customOptionLabel ? `<input type="text" name="custom.${esc(q.key)}" data-member-custom="${esc(q.key)}" aria-label="${esc(q.label)} 직접 입력" data-i18n-aria-label-en="${esc(labelEn)} custom entry" placeholder="직접 입력하세요" maxlength="200" hidden />` : ''}`;
       } else {
         const type = q.inputType === 'phone' ? 'text' : q.inputType;
-        control = `<input name="${esc(name)}" aria-label="${esc(q.label)}" type="${esc(type)}" value="${esc(value)}" ${q.required ? 'required' : ''} ${q.inputType === 'phone' ? 'data-member-phone inputmode="numeric" pattern="[0-9]*" maxlength="20" autocomplete="tel-national"' : q.key === 'password' ? 'minlength="4" maxlength="20"' : q.key === 'email' ? 'maxlength="255" autocapitalize="none" spellcheck="false"' : 'maxlength="500"'} ${core ? `autocomplete="${({ password: 'new-password', name: 'name', email: 'email' })[q.key]}"` : ''} />`;
+        control = `<input name="${esc(name)}" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" type="${esc(type)}" value="${esc(value)}" ${q.required ? 'required' : ''} ${q.inputType === 'phone' ? 'data-member-phone inputmode="numeric" pattern="[0-9]*" maxlength="20" autocomplete="tel-national"' : q.key === 'password' ? 'minlength="4" maxlength="20"' : q.key === 'email' ? 'maxlength="255" autocapitalize="none" spellcheck="false"' : 'maxlength="500"'} ${core ? `autocomplete="${({ password: 'new-password', name: 'name', email: 'email' })[q.key]}"` : ''} />`;
       }
       if (q.key === 'email' && settings.emailVerification) control = `<div class="applicant-member-input-action">${control}<button class="primary-button" type="button" data-applicant-action="member-send-code" ${busy || preview || resendSeconds() > 0 || !isValidSignupEmail(value) ? 'disabled' : ''}>${sendButtonText()}</button></div>`;
       let html = `<div class="applicant-public-field"><span>${label}</span>${note}${control}</div>`;
@@ -151,6 +158,8 @@
       return html;
     }
     document.addEventListener('change', event => {
+      const multiGroup = event.target.closest('[data-choice-prefix=member]');
+      if (multiGroup) { controls.readMultiSelect(multiGroup); return; }
       if (event.target.matches('[data-applicant-form="member-register"] [name="email"], #memberEmailCode')) syncEmailSendButton();
       const date = event.target.closest('[data-member-date-field-key]');
       if (date) {
@@ -185,7 +194,7 @@
         if (file.size > 5 * 1024 * 1024) throw new Error('파일은 5MB 이하여야 합니다.');
         const base64 = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(',')[1]); reader.onerror = reject; reader.readAsDataURL(file); });
         if (fileInput.files[0] !== file) return;
-        uploads.set(key, { fileName: file.name, mimeType: file.type, base64 }); mount.textContent = file.name;
+        uploads.set(key, { fileName: file.name, mimeType: file.type, base64 }); const fileLabel = document.createElement("span"); fileLabel.setAttribute("translate", "no"); fileLabel.textContent = file.name; mount.replaceChildren(fileLabel);
         if (['image/jpeg', 'image/png'].includes(file.type)) {
           const img = document.createElement('img'); img.src = `data:${file.type};base64,${base64}`; img.alt = '업로드한 사진 미리보기'; img.style.maxWidth = '160px'; img.style.display = 'block'; mount.append(img);
         }
@@ -196,12 +205,21 @@
       pendingUploads.add(promise); promise.finally(() => pendingUploads.delete(promise));
     });
     function showMemberNationality(input) {
-      const query = input.value.trim().toLowerCase(), key = input.dataset.memberNationalitySearch;
+      const selected = scope.AdmitCardApplicantFormConfig.findApplicantNationalityOption(input.parentElement.querySelector('input[type=hidden]').value);
+      const query = (selected && input.value === controls.formatNationalitySelection(selected) ? selected.label : input.value).trim().toLowerCase(), key = input.dataset.memberNationalitySearch;
       const picker = input.parentElement.querySelector('[data-member-nationality-picker]');
       const options = scope.AdmitCardApplicantFormConfig.nationalityOptions.filter(option => !query || option.searchLabel.includes(query));
       picker.innerHTML = controls.renderNationalityOptions(options, key, input.parentElement.querySelector('input[type=hidden]').value, 'member', 'code');
       picker.classList.add('is-open');
     }
+    function syncCountryDisplay() {
+      document.querySelectorAll('[data-member-nationality-search]').forEach(input => {
+        const code = input.parentElement.querySelector('input[type=hidden]')?.value;
+        const country = code && scope.AdmitCardApplicantFormConfig.findApplicantNationalityOption(code);
+        if (country) input.value = controls.formatNationalitySelection(country);
+      });
+    }
+    window.addEventListener('applyhub:languagechange', syncCountryDisplay);
     document.addEventListener('focusin', event => { if (event.target.matches('[data-member-nationality-search]')) showMemberNationality(event.target); });
     document.addEventListener('input', event => {
       if (event.target.matches('#memberEmailCode')) {
@@ -221,13 +239,22 @@
         const box = option.closest('.applicant-public-nationality-combobox'), input = box.querySelector('[data-member-nationality-search]');
         const country = scope.AdmitCardApplicantFormConfig.findApplicantNationalityOption(option.dataset.memberNationalityValue);
         box.querySelector('input[type=hidden]').value = country.code;
-        input.value = country.label; input.setCustomValidity(''); input.focus();
+        input.value = controls.formatNationalitySelection(country); input.setCustomValidity(''); input.focus();
         feedback.status(input);
         box.querySelector('[data-member-nationality-picker]').classList.remove('is-open');
       }
       document.querySelectorAll('[data-member-nationality-picker].is-open').forEach(picker => { if (!picker.parentElement.contains(event.target)) picker.classList.remove('is-open'); });
     });
     document.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && event.target.matches('[data-applicant-form="member-register"] input[name="email"]')) {
+        if (event.defaultPrevented) return;
+        event.preventDefault();
+        if (event.isComposing || event.keyCode === 229 || event.repeat) return;
+        syncEmailSendButton();
+        const button = event.target.form?.querySelector('[data-applicant-action="member-send-code"]');
+        if (button && !button.disabled) button.click();
+        return;
+      }
       const box = event.target.closest('.applicant-public-nationality-combobox');
       if (!box?.querySelector('[data-member-nationality-search]')) return;
       if (event.key === 'Escape') { event.preventDefault(); box.querySelector('[data-member-nationality-search]').focus(); box.querySelector('[data-member-nationality-picker]').classList.remove('is-open'); }
@@ -258,9 +285,9 @@
         <div data-member-step="terms" ${signupStep !== 'terms' ? 'hidden' : ''}>
           <form class="applicant-public-form" data-applicant-form="member-terms">
           ${(settings.terms || []).length ? settings.terms.map(term => `<div class="applicant-member-terms">
-            <div class="applicant-member-terms-heading"><h3>${esc(term.title)}${feedback.badge(term.required)}</h3></div>
-            <div class="applicant-member-terms-text" tabindex="0" role="region" aria-label="${esc(term.title)} 내용">${esc(term.text)}</div>
-            <div class="applicant-member-terms-consent"><button class="ghost-button applicant-member-terms-view" type="button" data-member-term-view="${esc(term.id)}" aria-haspopup="dialog" aria-controls="member-term-dialog" aria-label="${esc(term.title)} 전문보기" title="전문보기"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M8 9h8M8 12h8M8 15h5"></path></svg></button><div class="applicant-member-consent-options" role="radiogroup" aria-label="${esc(term.title)} 동의 여부">
+            <div class="applicant-member-terms-heading"><h3>${controls.renderAuthoredText(term.title, term.titleEn)}${feedback.badge(term.required)}</h3></div>
+            <div translate="no" class="applicant-member-terms-text" tabindex="0" role="region" aria-label="${esc(term.title)} 내용" data-i18n-aria-label-en="${esc(term.titleEn || term.title)} contents">${controls.renderAuthoredText(term.text, term.textEn)}</div>
+            <div class="applicant-member-terms-consent"><button class="ghost-button applicant-member-terms-view" type="button" data-member-term-view="${esc(term.id)}" aria-haspopup="dialog" aria-controls="member-term-dialog" aria-label="${esc(term.title)} 전문보기" data-i18n-aria-label-en="Read ${esc(term.titleEn || term.title)} in full" title="전문보기"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M8 9h8M8 12h8M8 15h5"></path></svg></button><div class="applicant-member-consent-options" role="radiogroup" aria-label="${esc(term.title)} 동의 여부" data-i18n-aria-label-en="Consent to ${esc(term.titleEn || term.title)}">
               <label class="applicant-member-consent-option"><input type="radio" name="term-consent-${esc(term.id)}" value="agree" data-member-term="${esc(term.id)}" ${termConsents.some(c => c.id === term.id && c.agreed) ? 'checked' : ''} /><span>동의</span></label>
               <label class="applicant-member-consent-option"><input type="radio" name="term-consent-${esc(term.id)}" value="disagree" ${termConsents.some(c => c.id === term.id && c.agreed === false) ? 'checked' : ''} /><span>미동의</span></label>
             </div></div>
@@ -271,11 +298,11 @@
         <div data-member-step="details" ${signupStep !== 'details' ? 'hidden' : ''}>
         <form class="applicant-public-form" data-applicant-form="member-register">
         <div class="applicant-member-form-grid">${settings.questions.map(signupQuestion).join('')}</div>
-        <div class="applicant-public-actions"><button class="ghost-button" type="button" data-applicant-action="member-terms-back">이전</button><button class="primary-button" type="submit" ${busy || preview ? "disabled" : ""}>회원가입</button></div>
+        <div class="applicant-public-actions"><button class="ghost-button applicant-public-back-button" type="button" data-applicant-action="member-terms-back">이전</button><button class="primary-button" type="submit" ${busy || preview ? "disabled" : ""}>회원가입</button></div>
       </form></div></article>
       <dialog id="member-term-dialog" class="applicant-member-term-dialog" aria-labelledby="member-term-dialog-title">
-        <div class="applicant-member-term-dialog-heading"><h2 id="member-term-dialog-title"></h2><button class="ghost-button" type="button" data-member-term-close autofocus>닫기</button></div>
-        <div class="applicant-member-term-dialog-text" data-member-term-content tabindex="0" role="region" aria-label="약관 전문"></div>
+        <div class="applicant-member-term-dialog-heading"><h2 translate="no" id="member-term-dialog-title"></h2><button class="ghost-button" type="button" data-member-term-close autofocus>닫기</button></div>
+        <div translate="no" class="applicant-member-term-dialog-text" data-member-term-content tabindex="0" role="region" aria-label="약관 전문"></div>
       </dialog></section>`;
     }
     document.addEventListener('click', event => {
@@ -285,9 +312,10 @@
       if (view) {
         const term = settings?.terms.find(item => item.id === view.dataset.memberTermView);
         if (!term) return;
-        dialog.querySelector('#member-term-dialog-title').textContent = term.title;
+        dialog.querySelector('#member-term-dialog-title').innerHTML = controls.renderAuthoredText(term.title, term.titleEn);
         const content = dialog.querySelector('[data-member-term-content]');
-        content.textContent = term.text;
+        content.innerHTML = controls.renderAuthoredText(term.text, term.textEn);
+        scope.ApplyHubPublicI18n?.apply();
         dialog.showModal();
         content.scrollTop = 0;
       } else if (event.target.closest('[data-member-term-close]')) {
@@ -308,7 +336,7 @@
       syncEmailSendButton();
       document.querySelector(`[data-member-step="${step}"] input, [data-member-step="${step}"] button`)?.focus();
     }
-    function formData(form) { return Object.fromEntries(new FormData(form)); }
+    function formData(form) { const data = Object.fromEntries(new FormData(form)); for (const group of form.querySelectorAll('[data-choice-prefix=member]')) data['profile.' + group.dataset.choiceGroup] = controls.readMultiSelect(group); return data; }
     function showCodePreview(code = '') {
       developmentCode = /^\d{6}$/.test(String(code)) ? String(code) : '';
       const mount = document.querySelector('[data-member-code-preview]');
@@ -377,7 +405,7 @@
             verificationId = ''; verifiedEmail = '';
             form.querySelector('[data-member-verified]').textContent = '';
             feedback.status(codeInput);
-            const result = await request("email-code", { email: data.email });
+            const result = await request("email-code", { email: data.email, language: scope.ApplyHubPublicI18n?.language || 'ko' });
             resendAvailableAt = Date.now() + 10000;
             try { sessionStorage.setItem(resendStorageKey, String(resendAvailableAt)); } catch { /* In-memory fallback. */ }
             // Ignore a response for an email changed while the request was pending.
@@ -454,7 +482,7 @@
           }
           for (const [key, upload] of uploads) profile[key] = upload;
           for (const q of settings.questions) if (q.customOptionLabel && profile[q.key] === q.customOptionLabel) profile[q.key] = q.customOptionLabel + ': ' + String(data[`custom.${q.key}`] || '').trim();
-          await request("register", { ...data, termConsents, profile, verificationId, termsVersion: agreedTermsVersion });
+          await request("register", { ...data, termConsents, profile, verificationId, termsVersion: agreedTermsVersion, language: scope.ApplyHubPublicI18n?.language || 'ko' });
           signup = {}; verificationId = ""; verifiedEmail = "";
           setMessage("success", "회원가입이 완료되었습니다.");
           busy = false;

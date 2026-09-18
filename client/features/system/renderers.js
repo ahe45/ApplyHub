@@ -1634,48 +1634,63 @@
   function renderLoginNoticeSettings() {
     const defaultFontFamily = getLoginNoticeDefaultFontFamily();
     const defaultFontSize = getLoginNoticeDefaultFontSize();
-    const { getLoginNoticeMarkup, renderLoginStage } = getAuthRenderers();
+    const { renderLoginStage } = getAuthRenderers();
     const activeScope = getActiveNoticeScope();
+    const activeLanguage = state.noticeManagement.activeLanguage === "en" ? "en" : "ko";
     const noticeTabs = [
       { key: "login", label: "공통 로그인 공지" },
       { key: "applicant", label: "수험생 로그인 후 공지" },
     ];
-    const renderApplicantNoticePreview = () => `
-      <section class="login-shell login-notice-editor-stage applicant-notice-editor-stage">
-        <header class="public-glass-intro">
-          <div class="applicant-public-brand login-stage-brand">
-            <img class="applicant-public-brand-mark" src="${escapeAttribute(globalThis.AdmitCardAppConfig.resolveSuperAdminLogoImageUrl(state.superAdmin || {}))}" alt="" />
-            <div class="applicant-public-brand-copy login-stage-brand-copy"><strong>원서접수시스템</strong></div><applyhub-theme-toggle disabled></applyhub-theme-toggle>
-          </div>
-        </header>
-        ${globalThis.AdmitCardApplicantPublicRenderingHelpers.renderCompactNotice({ html: String(state.loginNotice?.draftHtml || "").trim() || getLoginNoticeMarkup("", "공지사항을 입력하세요."), cardClassName: 'applicant-public-hero', contentClassName: 'template-editor-surface login-notice-editor-surface applicant-public-notice-surface', contentId: 'loginNoticeEditor', contentAttributes: 'contenteditable="true" spellcheck="false"', editing: true })}
+    const renderCanvas = (language) => {
+      const languageLabel = language === "en" ? "영어" : "한국어";
+      const notice = (language === "en" ? state.noticeManagement.englishScopes : state.noticeManagement.scopes)[activeScope];
+      const editorId = language === "en" ? "loginNoticeEditorEn" : "loginNoticeEditor";
+      const editorAttributes = `data-notice-editor-language="${language}" contenteditable="true" spellcheck="false" lang="${language}" role="textbox" aria-multiline="true" aria-label="${languageLabel} 공지사항 내용"`;
+      const renderApplicantNoticePreview = () => `
+        <section class="login-shell login-notice-editor-stage applicant-notice-editor-stage">
+          <header class="public-glass-intro">
+            <div class="applicant-public-brand login-stage-brand">
+              <img class="applicant-public-brand-mark" src="${escapeAttribute(globalThis.AdmitCardAppConfig.resolveSuperAdminLogoImageUrl(state.superAdmin || {}))}" alt="" />
+              <div class="applicant-public-brand-copy login-stage-brand-copy"><strong>원서접수시스템</strong></div><applyhub-theme-toggle disabled></applyhub-theme-toggle>
+            </div>
+          </header>
+          ${globalThis.AdmitCardApplicantPublicRenderingHelpers.renderCompactNotice({ html: buildLoginNoticeEditorMarkup(notice.draftHtml), cardClassName: 'applicant-public-hero', contentClassName: 'template-editor-surface login-notice-editor-surface applicant-public-notice-surface', contentId: editorId, contentAttributes: editorAttributes, editing: true })}
 
-        <article class="applicant-public-panel applicant-public-action-grid login-panel-card login-stage-panel applicant-notice-stage-panel">
-          <div class="applicant-member-welcome"><span>나의 접수 메뉴</span><button class="ghost-button" type="button" disabled>로그아웃</button></div>
-          <div class="applicant-member-menu">
-            ${["원서접수", "서류 제출", "접수결과 조회", "수험표 조회"].map((label, index) => `<button class="ghost-button applicant-member-tile" type="button" disabled><span class="applicant-member-tile-number">0${index + 1}</span><strong>${label}</strong></button>`).join("")}
-          </div>
-        </article>
-        <p class="login-shell-copyright">ApplyHub · 원서접수시스템<br>© 2026 U-PLUS SYSTEM</p>
-      </section>
-    `;
-    const previewMarkup =
-      activeScope === "applicant"
-        ? renderApplicantNoticePreview()
-        : renderLoginStage({
-            noticeHtml: state.loginNotice.draftHtml,
-            heading: "로그인",
-            description: "관리자와 수험생이 함께 사용하는 로그인 화면입니다.",
-            submitLabel: "로그인",
-            accountIdValue: "",
-            passwordValue: "",
-            shellClassName: "login-notice-editor-stage",
-            panelClassName: "login-notice-stage-panel",
-            noticeContentClassName: "template-editor-surface login-notice-editor-surface",
-            noticeContentId: "loginNoticeEditor",
-            noticeContentAttributes: 'contenteditable="true" spellcheck="false"',
-            useEditorMarkup: true,
-          });
+          <article class="applicant-public-panel applicant-public-action-grid login-panel-card login-stage-panel applicant-notice-stage-panel">
+            <div class="applicant-member-welcome"><span>나의 접수 메뉴</span><button class="ghost-button" type="button" disabled>로그아웃</button></div>
+            <div class="applicant-member-menu">
+              ${["원서접수", "서류 제출", "서류 제출 확인", "접수결과 조회", "수험표 조회"].filter((label, index) => index !== 0 || state.superAdmin?.savedSnapshot?.recruitmentEnabled !== false).map((label, index) => `<button class="ghost-button applicant-member-tile" type="button" disabled><span class="applicant-member-tile-number">0${index + 1}</span><strong>${label}</strong></button>`).join("")}
+            </div>
+          </article>
+          <p class="login-shell-copyright">ApplyHub · 원서접수시스템<br>© 2026 U-PLUS SYSTEM</p>
+        </section>
+      `;
+      const previewMarkup =
+        activeScope === "applicant"
+          ? renderApplicantNoticePreview()
+          : renderLoginStage({
+              noticeHtml: notice.draftHtml,
+              heading: "로그인",
+              description: "관리자와 수험생이 함께 사용하는 로그인 화면입니다.",
+              submitLabel: "로그인",
+              accountIdValue: "",
+              passwordValue: "",
+              shellClassName: "login-notice-editor-stage",
+              panelClassName: "login-notice-stage-panel",
+              noticeContentClassName: "template-editor-surface login-notice-editor-surface",
+              noticeContentId: editorId,
+              noticeContentAttributes: editorAttributes,
+              useEditorMarkup: true,
+            });
+
+      return `<section class="notice-language-canvas ${activeLanguage === language ? 'is-active' : ''}" data-notice-canvas="${language}" aria-labelledby="noticeCanvasHeading-${language}">
+        <header class="notice-canvas-header">
+          <h4 id="noticeCanvasHeading-${language}">${language === 'en' ? 'English · 영어' : '한국어'}</h4>
+          <button class="primary-button" data-notice-action="save" type="button">${languageLabel} 저장</button>
+        </header>
+        <div class="notice-canvas-preview">${previewMarkup}</div>
+      </section>`;
+    };
 
     return `
       <section class="view-stack login-notice-settings-stack">
@@ -1683,7 +1698,7 @@
           <div class="section-header">
             <div class="menu-section-copy">
               <h3>공지사항 설정</h3>
-              <p>공통 로그인 전 공지와 수험생 로그인 후 공지를 각각 관리합니다. 기존 공지 내용은 유지됩니다.</p>
+              <p>화면별로 한국어와 영어 공지를 각각 작성합니다. 영어 공지가 없으면 한국어 공지가 표시됩니다.</p>
             </div>
           </div>
           <div class="template-management-tabs notice-settings-tabs" role="tablist" aria-label="공지사항 화면 선택">
@@ -1703,18 +1718,16 @@
               )
               .join("")}
           </div>
-          <div class="login-notice-editor-shell">
+          <p class="notice-language-description">편집할 공지를 클릭하면 공통 서식 도구가 적용됩니다. 작성한 내용은 각 캔버스에서 저장해 주세요.</p>
+          <div class="login-notice-editor-shell notice-bilingual-shell">
             <div class="editor-toolbar-column login-notice-editor-toolbar-column">
+              <p class="notice-active-label" data-notice-active-label aria-live="polite">${activeLanguage === 'en' ? '영어' : '한국어'} 서식 편집</p>
               ${renderLoginNoticeEditorToolbar(defaultFontFamily, defaultFontSize)}
-              <div class="editor-toolbar-footer login-notice-editor-toolbar-footer">
-                <div class="toolbar-actions">
-                  <button class="primary-button" data-notice-action="save" type="button">저장</button>
-                </div>
-              </div>
             </div>
 
-            <div class="login-notice-editor-page">
-              ${previewMarkup}
+            <div class="notice-bilingual-canvases">
+              ${renderCanvas('ko')}
+              ${renderCanvas('en')}
             </div>
           </div>
         </article>
@@ -1902,8 +1915,8 @@
 
             <section class="super-admin-setting-card">
               <div class="system-settings-section-head">
-                <span class="system-settings-label">접수 사용 여부</span>
-                <small class="muted system-settings-help">사용하지 않으면 관리자와 운영자 메뉴에서 전형 관리, 일정 관리, 가입·접수 설정, 접수 이력이 숨겨집니다.</small>
+                <span class="system-settings-label">접수 버튼 표시 여부</span>
+                <small class="muted system-settings-help">사용자 홈 화면의 원서접수 버튼을 표시하거나 숨깁니다.</small>
               </div>
               <label class="super-admin-switch" for="superAdminRecruitmentEnabled">
                 <input
@@ -1917,8 +1930,8 @@
                   <span class="super-admin-switch-thumb"></span>
                 </span>
                 <span class="super-admin-switch-copy">
-                  <strong>${recruitmentEnabled ? "사용함" : "사용하지 않음"}</strong>
-                  <span>${recruitmentEnabled ? "접수 관련 관리 메뉴를 정상 표시합니다." : "관리자와 운영자에서 접수 관련 관리 메뉴를 숨깁니다."}</span>
+                  <strong>${recruitmentEnabled ? "표시함" : "숨김"}</strong>
+                  <span>${recruitmentEnabled ? "사용자 홈 화면에 원서접수 버튼을 표시합니다." : "사용자 홈 화면에서 원서접수 버튼을 숨깁니다."}</span>
                 </span>
               </label>
             </section>

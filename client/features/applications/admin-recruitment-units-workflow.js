@@ -89,12 +89,15 @@
         trackName: unit.trackName || "",
         admissionCode: unit.admissionCode || "",
         admissionName: unit.admissionName || "",
+        admissionNameEn: unit.admissionNameEn || "",
         seriesCode: unit.seriesCode || "",
         seriesName: unit.seriesName || "",
         unitCode: unit.unitCode || "",
         unitName: unit.unitName || "",
+        unitNameEn: unit.unitNameEn || "",
         majorCode: unit.majorCode || "",
         majorName: unit.majorName || "",
+        majorNameEn: unit.majorNameEn || "",
       };
       renderView();
       syncApplicantRecruitmentUnitModalForm();
@@ -134,12 +137,15 @@
             trackName: editorState.trackName,
             admissionCode: editorState.admissionCode,
             admissionName: editorState.admissionName,
+            admissionNameEn: editorState.admissionNameEn,
             seriesCode: editorState.seriesCode,
             seriesName: editorState.seriesName,
             unitCode: editorState.unitCode,
             unitName: editorState.unitName,
+            unitNameEn: editorState.unitNameEn,
             majorCode: editorState.majorCode,
             majorName: editorState.majorName,
+            majorNameEn: editorState.majorNameEn,
           }),
         });
         await requestCloseModal?.("applicantRecruitmentUnitModal");

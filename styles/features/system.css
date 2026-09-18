@@ -1,5 +1,24 @@
 /* System settings and control layouts */
 
+.notice-language-description { margin: 10px 0 16px; color: var(--glass-muted, #526070); font-size: 13px; }
+.notice-bilingual-canvases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; min-width: 0; align-items: start; }
+.notice-bilingual-shell > .editor-toolbar-column { grid-template-rows: auto auto; align-content: start; align-self: start; height: auto; }
+.notice-bilingual-shell > .editor-toolbar-column > .editor-toolbar { height: auto; }
+.notice-language-canvas { min-width: 0; border: 1px solid var(--glass-line, #d7dce2); border-radius: 20px; overflow: hidden; background: var(--glass-surface, #fff); }
+.notice-language-canvas.is-active { border-color: var(--glass-primary, #2563eb); box-shadow: 0 0 0 1px var(--glass-primary, #2563eb); }
+.notice-canvas-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 16px; border-bottom: 1px solid var(--glass-line, #d7dce2); }
+.notice-canvas-header h4 { margin: 0; font-size: 16px; }
+.notice-canvas-header button { min-height: 38px; padding: 8px 12px; font-size: 13px; }
+.notice-canvas-preview { padding: 16px; }
+.notice-bilingual-shell .login-shell.login-notice-editor-stage { width: 100%; min-width: 0; min-height: 0; }
+.notice-bilingual-shell .login-notice-editor-surface { overflow-wrap: anywhere; }
+.notice-bilingual-shell .login-shell.login-notice-editor-stage :is(.login-notice-card, .login-panel-card) { height: auto; min-height: 0; }
+.notice-bilingual-shell .login-notice-editor-stage .login-notice-editor-surface { min-height: 300px; }
+.notice-active-label { margin: 0; padding: 12px; color: var(--glass-primary, #2563eb); font-size: 13px; font-weight: 700; }
+@media (max-width: 800px) {
+  .notice-bilingual-canvases { grid-template-columns: 1fr; }
+}
+
 .system-settings-view {
   align-self: start;
   padding-bottom: 10px;

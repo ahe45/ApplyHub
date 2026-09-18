@@ -70,13 +70,24 @@ VALUES
   ('applicantExamNoPattern', 'AD-{YY}{MM}{DD}-{SEQ:4}'),
   ('applicantExamNoSequenceStart', '1');
 
+CREATE TABLE IF NOT EXISTS app_form_template (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  form_scope ENUM('application', 'documents') NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  is_default TINYINT(1) NOT NULL DEFAULT 0,
+  UNIQUE KEY uniq_form_template_name (form_scope, name)
+);
+
 CREATE TABLE IF NOT EXISTS app_form (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   form_scope ENUM('application', 'documents') NOT NULL DEFAULT 'application',
+  template_id BIGINT UNSIGNED NULL,
   field_key VARCHAR(60) NOT NULL,
   question_text VARCHAR(255) NOT NULL,
   question_description VARCHAR(500) NOT NULL DEFAULT '',
-  input_type ENUM('text', 'textarea', 'select', 'date', 'birthdate', 'time', 'photo', 'file', 'phone', 'nationality') NOT NULL DEFAULT 'text',
+  question_text_en VARCHAR(255) NOT NULL DEFAULT '',
+  question_description_en VARCHAR(500) NOT NULL DEFAULT '',
+  input_type ENUM('text', 'textarea', 'select', 'date', 'birthdate', 'time', 'photo', 'file', 'phone', 'nationality', 'multiselect') NOT NULL DEFAULT 'text',
   system_field_key VARCHAR(40) NOT NULL DEFAULT '',
   options_json TEXT NULL,
   required TINYINT(1) NOT NULL DEFAULT 0,
@@ -160,12 +171,15 @@ CREATE TABLE IF NOT EXISTS app_unit (
   track_name VARCHAR(100) NOT NULL DEFAULT '',
   admission_code VARCHAR(30) NOT NULL,
   admission_name VARCHAR(100) NOT NULL,
+  admission_name_en VARCHAR(200) NOT NULL DEFAULT '',
   series_code VARCHAR(30) NOT NULL DEFAULT '',
   series_name VARCHAR(100) NOT NULL DEFAULT '',
   unit_code VARCHAR(30) NOT NULL,
   unit_name VARCHAR(100) NOT NULL,
+  unit_name_en VARCHAR(200) NOT NULL DEFAULT '',
   major_code VARCHAR(30) NOT NULL DEFAULT '',
   major_name VARCHAR(100) NOT NULL DEFAULT '',
+  major_name_en VARCHAR(200) NOT NULL DEFAULT '',
   sort_order INT NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -177,15 +191,23 @@ CREATE TABLE IF NOT EXISTS app_unit (
 
 CREATE TABLE IF NOT EXISTS app_schedule (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  application_template_id BIGINT UNSIGNED NULL,
+  document_template_id BIGINT UNSIGNED NULL,
   track_name VARCHAR(100) NOT NULL DEFAULT '',
   admission_code VARCHAR(30) NOT NULL,
   admission_name VARCHAR(100) NOT NULL,
   applicant_schedule_start_at DATETIME NULL,
   applicant_schedule_end_at DATETIME NULL,
+  applicant_schedule_enabled TINYINT(1) NOT NULL DEFAULT 1,
   admit_card_lookup_schedule_start_at DATETIME NULL,
   admit_card_lookup_schedule_end_at DATETIME NULL,
+  admit_card_lookup_schedule_enabled TINYINT(1) NOT NULL DEFAULT 1,
   document_submission_schedule_start_at DATETIME NULL,
+  document_review_schedule_start_at DATETIME NULL,
   document_submission_schedule_end_at DATETIME NULL,
+  document_review_schedule_end_at DATETIME NULL,
+  document_submission_schedule_enabled TINYINT(1) NOT NULL DEFAULT 1,
+  document_review_schedule_enabled TINYINT(1) NOT NULL DEFAULT 1,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -222,3 +244,14 @@ ALTER TABLE accounts
   ADD COLUMN IF NOT EXISTS password_value VARCHAR(255) NOT NULL DEFAULT '1111' AFTER role,
   ADD COLUMN IF NOT EXISTS password_temporary TINYINT(1) NOT NULL DEFAULT 1 AFTER password_value,
   ADD COLUMN IF NOT EXISTS last_login_at DATETIME NULL AFTER password_temporary;
+
+CREATE TABLE IF NOT EXISTS app_document_status (
+        submission_id BIGINT UNSIGNED NOT NULL,
+        field_id BIGINT UNSIGNED NOT NULL,
+        status ENUM('submitted', 'missing', 'incomplete') NOT NULL DEFAULT 'missing',
+        updated_by VARCHAR(255) NOT NULL DEFAULT '',
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (submission_id, field_id),
+        CONSTRAINT fk_document_status_submission FOREIGN KEY (submission_id) REFERENCES app_meta(id) ON DELETE CASCADE,
+        CONSTRAINT fk_document_status_field FOREIGN KEY (field_id) REFERENCES app_form(id) ON DELETE CASCADE
+      );

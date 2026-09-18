@@ -89,6 +89,7 @@ const indexScriptSources = Object.freeze([
   "./client/features/system/renderers.js",
   "./client/features/system/signup-settings.js",
   "./client/features/applications/member-list.js",
+  "./client/features/applications/document-management.js",
   "./client/features/accounts/renderers.js",
   "./client/features/admit-cards/renderers.js",
   "./client/features/applications/admin-upload-target-workflow.js",

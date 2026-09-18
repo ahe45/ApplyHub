@@ -23,7 +23,13 @@
     "template-editor-kit:install": "node scripts/install-template-editor-kit.js",
     "test:submission-tickets": "node scripts/membership-smoke-test.js --submission-tickets",
     "smtp:check": "node scripts/check-smtp.js",
-    "test:verification-mail": "node scripts/verification-mail-test.js"
+    "test:verification-mail": "node scripts/verification-mail-test.js",
+    "test:public-language": "node scripts/membership-smoke-test.js --public-language",
+    "test:choice-settings": "node scripts/membership-smoke-test.js --choice-settings",
+    "test:document-status": "node scripts/membership-smoke-test.js --document-status",
+    "test:form-templates": "node scripts/membership-smoke-test.js --form-templates",
+    "test:terms-language": "node scripts/membership-smoke-test.js --terms-language",
+    "test:schedule-settings": "node scripts/membership-smoke-test.js --schedule-settings"
   },
   "private": true,
   "dependencies": {

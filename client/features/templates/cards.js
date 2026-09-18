@@ -146,6 +146,9 @@
           </div>
           <div class="template-card-header-tools">
             <span class="badge ${badgeClass}">${badgeLabel}</span>
+            <button class="icon-button template-card-copy-button" type="button" data-template-copy="${escapeAttribute(card.id)}" aria-label="양식 복사" title="양식 복사">
+              <svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"></path></svg>
+            </button>
             ${deleteButtonMarkup}
           </div>
         </div>

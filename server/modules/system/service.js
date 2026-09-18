@@ -10,7 +10,7 @@ function createSystemService({
   emailSettingsService,
   applicantFileStorageDirName,
   applicantPhotoStorageDirName,
-  buildRoleMenuVisibilityFromSuperAdminSettings,
+  buildDefaultRoleMenuVisibility,
   createHttpError,
   databaseName,
   defaultAutoLogoutMinutes,
@@ -22,6 +22,7 @@ function createSystemService({
   formatDateAsYmd,
   getAccounts,
 
+  getApplicantFormTemplates,
   getApplicantFormFields,
   getApplicantRecruitmentUnits,
   getApplicantSchedules,
@@ -41,7 +42,7 @@ function createSystemService({
   rootDir,
 }) {
   const systemSettingsService = createSystemSettingsService({
-    buildRoleMenuVisibilityFromSuperAdminSettings,
+    buildDefaultRoleMenuVisibility,
     createHttpError,
     defaultAutoLogoutMinutes,
     defaultInitialPassword,
@@ -130,6 +131,7 @@ function createSystemService({
     formatDateAsYmd,
     getAccounts,
 
+    getApplicantFormTemplates,
     getApplicantFormFields,
     getApplicantRecruitmentUnits,
     getApplicantSchedules,

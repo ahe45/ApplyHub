@@ -179,6 +179,7 @@
   flex-shrink: 0;
 }
 
+.template-card-copy-button,
 .template-card-delete-button {
   width: 36px;
   min-width: 36px;

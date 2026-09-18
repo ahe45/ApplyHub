@@ -13,7 +13,34 @@ function createApplicantRoutes(deps) {
     const roleMenuVisibility = await deps.getRoleMenuVisibilitySettings?.();
     if (!isViewAccessibleForRole("applicantHistory", account.role, { roleMenuVisibility })) throw deps.createHttpError(403, "접수 이력 다운로드 권한이 없습니다.");
   }
+  async function requireDocumentAccess(account) {
+    const roleMenuVisibility = await deps.getRoleMenuVisibilitySettings?.();
+    if (!account?.id || !isViewAccessibleForRole('applicantDocumentManagement', account.role, { roleMenuVisibility })) {
+      throw deps.createHttpError(403, '서류 제출 관리 권한이 없습니다.');
+    }
+  }
+  async function requireFormTemplateAccess(account) {
+    if (!account) throw deps.createHttpError(401, '로그인이 필요합니다.');
+    const permissions = await deps.getRoleMenuVisibilitySettings();
+    if (!isViewAccessibleForRole('applicantQuestionTemplateManagement', account.role, { roleMenuVisibility: permissions })) {
+      throw deps.createHttpError(403, '가입 접수 설정 권한이 없습니다.');
+    }
+  }
+
   return [
+    exactRoute('GET', '/api/applicant-document-status', async ({ response, requestUrl, authenticatedAccount }) => {
+      await requireDocumentAccess(authenticatedAccount);
+      return deps.sendJson(response, 200, await deps.applicantService.documentStatusService.list(Object.fromEntries(requestUrl.searchParams)), { 'Cache-Control': 'no-store' });
+    }),
+    regexRoute('GET', /^\/api\/applicant-document-status\/(?<submissionId>\d+)$/, async ({ response, params, authenticatedAccount }) => {
+      await requireDocumentAccess(authenticatedAccount);
+      return deps.sendJson(response, 200, await deps.applicantService.documentStatusService.detail(params.submissionId), { 'Cache-Control': 'no-store' });
+    }),
+    regexRoute('PUT', /^\/api\/applicant-document-status\/(?<submissionId>\d+)$/, async ({ request, response, params, authenticatedAccount }) => {
+      await requireDocumentAccess(authenticatedAccount);
+      const body = await deps.readJsonBody(request);
+      return deps.sendJson(response, 200, await deps.applicantService.documentStatusService.save(params.submissionId, body, authenticatedAccount.id), { 'Cache-Control': 'no-store' });
+    }),
     exactRoute("POST", "/api/applicant-submissions/archive-jobs", async ({ request, response, authenticatedAccount }) => {
       await requireArchiveAccess(authenticatedAccount);
       const body = await deps.readJsonBody(request);
@@ -200,6 +227,20 @@ function createApplicantRoutes(deps) {
       },
       { auth: false, getParams: (match) => decodeRouteParams(match.groups) },
     ),
+    exactRoute("GET", "/api/applicant-form-templates", async ({ response, authenticatedAccount }) => {
+      await requireFormTemplateAccess(authenticatedAccount);
+      return deps.sendJson(response, 200, await deps.applicantService.getApplicantFormTemplates()); }),
+    exactRoute("POST", "/api/applicant-form-templates", async ({ request, response, authenticatedAccount }) => {
+      await requireFormTemplateAccess(authenticatedAccount);
+      return deps.sendJson(response, 201, await deps.applicantService.saveApplicantFormTemplate(await deps.readJsonBody(request))); }),
+    regexRoute("PUT", /^\/api\/applicant-form-templates\/(?<templateId>\d+)$/, async ({ request, response, params, authenticatedAccount }) => {
+      await requireFormTemplateAccess(authenticatedAccount);
+      return deps.sendJson(response, 200, await deps.applicantService.saveApplicantFormTemplate(await deps.readJsonBody(request), params.templateId)); },
+      { getParams: match => decodeRouteParams(match.groups) }),
+    regexRoute("DELETE", /^\/api\/applicant-form-templates\/(?<templateId>\d+)$/, async ({ response, params, authenticatedAccount }) => {
+      await requireFormTemplateAccess(authenticatedAccount);
+      return deps.sendJson(response, 200, await deps.applicantService.deleteApplicantFormTemplate(params.templateId)); },
+      { getParams: match => decodeRouteParams(match.groups) }),
     exactRoute("POST", "/api/applicant-form-fields", async ({ request, response }) => {
       const body = await deps.readJsonBody(request);
       return deps.sendJson(response, 201, await deps.createApplicantFormField(body));

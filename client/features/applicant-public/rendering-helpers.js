@@ -19,6 +19,43 @@
     return escapeHtml(value);
   }
 
+  function renderAuthoredText(korean = '', english = '') {
+    return `<span translate="no" data-i18n-ko="${escapeAttribute(korean)}" data-i18n-en="${escapeAttribute(english || korean)}">${escapeHtml(korean)}</span>`;
+  }
+
+  function renderMultiSelect(field, value, { prefix = 'applicant', disabled = false } = {}) {
+    const key = field.fieldKey || field.key;
+    const values = globalThis.AdmitCardApplicantFormConfig.parseMultiSelectValue(value);
+    const custom = field.customOptionLabel || '';
+    const customValue = custom ? values.find(item => item.startsWith(custom + ': ')) : '';
+    const customSelected = Boolean(customValue || (custom && values.includes(custom)));
+    return `<div class="applicant-multiple-choice" data-choice-group="${escapeAttribute(key)}" data-choice-prefix="${prefix}" data-choice-custom="${escapeAttribute(custom)}" data-choice-required="${field.required === true}" role="group" aria-label="${escapeAttribute(field.questionText || field.label)}" data-i18n-aria-label-en="${escapeAttribute(field.questionTextEn || field.labelEn || field.questionText || field.label)}">
+      ${(field.options || []).map((option, index) => `<label class="applicant-multiple-choice-option"><input type="checkbox" id="${prefix === 'applicant' ? 'field' : 'member-choice'}-${escapeAttribute(key)}${index ? '-' + index : ''}" name="profile.${escapeAttribute(key)}" data-choice-option value="${escapeAttribute(option)}" ${(option === custom ? customSelected : values.includes(option)) ? 'checked' : ''} ${disabled ? 'disabled' : ''} ${index === 0 && field.required && !values.length ? 'required' : ''} />${renderAuthoredText(option, field.optionsEn?.[option])}</label>`).join('')}
+      ${custom ? `<input type="text" data-choice-custom-input name="custom.${escapeAttribute(key)}" aria-label="직접 입력" placeholder="직접 입력하세요" maxlength="200" value="${escapeAttribute(customValue ? customValue.slice(custom.length + 2) : '')}" ${customSelected ? '' : 'hidden'} ${disabled ? 'disabled' : ''} />` : ''}
+    </div>`;
+  }
+
+  function readMultiSelect(group) {
+    const selected = [...group.querySelectorAll('[data-choice-option]:checked')].map(input => input.value);
+    const custom = group.dataset.choiceCustom;
+    const input = group.querySelector('[data-choice-custom-input]');
+    if (input) { input.hidden = !selected.includes(custom); input.required = !input.hidden; }
+    const first = group.querySelector('[data-choice-option]');
+    if (first) first.required = group.dataset.choiceRequired === 'true' && !selected.length;
+    return selected.map(value => input && value === custom ? custom + ': ' + input.value.trim() : value);
+  }
+
+  function renderChoiceAnswer(field, value) {
+    const values = Array.isArray(value) ? value : [String(value || '')];
+    const english = values.map(item => {
+      if (Object.hasOwn(field.optionsEn || {}, item) && field.optionsEn[item]) return field.optionsEn[item];
+      const custom = field.customOptionLabel;
+      if (custom && item.startsWith(custom + ': ')) return (field.optionsEn?.[custom] || custom) + item.slice(custom.length);
+      return item;
+    });
+    return renderAuthoredText(values.join(', ') || '-', english.join(', ') || '-');
+  }
+
   function formatApplicantBirthDate(value) {
     const text = String(value || '').trim();
     const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
@@ -40,13 +77,17 @@
   function renderDateOptions(values, selected, label) {
     return `<option value="">${escapeHtml(label)}</option>` + values.map(value => `<option value="${escapeAttribute(value)}" ${value === selected ? 'selected' : ''}>${escapeHtml(value)}</option>`).join('');
   }
-  function renderDateSelectControls({ fieldKey, inputType, parts = {}, prefix = 'applicant', label = '', required = false, disabled = false }) {
+  function renderDateSelectControls({ fieldKey, inputType, parts = {}, prefix = 'applicant', label = '', labelEn = '', required = false, disabled = false }) {
     const values = { year: getDateYearOptions(inputType, parts.year), month: Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')), day: Array.from({ length: getDateDayCount(parts.year, parts.month) }, (_, i) => String(i + 1).padStart(2, '0')) };
-    return `<div class="applicant-public-date-select-grid">${['year', 'month', 'day'].map(part => `<select id="${prefix === 'applicant' ? 'field' : 'member-date'}-${escapeAttribute(fieldKey)}-${part}" data-${prefix}-date-field-key="${escapeAttribute(fieldKey)}" data-${prefix}-date-part="${part}" aria-label="${escapeAttribute(label)} ${({ year: '연도', month: '월', day: '일' })[part]}" ${required ? 'required' : ''} ${disabled ? 'disabled' : ''}>${renderDateOptions(values[part], parts[part], ({year: '연', month: '월', day: '일'})[part])}</select>`).join('')}</div>`;
+    return `<div class="applicant-public-date-select-grid">${['year', 'month', 'day'].map(part => `<select id="${prefix === 'applicant' ? 'field' : 'member-date'}-${escapeAttribute(fieldKey)}-${part}" data-${prefix}-date-field-key="${escapeAttribute(fieldKey)}" data-${prefix}-date-part="${part}" data-i18n-aria-label-en="${escapeAttribute(labelEn || label)} ${part}" aria-label="${escapeAttribute(label)} ${({ year: '연도', month: '월', day: '일' })[part]}" ${required ? 'required' : ''} ${disabled ? 'disabled' : ''}>${renderDateOptions(values[part], parts[part], ({year: '연', month: '월', day: '일'})[part])}</select>`).join('')}</div>`;
   }
+  function formatNationalitySelection(option) {
+    return option ? [option.label, option.englishLabel, option.code].filter(Boolean).join(' · ') : '';
+  }
+
   function renderNationalityOptions(options, fieldKey, selected, prefix = 'applicant', valueKey = 'label') {
     if (!options.length) return '<div class="applicant-public-nationality-empty">검색 결과가 없습니다.</div>';
-    return `<div class="applicant-public-nationality-options">${options.map(option => `<button type="button" class="applicant-public-nationality-option ${selected === option[valueKey] ? 'is-selected' : ''}" data-${prefix}-nationality-field-key="${escapeAttribute(fieldKey)}" data-${prefix}-nationality-value="${escapeAttribute(option[valueKey])}"><strong>${escapeHtml(option.label)}</strong><span>${escapeHtml([option.englishLabel, option.code].filter(Boolean).join(' · '))}</span></button>`).join('')}</div>`;
+    return `<div class="applicant-public-nationality-options">${options.map(option => `<button type="button" class="applicant-public-nationality-option ${selected === option[valueKey] ? 'is-selected' : ''}" data-${prefix}-nationality-field-key="${escapeAttribute(fieldKey)}" data-${prefix}-nationality-value="${escapeAttribute(option[valueKey])}"><strong data-i18n-en="${escapeAttribute(option.englishLabel || option.label)}">${escapeHtml(option.label)}</strong><span>${escapeHtml([option.englishLabel, option.code].filter(Boolean).join(' · '))}</span></button>`).join('')}</div>`;
   }
 
   function getApplicantHomeActionIconMarkup(iconKey = "") {
@@ -100,15 +141,22 @@
     return `${getApplicantHomeActionIconMarkup(iconKey)}<span>${escapeHtml(label)}</span>`;
   }
 
-  function renderCompactNotice({ html = '', cardClassName = '', contentClassName = '', contentId = '', contentAttributes = '', editing = false } = {}) {
+  function getNoticePreview(html) {
     const text = String(html).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     const decoder = typeof document === 'object' ? document.createElement('textarea') : null;
     if (decoder) decoder.innerHTML = text;
-    const preview = decoder ? decoder.value : text;
+    return decoder ? decoder.value : text;
+  }
+
+  function renderCompactNotice({ html = '', htmlEn = '', userContent = true, cardClassName = '', contentClassName = '', contentId = '', contentAttributes = '', editing = false } = {}) {
+    const preview = getNoticePreview(html);
+    const bilingual = !editing && Boolean(String(htmlEn).trim());
+    const previewMarkup = bilingual ? renderAuthoredText(preview, getNoticePreview(htmlEn)) : escapeHtml(preview || '공지사항을 확인해 주세요.');
+    const languageAttributes = bilingual ? `data-i18n-html-ko="${escapeAttribute(html)}" data-i18n-html-en="${escapeAttribute(htmlEn)}"` : '';
     return `<article class="login-hero-card login-notice-card ${escapeAttribute(cardClassName)}">
       <details class="public-glass-notice" ${editing ? 'open' : ''}>
-        <summary><div class="login-notice-head"><h2>Notice</h2><span class="public-glass-notice-more">전체보기</span><span class="public-glass-notice-less">접기</span></div><p class="public-glass-notice-preview">${escapeHtml(preview || '공지사항을 확인해 주세요.')}</p></summary>
-        <div ${contentId ? `id="${escapeAttribute(contentId)}"` : ''} class="login-notice-content ${escapeAttribute(contentClassName)}" ${contentAttributes}>${html}</div>
+        <summary><div class="login-notice-head"><h2>Notice</h2><span class="public-glass-notice-more">전체보기</span><span class="public-glass-notice-less">접기</span></div><p ${userContent && preview ? 'translate="no"' : ''} class="public-glass-notice-preview">${previewMarkup}</p></summary>
+        <div ${userContent || bilingual ? 'translate="no"' : ''} ${languageAttributes} ${contentId ? `id="${escapeAttribute(contentId)}"` : ''} class="login-notice-content ${escapeAttribute(contentClassName)}" ${contentAttributes}>${html}</div>
       </details>
     </article>`;
   }
@@ -116,12 +164,17 @@
   return Object.freeze({
     escapeAttribute,
     escapeHtml,
+    renderAuthoredText,
+    renderMultiSelect,
+    readMultiSelect,
+    renderChoiceAnswer,
     formatApplicantBirthDate,
     getDateDayCount,
     getDateYearOptions,
     renderDateOptions,
     renderDateSelectControls,
     renderNationalityOptions,
+    formatNationalitySelection,
     getApplicantHomeActionIconMarkup,
     renderApplicantHomeActionButtonLabel,
     renderCompactNotice,

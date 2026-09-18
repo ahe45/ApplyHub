@@ -338,21 +338,25 @@
       syncLoginNoticeEditorDraft();
       const activeScope = getActiveNoticeScope();
       const activeScopeLabel = getActiveNoticeScopeLabel();
+      const language = state.noticeManagement.activeLanguage === "en" ? "en" : "ko";
+      const submittedHtml = state.loginNotice.draftHtml;
 
       try {
         const payload = await apiRequest("/api/login-notice", {
           method: "PUT",
           body: JSON.stringify({
             scope: activeScope,
-            html: state.loginNotice.draftHtml,
+            language,
+            html: submittedHtml,
           }),
         });
 
-        applyLoginNoticePayload(payload.html || payload.loginNoticeHtml || payload.applicantNoticeHtml || state.loginNotice.draftHtml, {
+        applyLoginNoticePayload(payload.html ?? submittedHtml, {
           scope: activeScope,
+          language,
         });
         renderView();
-        showToast(`${activeScopeLabel} 공지사항을 저장했습니다.`);
+        showToast(`${activeScopeLabel} ${language === "en" ? "영어" : "한국어"} 공지사항을 저장했습니다.`);
       } catch (error) {
         if (handleAuthenticationFailure(error)) {
           return;

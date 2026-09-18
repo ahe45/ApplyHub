@@ -5,7 +5,7 @@ const DEFAULT_TEMPLATE_SEEDS = [{
 }];
 const {
   accountRoleOptions,
-  buildRoleMenuVisibilityFromSuperAdminSettings,
+  buildDefaultRoleMenuVisibility,
   normalizeSuperAdminSettings,
   superAdminRole,
   templateRenderTagDefinitions: templateTagDefinitions,
@@ -43,9 +43,11 @@ const APPLICANT_PUBLIC_ACCESS_TTL_MS = 1000 * 60 * 60;
 const EXAMINEE_PHOTO_STORAGE_DIR_NAME = "photo";
 const APPLICANT_PHOTO_STORAGE_DIR_NAME = "uploads/photo";
 const APPLICANT_FILE_STORAGE_DIR_NAME = "uploads/file";
-const EDGE_EXECUTABLE_PATHS = [
+const PDF_BROWSER_EXECUTABLE_PATHS = [
   "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
   "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
 ];
 const DEFAULT_SEED_ACCOUNTS = Object.freeze([
   Object.freeze({
@@ -156,7 +158,7 @@ function createApplicationServices({ env = process.env, fs, getPool, path, query
     batchAdmitCardJobTtlMs: BATCH_ADMIT_CARD_JOB_TTL_MS,
     createHttpError,
     createTemplateExamineeRenderer,
-    edgeExecutablePaths: EDGE_EXECUTABLE_PATHS,
+    browserExecutablePaths: PDF_BROWSER_EXECUTABLE_PATHS,
     escapeHtml,
     getActiveTemplate,
     getExamineeByNo,
@@ -196,6 +198,7 @@ function createApplicationServices({ env = process.env, fs, getPool, path, query
   });
   const {
 
+    getApplicantFormTemplates,
     getApplicantFormFields,
     getApplicantRecruitmentUnits,
     getApplicantSchedules,
@@ -222,7 +225,7 @@ function createApplicationServices({ env = process.env, fs, getPool, path, query
     emailSettingsService,
     applicantFileStorageDirName: APPLICANT_FILE_STORAGE_DIR_NAME,
     applicantPhotoStorageDirName: APPLICANT_PHOTO_STORAGE_DIR_NAME,
-    buildRoleMenuVisibilityFromSuperAdminSettings,
+    buildDefaultRoleMenuVisibility,
     createHttpError,
     databaseName,
     defaultAutoLogoutMinutes: DEFAULT_AUTO_LOGOUT_MINUTES,
@@ -234,6 +237,7 @@ function createApplicationServices({ env = process.env, fs, getPool, path, query
     formatDateAsYmd,
     getAccounts,
 
+    getApplicantFormTemplates,
     getApplicantFormFields,
     getApplicantRecruitmentUnits,
     getApplicantSchedules,

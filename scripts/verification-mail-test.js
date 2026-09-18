@@ -98,6 +98,28 @@ async function run() {
     const code=delivered.message.text.match(/인증 코드: (\d{6})/)[1];
     assert.equal((await call('/api/public/members/verify-email',{email:'success@example.test',verificationId:result.body.verificationId,code})).status,200);
     assert(!(JSON.stringify(await query('SELECT * FROM applicant_member_verifications'))).includes('"'+code+'"'));
+    result=await call('/api/public/members/email-code',{email:'english@example.test',language:'en'});
+    assert.equal(result.status,200);
+    const englishMail=sent.at(-1).message;
+    assert.match(englishMail.subject,/Email verification code/);
+    assert.match(englishMail.text,/Verification code: \d{6}/);
+    assert.match(englishMail.text,/Korea Standard Time, UTC\+09:00/);
+    assert.match(englishMail.html,/lang="en"/);
+    assert.match(englishMail.html,/Verify your email/);
+    const englishCode=englishMail.text.match(/Verification code: (\d{6})/)[1];
+    assert.equal((await call('/api/public/members/verify-email',{email:'english@example.test',verificationId:result.body.verificationId,code:englishCode})).status,200);
+    result=await call('/api/public/members/email-code',{email:'fallback@example.test',language:'unsupported'});
+    assert.equal(result.status,200);assert.match(sent.at(-1).message.html,/lang="ko"/);
+    await query("INSERT INTO applicant_members (login_id,password_hash,name,email,email_verified,profile_json,consent_json) VALUES ('existing@example.test','unused','Existing','existing@example.test',1,'{}','{}')");
+    await query("INSERT INTO accounts (login_id,display_name,role,password_value,password_temporary) VALUES ('staff@example.test','Staff','조회용','unused',0)");
+    const beforeDuplicate=sent.length;
+    const proofsBeforeDuplicate=await query('SELECT * FROM applicant_member_verifications ORDER BY id');
+    for(const email of ['  EXISTING@example.test  ','STAFF@example.test']) {
+      result=await call('/api/public/members/email-code',{email,language:'en'});
+      assert.equal(result.status,409);assert.equal(result.body.error,'이미 사용 중인 이메일입니다.');
+    }
+    assert.equal(sent.length,beforeDuplicate,'Duplicate emails must never reach SMTP');
+    assert.deepEqual(await query('SELECT * FROM applicant_member_verifications ORDER BY id'),proofsBeforeDuplicate,'Duplicate requests must not create or delete verification codes');
     await call(emailPath,{...payload,password:'changed-secret',fromName:'변경 입학처',security:'starttls',port:587},adminCookie,'PUT');
     await call('/api/public/members/email-code',{email:'changed@example.test'});
     assert.equal(sent.at(-1).options.auth.pass,'changed-secret');assert.equal(sent.at(-1).options.requireTLS,true);assert.equal(sent.at(-1).message.from.name,'변경 입학처');
@@ -115,6 +137,8 @@ async function run() {
     result=await call('/api/public/members/email-code',{email:'rejected@example.test'});assert.equal(result.status,502);rejected=false;
     result=await call('/api/public/members/recovery/request',{purpose:'password',name:'회원 테스트',email:'recovery@example.test'});
     assert.equal(result.status,200);assert.equal(result.body.debugCode,undefined);assert.equal(sent.at(-1).options.auth.pass,'changed-secret');assert(sent.at(-1).message.subject.includes('비밀번호 재설정'));
+    result=await call('/api/public/members/recovery/request',{purpose:'password',name:'Existing',email:'existing@example.test',language:'en'});
+    assert.equal(result.status,200);assert.match(sent.at(-1).message.subject,/Password reset code/);assert.match(sent.at(-1).message.html,/Reset your password/);assert.match(sent.at(-1).message.html,/lang="en"/);
     const bootstrap=await call('/api/bootstrap',null,adminCookie,'GET');
     assert(!JSON.stringify(bootstrap.body).includes('passwordEncrypted'));assert(!JSON.stringify(bootstrap.body).includes('changed-secret'));
     const audit=await services.systemService.getSystemAuditLogs({limit:100});assert(!JSON.stringify(audit).includes('changed-secret'));
@@ -169,8 +193,49 @@ async function run() {
     await page.waitForSelector('applyhub-email-settings input[name=password]');
     assert.equal(await page.$eval('applyhub-email-settings input[name=password]',el=>el.value),'');
     assert.equal(await page.evaluate(()=>window.AdmitCardEmailSettings.hasUnsavedChanges()),false);
+    const visitor=await browser.createBrowserContext();
+    const signupPage=await visitor.newPage();signupPage.on('pageerror',error=>errors.push(error.message));
+    await services.membershipService.saveSettings({birth:'hidden',phone:'hidden',terms:[],extraFields:[]});
+    await signupPage.goto(base+'/applicant/signup',{waitUntil:'networkidle0'});
+    await signupPage.click('[data-language="en"]');
+    await signupPage.click('[data-applicant-form="member-terms"] button[type="submit"]');
+    await signupPage.waitForSelector('[data-applicant-form="member-register"] [name="email"]');
+    await signupPage.evaluate(()=>{
+      window.emailEnterEvents={send:0,submit:0,invalid:0};
+      const form=document.querySelector('[data-applicant-form="member-register"]');
+      form.addEventListener('submit',()=>window.emailEnterEvents.submit++);
+      form.addEventListener('invalid',()=>window.emailEnterEvents.invalid++,true);
+      form.querySelector('[data-applicant-action="member-send-code"]').addEventListener('click',()=>window.emailEnterEvents.send++);
+    });
+    await signupPage.focus('[name="email"]');await signupPage.keyboard.press('Enter');
+    assert.deepEqual(await signupPage.evaluate(()=>window.emailEnterEvents),{send:0,submit:0,invalid:0},'Empty email Enter must not submit the registration form');
+    await signupPage.type('[name="email"]','existing@example.test');
+    await signupPage.$eval('[name="email"]',el=>{
+      for(const state of [{isComposing:true},{repeat:true}]) el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true,...state}));
+    });
+    assert.deepEqual(await signupPage.evaluate(()=>window.emailEnterEvents),{send:0,submit:0,invalid:0},'Composition and held Enter must not send mail');
+    const browserBeforeDuplicate=sent.length;
+    let responsePromise=signupPage.waitForResponse(r=>r.url().endsWith('/members/email-code'));
+    await signupPage.keyboard.press('Enter');
+    assert.equal((await responsePromise).status(),409);
+    await signupPage.waitForFunction(()=>document.querySelector('[name="email"]').closest('.applicant-public-field').textContent.includes('This email is already in use.'));
+    assert.equal(sent.length,browserBeforeDuplicate);
+    await signupPage.click('[name="email"]',{clickCount:3});await signupPage.type('[name="email"]','browser-en@example.test');
+    responsePromise=signupPage.waitForResponse(r=>r.url().endsWith('/members/email-code'));
+    await signupPage.keyboard.press('Enter');
+    assert.equal((await responsePromise).status(),200);assert.match(sent.at(-1).message.subject,/Email verification code/);
+    await signupPage.waitForFunction(()=>document.querySelector('[name="email"]').closest('.applicant-public-field').textContent.includes('10 minutes'));
+    await signupPage.keyboard.press('Enter');
+    assert.deepEqual(await signupPage.evaluate(()=>window.emailEnterEvents),{send:2,submit:0,invalid:0},'Enter sends only the code request and respects the resend cooldown');
+    assert.equal(sent.length,browserBeforeDuplicate+1);
+    await signupPage.goto(base+'/account-recovery',{waitUntil:'networkidle0'});
+    await signupPage.type('[name="name"]','Existing');await signupPage.type('[name="email"]','browser-recovery@example.test');
+    responsePromise=signupPage.waitForResponse(r=>r.url().endsWith('/recovery/request'));
+    await signupPage.click('#recoveryForm button[type="submit"]');
+    assert.equal((await responsePromise).status(),200);assert.match(sent.at(-1).message.subject,/Password reset code/);assert.match(sent.at(-1).message.html,/lang="en"/);
+    await visitor.close();
     assert.deepEqual(errors,[]);
-    console.log('PASS: admin permissions, encrypted persistence, password retention/recovery, safe backups, SMTP errors, real verification flow with mocked SMTP, immediate config updates and responsive settings UI');
+    console.log('PASS: bilingual signup/recovery emails, duplicate email blocking and translated feedback, admin permissions, encrypted persistence, safe backups, SMTP errors and responsive settings UI');
   } finally {
     nodemailer.createTransport=originalTransport;
     if(browser) await browser.close();

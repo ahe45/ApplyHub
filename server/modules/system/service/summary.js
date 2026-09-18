@@ -1,6 +1,7 @@
 function createSystemSummaryService({
   formatDateAsYmd,
   getAccounts,
+  getApplicantFormTemplates,
   getApplicantFormFields,
   getApplicantRecruitmentUnits,
   getApplicantNoticeHtml,
@@ -53,6 +54,7 @@ function createSystemSummaryService({
 
     return {
       applicantManager: {
+        formTemplates: await getApplicantFormTemplates(),
         fields: applicantFormFields,
         recruitmentUnits: applicantRecruitmentUnits,
         schedules: applicantSchedules,
@@ -69,6 +71,8 @@ function createSystemSummaryService({
       superAdminSettings,
       loginNoticeHtml,
       applicantNoticeHtml,
+      loginNoticeHtmlEn: await getLoginNoticeHtml("login", "en"),
+      applicantNoticeHtmlEn: await getLoginNoticeHtml("applicant", "en"),
       serverDate: formatDateAsYmd(new Date()),
       serverTime: Date.now(),
     };

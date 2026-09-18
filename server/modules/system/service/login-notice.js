@@ -54,12 +54,14 @@ function createSystemLoginNoticeService({
   function normalizeLoginNoticePayload(payload = {}) {
     return {
       scope: normalizeNoticeScope(payload.scope),
+      language: payload.language === "en" ? "en" : "ko",
       html: String(payload.html ?? payload.loginNoticeHtml ?? ""),
     };
   }
 
-  async function getLoginNoticeHtml(scope = "login") {
+  async function getLoginNoticeHtml(scope = "login", language = "ko") {
     const scopeConfig = getNoticeScopeConfig(scope);
+    const settingKey = scopeConfig.settingKey + (language === "en" ? "En" : "");
     const rows = await query(
       `
         SELECT
@@ -68,11 +70,12 @@ function createSystemLoginNoticeService({
         FROM system_set
         WHERE setting_key IN ('initialPassword', ?)
       `,
-      [scopeConfig.settingKey],
+      [settingKey],
     );
     const rowsByKey = new Map((Array.isArray(rows) ? rows : []).map((row) => [String(row.settingKey || ""), row.settingValue]));
     const initialPassword = parseSystemInitialPassword(rowsByKey.get("initialPassword"));
-    const storedValue = rowsByKey.get(scopeConfig.settingKey);
+    const storedValue = rowsByKey.get(settingKey);
+    if (language === "en") return String(storedValue ?? "");
 
     return scopeConfig.settingKey === "applicantNoticeHtml"
       ? parseApplicantNoticeHtml(storedValue)
@@ -90,15 +93,16 @@ function createSystemLoginNoticeService({
         ON DUPLICATE KEY UPDATE
           setting_value = VALUES(setting_value)
       `,
-      [scopeConfig.settingKey, nextNotice.html],
+      [scopeConfig.settingKey + (nextNotice.language === "en" ? "En" : ""), nextNotice.html],
     );
 
-    const savedHtml = await getLoginNoticeHtml(nextNotice.scope);
+    const savedHtml = await getLoginNoticeHtml(nextNotice.scope, nextNotice.language);
 
     return {
       scope: nextNotice.scope,
+      language: nextNotice.language,
       html: savedHtml,
-      [scopeConfig.responseKey]: savedHtml,
+      [scopeConfig.responseKey + (nextNotice.language === "en" ? "En" : "")]: savedHtml,
     };
   }
 

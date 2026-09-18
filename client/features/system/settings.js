@@ -1043,7 +1043,7 @@
       }
 
       if (summaryKey === "recruitmentEnabled") {
-        return normalizedSnapshot.recruitmentEnabled ? "사용함" : "사용하지 않음";
+        return normalizedSnapshot.recruitmentEnabled ? "표시함" : "숨김";
       }
 
       return "-";
@@ -1056,7 +1056,7 @@
         { key: "schoolName", label: "학교명" },
         { key: "logoImageUrl", label: "로고 이미지" },
         { key: "backgroundImageUrl", label: "배경 이미지" },
-        { key: "recruitmentEnabled", label: "접수 사용 여부" },
+        { key: "recruitmentEnabled", label: "접수 버튼 표시 여부" },
       ];
 
       return summaryDefinitions

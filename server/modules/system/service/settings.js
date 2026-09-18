@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 
 function createSystemSettingsService({
-  buildRoleMenuVisibilityFromSuperAdminSettings,
+  buildDefaultRoleMenuVisibility,
   createHttpError,
   defaultAutoLogoutMinutes,
   defaultInitialPassword,
@@ -501,7 +501,7 @@ function createSystemSettingsService({
   }
 
   async function getRoleMenuVisibilitySettings() {
-    return buildRoleMenuVisibilityFromSuperAdminSettings(await getSuperAdminSettings());
+    return buildDefaultRoleMenuVisibility();
   }
 
   async function updateSystemSettings(payload) {
