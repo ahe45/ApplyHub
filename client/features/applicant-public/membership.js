@@ -70,12 +70,30 @@
       return { label, isAvailable: !reason, disabled: busy || Boolean(reason), complete: key === 'apply' && complete,
         description: reason || { apply: '접수 신청서 작성', summary: '나의 접수 내역 확인', ticket: '수험표 확인 및 출력', documents: '첨부 서류 업로드', 'document-status': '서류별 제출 상태 확인' }[key] };
     }
+    const periodDateFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    function menuPeriod(key) {
+      const label = (ko, en) => controls.renderAuthoredText(ko, en);
+      if (!applicationContext || contextError) return label('일정 확인 중', 'Checking dates');
+      if (key === 'summary') return label('접수 후 상시 조회', 'Any time after submission');
+      const period = applicationContext.menuWindows?.[key];
+      if (period?.variesByAdmission) return label('전형별 일정 상이', 'Dates vary by admission');
+      if (!Number.isFinite(period?.startAt) || !Number.isFinite(period?.endAt) || period.startAt > period.endAt) return label('기간 미설정', 'Dates not set');
+      const date = timestamp => {
+        const parts = Object.fromEntries(periodDateFormatter.formatToParts(timestamp).map(part => [part.type, part.value]));
+        return `${parts.year}.${parts.month}.${parts.day} ${parts.hour}:${parts.minute}`;
+      };
+      return `<span class="applicant-member-period-label">${label('이용 기간 (KST)', 'Period (KST)')}</span><time datetime="${new Date(period.startAt).toISOString()}" translate="no">${date(period.startAt)}</time><time datetime="${new Date(period.endAt).toISOString()}" translate="no">~ ${date(period.endAt)}</time>`;
+    }
     function syncMenuButtons() {
       document.querySelectorAll('.applicant-member-menu [data-applicant-action]').forEach(button => {
-        const item = menuState(button.dataset.applicantAction.replace('member-', ''));
+        const key = button.dataset.applicantAction.replace('member-', '');
+        const item = menuState(key);
         button.disabled = item.disabled; button.classList.toggle('is-complete', item.complete);
         button.querySelector('strong').textContent = item.label;
         button.querySelector('small').textContent = item.description;
+        const period = button.querySelector('.applicant-member-tile-period');
+        const markup = menuPeriod(key);
+        if (period && period.dataset.markup !== markup) { period.innerHTML = markup; period.dataset.markup = markup; }
       });
     }
     function startMenuTimer() {
@@ -94,7 +112,7 @@
       if (!member) return `<a class="primary-button" href="/login">공통 로그인으로 이동</a>`;
       return `<div class="applicant-member-menu">${['apply', 'documents', 'document-status', 'summary', 'ticket'].filter(key => (key !== 'apply' || isApplyButtonVisible()) && applicationContext?.menuVisibility?.[key] !== false).map(key => {
           const item = menuState(key);
-          return `<button type="button" class="ghost-button applicant-member-tile${item.complete ? ' is-complete' : ''}" data-applicant-action="member-${key}" ${item.disabled ? 'disabled' : ''}><span class="applicant-member-tile-number" aria-hidden="true">${controls.getApplicantHomeActionIconMarkup(key === 'documents' || key === 'document-status' ? 'scan' : key)}</span><strong>${esc(item.label)}</strong><small>${esc(item.description)}</small></button>`;
+          return `<button type="button" class="ghost-button applicant-member-tile${item.complete ? ' is-complete' : ''}" data-applicant-action="member-${key}" ${item.disabled ? 'disabled' : ''}><span class="applicant-member-tile-number" aria-hidden="true">${controls.getApplicantHomeActionIconMarkup(key === 'documents' || key === 'document-status' ? 'scan' : key)}</span><strong>${esc(item.label)}</strong><small>${esc(item.description)}</small><span class="applicant-member-tile-period">${menuPeriod(key)}</span></button>`;
         }).join('')}</div>`;
     }
     function isValidSignupEmail(value) {

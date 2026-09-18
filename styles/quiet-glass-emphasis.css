@@ -72,10 +72,12 @@
 }
 /* Focus is an additional cue, separate from selection or hover. */
 :root body.applicant-public-body .applicant-member-menu .applicant-member-tile:disabled :is(strong, small) { color: var(--glass-disabled-ink); }
+:root body.applicant-public-body .applicant-member-menu .applicant-member-tile:disabled .applicant-member-tile-period { color: var(--glass-disabled-ink); border-color: var(--glass-line); }
 :root body.applicant-public-body .applicant-member-menu .applicant-member-tile.is-complete:disabled {
   background: var(--glass-success-bg); border-color: var(--glass-success-line); color: var(--glass-success);
 }
 :root body.applicant-public-body .applicant-member-menu .applicant-member-tile.is-complete:disabled :is(strong, small) { color: var(--glass-success); }
+:root body.applicant-public-body .applicant-member-menu .applicant-member-tile.is-complete:disabled .applicant-member-tile-period { color: var(--glass-success); border-color: var(--glass-success-line); }
 :root body.applicant-public-body .applicant-member-menu .applicant-member-tile.is-complete .applicant-member-tile-number { background: transparent; color: var(--glass-success); }
 :root body :is(button, a, input, select, textarea, summary):focus-visible {
   outline: 3px solid var(--glass-selected-line); outline-offset: 3px;

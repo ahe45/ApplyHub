@@ -4481,12 +4481,21 @@ function createApplicantService({
       startAt: Number.isFinite(getApplicantScheduleTimestamp(start)) ? getApplicantScheduleTimestamp(start) : null,
       endAt: Number.isFinite(getApplicantScheduleTimestamp(end, { inclusiveEndMinute: true })) ? getApplicantScheduleTimestamp(end, { inclusiveEndMinute: true }) : null,
     });
+    const menuWindow = (type, startKey, endKey) => {
+      if (submission) return window(schedule?.[startKey], schedule?.[endKey]);
+      const windows = schedules.filter(item => applicantFormConfig.isApplicantScheduleEnabled(item, type))
+        .map(item => window(item[startKey], item[endKey]));
+      const first = windows[0] || window();
+      return windows.some(item => item.startAt !== first.startAt || item.endAt !== first.endAt)
+        ? { startAt: null, endAt: null, variesByAdmission: true } : first;
+    };
     return { accessToken, submission, serverTime: Date.now(), menuVisibility: {
       apply: visible('submission'), documents: visible('documents'), 'document-status': visible('document-status'), ticket: visible('lookup'),
     }, menuWindows: {
-      ticket: window(schedule?.admitCardLookupScheduleStartAt, schedule?.admitCardLookupScheduleEndAt),
-      documents: window(schedule?.documentSubmissionScheduleStartAt, schedule?.documentSubmissionScheduleEndAt),
-      "document-status": window(schedule?.documentReviewScheduleStartAt, schedule?.documentReviewScheduleEndAt),
+      apply: menuWindow('submission', 'applicantScheduleStartAt', 'applicantScheduleEndAt'),
+      ticket: menuWindow('lookup', 'admitCardLookupScheduleStartAt', 'admitCardLookupScheduleEndAt'),
+      documents: menuWindow('documents', 'documentSubmissionScheduleStartAt', 'documentSubmissionScheduleEndAt'),
+      "document-status": menuWindow('document-status', 'documentReviewScheduleStartAt', 'documentReviewScheduleEndAt'),
     } };
   }
 

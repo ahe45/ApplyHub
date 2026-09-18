@@ -36,9 +36,24 @@ async function runScheduleSettingsChecks({ services, query, base, call, memberCo
     assert(result.body.code?.includes('SCHEDULE'), JSON.stringify(result.body));
   } finally { await query('UPDATE app_meta SET member_id = ? WHERE id = ?', [meta.member_id, submissionId]); }
   await query("INSERT INTO app_unit (track_name, admission_code, admission_name, series_code, series_name, unit_code, unit_name) VALUES ('정시','9','별도전형','8','자연','7','수학')");
-  await service.saveApplicantSchedule({ ...original, trackName: '정시', admissionCode: '9', admissionName: '별도전형' });
+  await service.saveApplicantSchedule({ ...original, trackName: '정시', admissionCode: '9', admissionName: '별도전형', applicantScheduleStartAt: '2030-01-01T09:00', applicantScheduleEndAt: '2030-01-31T18:00' });
   const context = (await call('/api/public/members/application', null, memberCookie, 'GET')).body;
   assert.deepEqual(context.menuVisibility, { apply: false, documents: false, 'document-status': true, ticket: false }, 'Other active admissions cannot enable completed applicants’ menus');
+  assert.deepEqual(context.menuWindows.apply, {
+    startAt: formConfig.getApplicantScheduleTimestamp(original.applicantScheduleStartAt),
+    endAt: formConfig.getApplicantScheduleTimestamp(original.applicantScheduleEndAt, { inclusiveEndMinute: true }),
+  }, 'Completed applicants see their own admission dates');
+  await query('UPDATE app_meta SET member_id = NULL WHERE id = ?', [submissionId]);
+  try {
+    const before = (await call('/api/public/members/application', null, memberCookie, 'GET')).body;
+    assert.equal(before.menuWindows.apply.startAt, formConfig.getApplicantScheduleTimestamp('2030-01-01T09:00'), 'Before applying, only enabled schedules contribute to displayed dates');
+    await service.saveApplicantSchedule({ trackName: original.trackName, admissionCode: original.admissionCode, admissionName: original.admissionName, applicantScheduleEnabled: true });
+    const varied = (await call('/api/public/members/application', null, memberCookie, 'GET')).body;
+    assert.deepEqual(varied.menuWindows.apply, { startAt: null, endAt: null, variesByAdmission: true }, 'Different admission periods are not merged into a misleading date range');
+  } finally {
+    await query('UPDATE app_meta SET member_id = ? WHERE id = ?', [meta.member_id, submissionId]);
+    await service.saveApplicantSchedule({ trackName: original.trackName, admissionCode: original.admissionCode, admissionName: original.admissionName, applicantScheduleEnabled: false });
+  }
   console.log('PASS: enabled-by-default migration, preserved dates, partial saves, disabled API access and admission isolation');
 
   const artifacts = path.resolve('.tmp-schedule-settings'); fs.mkdirSync(artifacts, { recursive: true });

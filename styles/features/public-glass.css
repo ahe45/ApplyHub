@@ -162,18 +162,20 @@ ticket-pdf-viewer canvas[hidden] { display: none; }
 :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-welcome { font-size: 13px; color: var(--glass-muted); justify-content: center; margin-top: 8px; order: 2; }
 :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-welcome > span { display: none; }
 :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-welcome .ghost-button { background: transparent; min-height: 44px; padding: 6px 10px; font-size: 12px; }
-:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-menu { gap: 12px; }
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-menu { gap: 10px; }
 :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-menu .applicant-member-tile {
-  min-height: 144px; padding: 18px; gap: 10px; justify-content: flex-start;
-  border: 1px solid var(--glass-line); border-radius: 24px;
+  min-height: 80px; padding: 14px 16px; gap: 4px 14px;
+  border: 1px solid var(--glass-line); border-radius: 16px;
   background: var(--glass-surface); box-shadow: var(--glass-shadow);
 }
 :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile strong { font-size: 15px; font-weight: 700; color: var(--glass-ink); }
 :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile small { font-size: 11px; font-weight: 400; color: var(--glass-muted); }
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile-period { color: var(--glass-muted); border-color: var(--glass-line); }
 :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile-number { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--glass-tint); color: var(--glass-tint-ink); }
 :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile-number svg { width: 22px; height: 22px; stroke: currentColor; }
 :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-menu .applicant-member-tile:first-child { background: var(--glass-primary); border-color: var(--glass-primary); }
 :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile:first-child :is(strong, small) { color: #fff; }
+:is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile:first-child .applicant-member-tile-period { color: #fff; border-color: #ffffff40; }
 :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile:first-child .applicant-member-tile-number { color: #fff; background: #ffffff24; }
 :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-menu .applicant-member-tile:first-child:hover:not(:disabled) { background: var(--glass-primary-hover); }
 
@@ -242,7 +244,9 @@ ticket-pdf-viewer canvas[hidden] { display: none; }
 
 @media (max-width: 360px) {
   .public-glass-intro .public-glass-product-name { font-size: 9px; letter-spacing: 0; }
-  :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-menu .applicant-member-tile { padding: 14px; min-height: 144px; }
+  :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-menu .applicant-member-tile { padding: 12px; min-height: 80px; grid-template-columns: 26px minmax(0, 1fr) 110px; column-gap: 8px; }
+  :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile-number { width: 26px; height: 30px; }
+  :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile-period { font-size: 10px; padding-left: 6px; }
   :is(.applicant-public-body, .applicant-notice-editor-stage) .applicant-member-tile strong { font-size: 15px; }
 }
 @media (prefers-reduced-motion: reduce) {
