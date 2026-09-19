@@ -193,7 +193,7 @@ function createApplicationServices({ env = process.env, fs, getPool, path, query
     verifyPassword,
   });
   const membershipService = createApplicantMembershipService({
-    query, getPool, createHttpError, env,
+    query, getPool, createHttpError, env, rootDir,
     sendEmail: emailSettingsService.sendVerificationEmail,
   });
   const {
@@ -296,7 +296,7 @@ function createApplicationServices({ env = process.env, fs, getPool, path, query
 
     const account = await authService.getAccountAuthRecord(normalizedAccountId);
 
-    if (!account || !verifyPassword(normalizedPassword, account.passwordValue)) {
+    if (!account || !(await verifyPassword(normalizedPassword, account.passwordValue))) {
       throw createHttpError(401, "현재 비밀번호가 올바르지 않습니다.", "SYSTEM_DATA_DELETE_PASSWORD_INVALID");
     }
 
@@ -307,8 +307,13 @@ function createApplicationServices({ env = process.env, fs, getPool, path, query
     const schemaConnection = await getPool().getConnection();
     try {
       await maintainApplicationSchema({ connection: schemaConnection, rootDir, initialize: async () => {
-        await schemaBootstrapService.ensureApplicantSchema();
-        await schemaBootstrapService.ensurePrintHistorySchema();
+        const schemaOnConnection = createSchemaBootstrapService({
+          defaultAutoLogoutMinutes: DEFAULT_AUTO_LOGOUT_MINUTES, defaultInitialPassword: DEFAULT_INITIAL_PASSWORD,
+          migrateLegacyAccountPasswords,
+          query: async (sql, params) => (await schemaConnection.query(sql, params))[0],
+        });
+        await schemaOnConnection.ensureApplicantSchema();
+        await schemaOnConnection.ensurePrintHistorySchema();
       } });
     } finally {
       schemaConnection.release();

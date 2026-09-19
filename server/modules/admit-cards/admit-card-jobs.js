@@ -1,3 +1,6 @@
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { randomUUID } = require("crypto");
 
 const BATCH_ADMIT_CARD_OUTPUT_MODES = Object.freeze({
@@ -35,6 +38,9 @@ function createBatchAdmitCardJobController({
   translateDatabaseError,
 }) {
   const batchAdmitCardJobStore = new Map();
+  const outputDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'applyhub-tickets-'));
+  const cleanupTimer = setInterval(cleanupBatchAdmitCardJobs, 60000);
+  cleanupTimer.unref();
 
   function normalizeBatchAdmitCardOutputMode(value) {
     return String(value || "").trim() === BATCH_ADMIT_CARD_OUTPUT_MODES.PDF_ZIP
@@ -76,7 +82,9 @@ function createBatchAdmitCardJobController({
         return;
       }
 
+      if (job.status === 'running') return;
       batchAdmitCardJobStore.delete(jobId);
+      if (job.filePath) fs.promises.unlink(job.filePath).catch(error => { if (error.code !== 'ENOENT') console.warn('Ticket cleanup failed:', error.code); });
     });
   }
 
@@ -190,7 +198,10 @@ function createBatchAdmitCardJobController({
         normalizedOutputMode === BATCH_ADMIT_CARD_OUTPUT_MODES.PDF_ZIP
           ? buildBatchAdmitCardZipBuffer
           : buildBatchAdmitCardPdfBuffer;
+      const filePath = path.join(outputDirectory, jobId + (normalizedOutputMode === BATCH_ADMIT_CARD_OUTPUT_MODES.PDF_ZIP ? '.zip' : '.pdf'));
+      job.filePath = filePath;
       const fileBuffer = await buildBatchAdmitCardBuffer(examineeNos, {
+        outputPath: filePath,
         onPhaseChange: (payload) => {
           updateBatchAdmitCardJobProgress(jobId, payload);
         },
@@ -223,11 +234,14 @@ function createBatchAdmitCardJobController({
         return;
       }
 
-      activeJob.status = BATCH_ADMIT_CARD_JOB_STATUSES.COMPLETED;
+
       activeJob.phase = "ready";
       activeJob.completedCount = Math.max(activeJob.completedCount, activeJob.totalCount);
       activeJob.completedPageCount = Math.max(activeJob.completedPageCount, activeJob.totalPageCount);
-      activeJob.fileBuffer = fileBuffer;
+      if (Buffer.isBuffer(fileBuffer)) await fs.promises.writeFile(filePath, fileBuffer);
+      activeJob.fileBuffer = null;
+      activeJob.fileSize = (await fs.promises.stat(filePath)).size;
+      activeJob.status = BATCH_ADMIT_CARD_JOB_STATUSES.COMPLETED;
       activeJob.error = "";
       activeJob.errorCode = "";
       touchBatchAdmitCardJob(activeJob);
@@ -270,6 +284,11 @@ function createBatchAdmitCardJobController({
     }
 
     cleanupBatchAdmitCardJobs();
+    const running = [...batchAdmitCardJobStore.values()].filter(job => job.status === 'running');
+    if (normalizedExamineeNos.length > 2000) throw createHttpError(400, '한 번에 최대 2,000명까지 출력할 수 있습니다.');
+    if (running.some(job => job.accountId === String(accountId))) throw createHttpError(409, '이미 수험표를 생성하고 있습니다.');
+    if (running.length >= 2) throw createHttpError(429, '다른 수험표 작업을 처리하고 있습니다. 잠시 후 다시 시도하세요.');
+    if ([...batchAdmitCardJobStore.values()].reduce((sum, job) => sum + (job.fileSize || 0), 0) >= 2 * 1024 ** 3) throw createHttpError(429, '출력 파일 임시 저장 공간이 사용 중입니다. 잠시 후 다시 시도하세요.');
 
     const normalizedOutputMode = normalizeBatchAdmitCardOutputMode(outputMode);
     const jobId = randomUUID();

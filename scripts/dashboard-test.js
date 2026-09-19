@@ -56,6 +56,19 @@ async function verifyDashboard(page, base) {
   const bootstrap = await page.evaluate(async () => (await fetch('/api/bootstrap')).json());
   let manager = fixture();
   const handler = request => {
+    const pathname = new URL(request.url()).pathname;
+    const respond = value => request.respond({status:200,contentType:'application/json',body:JSON.stringify(value)});
+    if(pathname === '/api/applicant-submissions/list') {
+      const body=JSON.parse(request.postData() || '{}');
+      const filterOptions=Object.fromEntries(['track','admission','series','unit','major'].map(key=>[key,[...new Set(manager.submissions.map(row=>row[key]).filter(Boolean))]]));
+      if(body.kind==='dashboard') return respond({...data.buildDashboardData(manager,body,now),filterOptions});
+      let rows=data.filterHistoryRows(manager.submissions,manager.fields,{...body,mode:body.mode||'all'});
+      if(body.optionsKey) return respond({values:[...new Set(rows.map(row=>String(row[body.optionsKey]||''))) ]});
+      const page=Number(body.page||1),pageSize=Number(body.pageSize||20);
+      return respond({rows:rows.slice((page-1)*pageSize,page*pageSize),total:rows.length,page,pageSize,filterOptions,references:rows.map(({id,examineeNo})=>({id,examineeNo}))});
+    }
+    if(/^\/api\/applicant-submissions\/\d+$/.test(pathname)) return respond(manager.submissions.find(row=>row.id===Number(pathname.split('/').pop())));
+
     if (new URL(request.url()).pathname === '/api/bootstrap') return request.respond({status:200,contentType:'application/json',body:JSON.stringify({
       ...bootstrap, serverDate:'2026-09-15', serverTime:now, applicantManager:{...bootstrap.applicantManager,...manager},
       examinees:manager.submissions.map(row=>({...row,examineeNo:row.examineeNo})),

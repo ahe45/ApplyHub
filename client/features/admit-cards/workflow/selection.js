@@ -22,7 +22,7 @@
 
       const selectedRowIds = new Set(getGridSelectedRowIds("admitCardLookupGrid"));
 
-      return getGridRows("admitCardLookupGrid").filter((row) =>
+      return (globalThis.AdmitCardRemoteGrids?.references("admitCardLookupGrid") || getGridRows("admitCardLookupGrid")).filter((row) =>
         selectedRowIds.has(getGridRowId("admitCardLookupGrid", row)),
       );
     }

@@ -145,7 +145,7 @@
       trigger = doc.querySelector('[data-open-modal="applicantSubmissionDownloadModal"]');
       if (!busy) {
         kind = nextKind;
-        targetIds = getGridRows('applicantHistoryGrid').map(row => Number(row.id));
+        targetIds = (scope.AdmitCardRemoteGrids?.references('applicantHistoryGrid') || getGridRows('applicantHistoryGrid')).map(row => Number(row.id));
         scope.clearTimeout(timer);
         activeJob = null; downloadedJob = null;
         dialog?.remove();

@@ -176,6 +176,8 @@
     }
 
     function getGridFilterOptionValues(gridKey, targetKey) {
+      const remote = globalThis.AdmitCardRemoteGrids?.filterOptions(gridKey, targetKey);
+      if (remote) return remote;
       const tableState = getTableState(gridKey);
 
       return getSortedDistinctValues(

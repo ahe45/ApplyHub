@@ -1,3 +1,5 @@
+const fs = require('node:fs');
+const { pipeline } = require('node:stream/promises');
 const { exactRoute, regexRoute } = require("../router");
 
 function decodeRouteParams(groups = {}) {
@@ -141,8 +143,8 @@ function createSystemRoutes(deps) {
       const settings = await deps.getSuperAdminSettings();
       return deps.sendJson(response, 200, { schoolName: settings.schoolName, logoImageUrl: settings.logoImageUrl });
     }, { auth: false }),
-    exactRoute("GET", "/api/bootstrap", async ({ response, authenticatedAccount }) => {
-      const payload = await deps.getBootstrapPayload();
+    exactRoute("GET", "/api/bootstrap", async ({ response, authenticatedAccount, requestUrl }) => {
+      const payload = await deps.getBootstrapPayload({ view: requestUrl.searchParams.get('view') || '' });
       if (authenticatedAccount?.role !== deps.superAdminRole) {
         payload.accounts = (payload.accounts || []).filter(account => account.role !== deps.superAdminRole);
         delete payload.systemBackupAutomation;
@@ -229,6 +231,7 @@ function createSystemRoutes(deps) {
         await deps.verifySystemDataDeletionPassword(authenticatedAccount?.id, body?.currentPassword);
 
         const backupArchive = await deps.buildSystemBackupArchive({
+          preferFile: true,
           includeDatabase: body?.includeDatabase !== false,
           includedAssetKeys: Array.isArray(body?.includedAssetKeys) ? body.includedAssetKeys : [],
         });
@@ -245,16 +248,13 @@ function createSystemRoutes(deps) {
           },
         });
 
-        return deps.sendBinary(
-          response,
-          200,
-          {
-            "Content-Type": "application/zip",
-            "Content-Disposition": deps.buildContentDisposition("attachment", backupArchive.fileName || "system-backup.zip"),
-            "Cache-Control": "no-store",
-          },
-          backupArchive.archiveBuffer,
-        );
+        try {
+          const stat = await fs.promises.stat(backupArchive.filePath);
+          response.writeHead(200, { 'Content-Type':'application/zip','Content-Length':stat.size,
+            'Content-Disposition':deps.buildContentDisposition('attachment',backupArchive.fileName),'Cache-Control':'no-store' });
+          await pipeline(fs.createReadStream(backupArchive.filePath),response);
+        } finally { await backupArchive.dispose(); }
+
       } catch (error) {
         await recordSystemAuditLogSafely(request, authenticatedAccount, {
           actionType: "system_backup_export_failed",

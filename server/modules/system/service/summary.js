@@ -23,7 +23,7 @@ function createSystemSummaryService({
     const [todayPrintSummary] = await query(`
       SELECT COUNT(*) AS todayPrints
       FROM print_log
-      WHERE DATE(printed_at) = CURDATE()
+      WHERE printed_at >= CURDATE() AND printed_at < CURDATE() + INTERVAL 1 DAY
     `);
 
     return {
@@ -33,11 +33,13 @@ function createSystemSummaryService({
     };
   }
 
-  async function getBootstrapPayload() {
+  async function getBootstrapPayload({ view = '' } = {}) {
+    const submissionsPromise = view ? Promise.resolve([]) : getApplicantSubmissions();
+    const examineesPromise = submissionsPromise.then(getExaminees);
     const [examinees, printHistory, templates, accounts, summary, systemSettings, systemBackupAutomation, superAdminSettings, loginNoticeHtml, applicantNoticeHtml, applicantFormFields, applicantRecruitmentUnits, applicantSchedules, applicantSubmissions, applicantSettings] = await Promise.all([
-      getExaminees(),
-      getPrintHistory(),
-      getTemplates(),
+      examineesPromise,
+      !view ? examineesPromise.then(records => getPrintHistory(records)) : [],
+      !view || view === 'templateManagement' ? getTemplates() : [],
       getAccounts(),
       getSummary(),
       getSystemSettings(),
@@ -48,7 +50,7 @@ function createSystemSummaryService({
       getApplicantFormFields(),
       getApplicantRecruitmentUnits(),
       getApplicantSchedules(),
-      getApplicantSubmissions(),
+      submissionsPromise,
       getApplicantSettings(),
     ]);
 

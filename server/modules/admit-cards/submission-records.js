@@ -3,9 +3,9 @@ const { createExamineeWorkbookService } = require('./workbook');
 // Ticket records come directly from submitted applications.
 function createSubmissionTicketDataService({ createHttpError, query, getApplicantService }) {
   const { buildPrintHistoryExportBuffer } = createExamineeWorkbookService({createHttpError});
-  async function getExaminees() {
+  async function getExaminees(providedSubmissions = null) {
     const service = getApplicantService();
-    const submissions = await service.getApplicantSubmissions();
+    const submissions = providedSubmissions || await service.getApplicantSubmissions();
     return Promise.all(submissions.map(async submission => normalizeExamineeRecord(
       await service.buildApplicantAdmitCardRecordFromSubmission(submission, {includePhoto: false}),
     )));
@@ -35,9 +35,9 @@ function createSubmissionTicketDataService({ createHttpError, query, getApplican
     if (!record) throw createHttpError(400, '수험번호가 필요합니다.');
     return record;
   }
-  async function getPrintHistory() {
+  async function getPrintHistory(providedRecords = null) {
     const rows = await query("SELECT id AS historyId, examinee_no AS examineeNo, DATE_FORMAT(printed_at, '%Y-%m-%d %H:%i:%s') AS printedAt FROM print_log ORDER BY printed_at DESC, id DESC");
-    const records = new Map((await getExaminees()).map(row => [row.examineeNo, row]));
+    const records = new Map((providedRecords || await getExaminees()).map(row => [row.examineeNo, row]));
     return rows.map(row => normalizeExamineeRecord({...records.get(row.examineeNo), ...row}));
   }
   return Object.freeze({getExaminees, getExamineeByNo, getExamineesByNos, getPrintHistory, buildPrintHistoryExportBuffer});

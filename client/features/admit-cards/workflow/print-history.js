@@ -40,7 +40,10 @@
               : { examineeNos: normalizedExamineeNos },
           ),
         });
-        await loadBootstrapData({ showLoading: false });
+        state.metrics.totalPrints += normalizedExamineeNos.length;
+        state.metrics.todayPrints += normalizedExamineeNos.length;
+        globalThis.AdmitCardRemoteGrids?.invalidate();
+        renderView();
       } catch (error) {
         state.bootstrap.error = error.message;
         renderView();

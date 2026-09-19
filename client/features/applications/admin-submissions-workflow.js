@@ -29,7 +29,7 @@
       }
     }
 
-    function toggleApplicantSubmissionDetail(submissionId) {
+    async function toggleApplicantSubmissionDetail(submissionId) {
       const normalizedSubmissionId = Number(submissionId || 0);
 
       if (!Number.isInteger(normalizedSubmissionId) || normalizedSubmissionId <= 0) {
@@ -38,8 +38,13 @@
       }
 
       const submissions = Array.isArray(state.applicantManager?.submissions) ? state.applicantManager.submissions : [];
-      const targetSubmission = submissions.find((submission) => Number(submission?.id || 0) === normalizedSubmissionId) || null;
+      let targetSubmission = submissions.find((submission) => Number(submission?.id || 0) === normalizedSubmissionId) || null;
 
+      try {
+        const detail = await apiRequest('/api/applicant-submissions/' + normalizedSubmissionId);
+        if (targetSubmission) Object.assign(targetSubmission, detail);
+        else { targetSubmission = detail; submissions.push(detail); }
+      } catch (error) { showToast(error.message, 'error', 3200); return; }
       if (!targetSubmission) {
         showToast("답변을 확인할 접수 이력을 찾을 수 없습니다.", "error", 3200);
         return;
@@ -96,7 +101,7 @@
       try {
         const fileContentBase64 = arrayBufferToBase64(await readFileAsArrayBuffer(file));
 
-        await apiRequest(`/api/applicant-submissions/${normalizedSubmissionId}/photo`, {
+        const updated = await apiRequest(`/api/applicant-submissions/${normalizedSubmissionId}/photo`, {
           method: "PUT",
           body: JSON.stringify({
             fileName: normalizedFileName,
@@ -105,7 +110,11 @@
           }),
         });
 
-        await loadBootstrapData({ showLoading: false });
+        const rows = state.applicantManager.submissions || [];
+        const index = rows.findIndex(row => Number(row.id) === normalizedSubmissionId);
+        if (index >= 0) rows[index] = updated;
+        globalScope.AdmitCardRemoteGrids?.invalidate();
+        renderView();
         showToast("접수 사진을 다시 등록했습니다.");
       } catch (error) {
         if (handleAuthenticationFailure(error)) {

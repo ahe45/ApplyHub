@@ -4,7 +4,7 @@ const { createMemberAdminService } = require('../../modules/applications/member-
 function createMembershipRoutes(deps) {
   const members = deps.membershipService;
   const applicants = deps.applicantService;
-  const memberAdmin = createMemberAdminService({ query: deps.query, getSettings: members.getSettings, createHttpError: deps.createHttpError });
+  const memberAdmin = createMemberAdminService({ query: deps.query, getSettings: members.getSettings, readMemberFile: members.readMemberFile, createHttpError: deps.createHttpError });
   const publicRoute = (method, path, handler) => exactRoute(method, path, async (ctx) => {
     ctx.response.setHeader("Cache-Control", "no-store");
     if (method !== "GET") {

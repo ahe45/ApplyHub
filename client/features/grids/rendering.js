@@ -34,6 +34,8 @@
     let headerComboMeasureContext = null;
 
     function getHeaderOptionValues(targetKey) {
+      const remote = globalThis.AdmitCardRemoteGrids?.headerOptions(targetKey);
+      if (remote) return remote;
       return getOrderedValues(getHeaderFilteredRows(getExamineeGridRows(), targetKey).map((row) => row[targetKey]));
     }
 
@@ -89,6 +91,8 @@
     }
 
     function getLookupOptionValues(targetKey) {
+      const remote = globalThis.AdmitCardRemoteGrids?.headerOptions(targetKey);
+      if (remote) return remote;
       const selectFilters = getLookupSelectFilters();
 
       return getOrderedValues(

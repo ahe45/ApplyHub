@@ -1,3 +1,4 @@
+const { insertRows } = require('../database/bulk-write');
 function createPrintHistoryService({
   createHttpError,
   getPool,
@@ -27,24 +28,14 @@ function createPrintHistoryService({
 
     try {
       await connection.beginTransaction();
-      const insertedHistory = [];
-
-      for (const examineeNo of examineeNos) {
-        const [examineeRows] = await connection.query(
-          `SELECT m.id FROM app_meta m WHERE m.examinee_no = ? AND EXISTS (SELECT 1 FROM app_subm s WHERE s.id = m.id) FOR UPDATE`,
-          [examineeNo],
-        );
-
-        if (examineeRows.length === 0) {
-          throw createHttpError(404, "수험생 정보를 찾을 수 없습니다.");
-        }
-
-        await connection.query(
-          `INSERT INTO print_log (examinee_no, print_count) VALUES (?, ?)`,
-          [examineeNo, 1],
-        );
-        insertedHistory.push(examineeNo);
+      const insertedHistory = examineeNos;
+      const sorted = [...examineeNos].sort();
+      for (let offset = 0; offset < sorted.length; offset += 200) {
+        const chunk = sorted.slice(offset, offset + 200);
+        const [found] = await connection.query('SELECT m.id FROM app_meta m WHERE m.examinee_no IN (' + chunk.map(() => '?').join(',') + ') AND EXISTS (SELECT 1 FROM app_subm s WHERE s.id=m.id) ORDER BY m.examinee_no FOR UPDATE', chunk);
+        if (found.length !== chunk.length) throw createHttpError(404, '수험생 정보를 찾을 수 없습니다.');
       }
+      await insertRows(connection, 'print_log', ['examinee_no','print_count'], examineeNos.map(number => [number,1]));
 
       await connection.commit();
 

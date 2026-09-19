@@ -1,3 +1,4 @@
+const { ensureExamNumberSchema } = require('../../applications/exam-number-sequence');
 function createApplicantSchemaBootstrap({
   getTableColumns,
   hasColumn,
@@ -662,6 +663,7 @@ function createApplicantSchemaBootstrap({
       WHERE delivery_status = 'sent'
         AND sent_at IS NULL
     `);
+    await ensureExamNumberSchema(query);
   }
 
   return Object.freeze({

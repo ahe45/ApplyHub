@@ -25,7 +25,7 @@ async function run() {
   let pool, server, browser;
   try {
     await admin.query(`CREATE DATABASE \`${database}\` CHARACTER SET utf8mb4`);
-    pool = mysql.createPool({ ...getDbConfig(), database });
+    pool = mysql.createPool({ ...getDbConfig(), database, ...(process.argv.includes('--single-connection') ? {connectionLimit:1} : {}) });
     const query = async (sql, params = []) => (await pool.query(sql, params))[0];
     const services = createApplicationServices({ fs, path, query, getPool: () => pool, rootDir: root, env: { ...process.env, DB_NAME: database } });
     await services.initializeApplicationData();
@@ -37,7 +37,7 @@ async function run() {
     assert((await query('SELECT form_scope FROM app_form')).every(field => field.form_scope === 'application'));
     assert((await query('SELECT question_text_en, question_description_en FROM app_form')).every(field => field.question_text_en === '' && field.question_description_en === ''), 'Existing questions migrate with empty English fields');
     let deliveredCode = "";
-    const members = createApplicantMembershipService({ query, getPool: () => pool, createHttpError: services.createHttpError,
+    const members = createApplicantMembershipService({ query, rootDir: root, getPool: () => pool, createHttpError: services.createHttpError,
       env: { NODE_ENV: developmentMode ? 'development' : 'production', APPLICANT_SIGNUP_CODE_PREVIEW: 'true' },
       sendEmail: async ({ codeValue }) => { deliveredCode = codeValue; } });
     await query('ALTER TABLE applicant_members MODIFY login_id VARCHAR(40) NOT NULL');
@@ -231,6 +231,10 @@ async function run() {
     result = await call(memberPath + "documents", { answers: { "late-document": upload } }, login.cookie);
     assert.equal(result.status, 200, JSON.stringify(result));
     assert((await query("SELECT field_key FROM app_subm WHERE id = ? AND field_key = 'late-document'", [submission.id])).length);
+    if (process.argv.includes('--data-processing')) {
+      await require('./data-processing-test').verifyDataProcessing({services, query, pool, root, base, call, submissionId:submission.id, memberCookie:login.cookie});
+      return;
+    }
     if (process.argv.includes('--archive')) {
       await require('./applicant-archive-test').verifyApplicantArchive({ services, call, base, memberCookie: login.cookie, submissionId: submission.id });
       return;
@@ -318,7 +322,7 @@ async function run() {
       ]) {
         await query(`UPDATE app_schedule SET admit_card_lookup_schedule_start_at=${start}, admit_card_lookup_schedule_end_at=${end}, document_submission_schedule_start_at=${start}, document_submission_schedule_end_at=${end} WHERE track_name='수시' AND admission_code='1'`);
         const context = (await call(memberPath + 'application', null, login.cookie, 'GET')).body;
-        for (const window of Object.values(context.menuWindows)) assert(window.startAt === null || context.serverTime < window.startAt || context.serverTime > window.endAt, 'Only the submitted recruitment schedule applies');
+        for (const window of [context.menuWindows.ticket, context.menuWindows.documents]) assert(window.startAt === null || context.serverTime < window.startAt || context.serverTime > window.endAt, 'Only the submitted recruitment schedule applies');
         const pdf = await call(`/api/public/applications/${submission.id}/admit-card.pdf`, null, login.cookie, 'GET');
         assert.equal(pdf.status, 409); assert.equal(pdf.body.code, code);
         assert.equal((await call(memberPath + 'documents', { answers: { document: upload } }, login.cookie)).status, 409);
@@ -476,7 +480,7 @@ async function run() {
     await page.waitForSelector(".applicant-member-tile");
     await checkMobileLayout('member home');
     assert.equal(await page.$$eval(".applicant-member-tile", (tiles) => tiles.length), 5);
-    assert.equal(await page.$eval(".applicant-member-menu", (el) => getComputedStyle(el).gridTemplateColumns.split(" ").length), 2);
+    assert.equal(await page.$eval(".applicant-member-menu", (el) => getComputedStyle(el).gridTemplateColumns.split(" ").length), 1);
     const artifacts = path.resolve(__dirname, "../.tmp-membership-check");
     fs.mkdirSync(artifacts, { recursive: true });
     await page.screenshot({ path: path.join(artifacts, "member-home.png"), fullPage: true });

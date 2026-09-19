@@ -29,7 +29,8 @@
     "test:document-status": "node scripts/membership-smoke-test.js --document-status",
     "test:form-templates": "node scripts/membership-smoke-test.js --form-templates",
     "test:terms-language": "node scripts/membership-smoke-test.js --terms-language",
-    "test:schedule-settings": "node scripts/membership-smoke-test.js --schedule-settings"
+    "test:schedule-settings": "node scripts/membership-smoke-test.js --schedule-settings",
+    "test:data-processing": "node scripts/membership-smoke-test.js --data-processing"
   },
   "private": true,
   "dependencies": {

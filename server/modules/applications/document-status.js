@@ -1,6 +1,7 @@
+const { insertRows } = require('../database/bulk-write');
 const STATUS_LABELS = Object.freeze({ submitted: '제출완료', missing: '미제출', incomplete: '미비' });
 
-function createDocumentStatusService({ query, getPool, getFields, getFieldsForSubmission, getTemplateContext, getSubmission, getSubmissions, createHttpError }) {
+function createDocumentStatusService({ query, getPool, getFields, getFieldsForSubmission, getTemplateContext, getSubmission, getSubmissions, submissionQuery, createHttpError }) {
   const filterKeys = ['track', 'admission', 'series', 'unit', 'major'];
   function documentsFor(submission, fields, statuses) {
     return fields.map(field => {
@@ -24,24 +25,14 @@ function createDocumentStatusService({ query, getPool, getFields, getFieldsForSu
   }
 
   async function list(filters = {}) {
-    const text = key => String(filters[key] || '').trim().slice(0, 100);
-    const keyword = text('search').toLowerCase();
-    const [submissions, configuredFields] = await Promise.all([getSubmissions(), getFields({ activeOnly: true, formScope: 'documents' })]);
+    const [result, configuredFields, templateContext, selections] = await Promise.all([
+      submissionQuery.list(filters, { details: true }), getFields({ activeOnly: true, formScope: 'documents' }), getTemplateContext(), submissionQuery.selections(filters),
+    ]);
     const allFields = configuredFields.filter(field => field.inputType === 'file');
-    const matches = (row, excludedKey = '') => filterKeys.every(key => key === excludedKey || !text(key) || row[key] === text(key));
-    const filterOptions = Object.fromEntries(filterKeys.map(key => [key,
-      [...new Set(submissions.filter(row => matches(row, key)).map(row => row[key]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko', { numeric: true })),
-    ]));
-    const filtered = submissions.filter(row => matches(row)
-      && (!text('examineeNo') || row.examineeNo.includes(text('examineeNo')))
-      && (!text('examineeName') || row.name.includes(text('examineeName')))
-      && (!keyword || [row.name, row.email, row.examineeNo].some(value => value.toLowerCase().includes(keyword))));
-    const templateContext = await getTemplateContext();
-    const relevantFields = new Map(await Promise.all(filtered.map(async submission => [submission.id, await getFieldsForSubmission(submission, allFields, templateContext)])));
-    const documentCount = [...relevantFields.values()].reduce((maximum, fields) => Math.max(maximum, fields.length), 0);
-    const total = filtered.length;
-    const currentPage = Math.min(Math.max(1, Math.floor(Number(filters.page) || 1)), Math.max(1, Math.ceil(total / 20)));
-    const visible = filtered.slice((currentPage - 1) * 20, currentPage * 20);
+    const { rows: visible, total, page: currentPage, filterOptions } = result;
+    const relevantFields = new Map(await Promise.all(visible.map(async submission => [submission.id, await getFieldsForSubmission(submission, allFields, templateContext)])));
+    let documentCount = 0;
+    for (const selection of selections) documentCount = Math.max(documentCount, (await getFieldsForSubmission(selection, allFields, templateContext)).length);
     const saved = visible.length ? await query(`SELECT submission_id AS submissionId, field_id AS fieldId, status FROM app_document_status WHERE submission_id IN (${visible.map(() => '?').join(',')})`, visible.map(row => row.id)) : [];
     const rows = visible.map(submission => ({
       id: submission.id, name: submission.name, email: submission.email, examineeNo: submission.examineeNo,
@@ -66,14 +57,11 @@ function createDocumentStatusService({ query, getPool, getFields, getFieldsForSu
       await connection.beginTransaction();
       const [submissions] = await connection.query('SELECT id FROM app_meta WHERE id = ? FOR UPDATE', [submissionId]);
       if (!submissions.length) throw createHttpError(404, '접수 이력을 찾을 수 없습니다.');
-      const [fields] = await connection.query("SELECT id FROM app_form WHERE form_scope = 'documents' AND input_type = 'file' AND active = 1 FOR UPDATE");
+      const [fields] = await connection.query("SELECT id FROM app_form WHERE form_scope = 'documents' AND input_type = 'file' AND active = 1 AND id IN (" + changes.map(() => '?').join(',') + ') ORDER BY id FOR UPDATE', changes.map(item => item.fieldId));
       const allowed = new Set(fields.filter(field => applicableIds.has(Number(field.id))).map(field => Number(field.id)));
       if (changes.some(item => !allowed.has(item.fieldId))) throw createHttpError(400, '현재 서류제출에 설정된 서류 항목만 변경할 수 있습니다.');
-      for (const item of changes) {
-        await connection.query(`INSERT INTO app_document_status (submission_id, field_id, status, updated_by)
-          VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE status = VALUES(status), updated_by = VALUES(updated_by), updated_at = CURRENT_TIMESTAMP`,
-        [submissionId, item.fieldId, item.status, accountId]);
-      }
+      await insertRows(connection, 'app_document_status', ['submission_id','field_id','status','updated_by'], changes.map(item => [submissionId,item.fieldId,item.status,accountId]),
+        'ON DUPLICATE KEY UPDATE status=VALUES(status), updated_by=VALUES(updated_by), updated_at=CURRENT_TIMESTAMP');
       await connection.commit();
     } catch (error) { await connection.rollback(); throw error; }
     finally { connection.release(); }

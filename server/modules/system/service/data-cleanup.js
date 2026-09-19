@@ -41,7 +41,7 @@ function createSystemDataCleanupService({
     return normalizedScope;
   }
 
-  async function clearStoredFiles(directoryPath) {
+  async function clearStoredFiles(directoryPath, exclude = []) {
     if (!fs || !path) {
       return;
     }
@@ -50,7 +50,7 @@ function createSystemDataCleanupService({
       const entryNames = await fs.promises.readdir(directoryPath, { withFileTypes: true });
 
       await Promise.all(
-        entryNames.map((entry) => {
+        entryNames.filter(entry => !exclude.includes(entry.name)).map((entry) => {
           const entryPath = path.join(directoryPath, entry.name);
 
           if (entry.isDirectory()) {
@@ -75,7 +75,7 @@ function createSystemDataCleanupService({
   }
 
   async function clearApplicantStoredFileUploads() {
-    await clearStoredFiles(applicantFileStorageDirectoryPath);
+    await clearStoredFiles(applicantFileStorageDirectoryPath, ['members']);
   }
 
   async function deleteAllSystemData() {
@@ -105,6 +105,7 @@ function createSystemDataCleanupService({
       await connection.query(`DELETE FROM print_log`);
       await connection.query(`DELETE FROM app_subm`);
       await connection.query(`DELETE FROM app_meta`);
+      await connection.query(`DELETE FROM app_exam_sequence`);
       await connection.query(`DELETE FROM app_email_log`);
       await connection.query(`DELETE FROM applicant_member_sessions`);
       await connection.query(`DELETE FROM applicant_member_verifications`);
@@ -120,6 +121,7 @@ function createSystemDataCleanupService({
         ]);
       await Promise.all([clearApplicantStoredPhotoFiles(), clearApplicantStoredFileUploads()]);
 
+      await clearStoredFiles(path.join(applicantFileStorageDirectoryPath, 'members'));
       return {
         scope: "all",
         deletedMembers: Number(memberSummaryRows?.[0]?.memberCount || 0),
@@ -178,6 +180,7 @@ function createSystemDataCleanupService({
 
     await query(`DELETE FROM app_subm`);
     await query(`DELETE FROM app_meta`);
+    await query(`DELETE FROM app_exam_sequence`);
     await query(`DELETE FROM app_email_log`);
     await resetAutoIncrementCounters(query, ["app_meta", "app_email_log"]);
     await Promise.all([clearApplicantStoredPhotoFiles(), clearApplicantStoredFileUploads()]);
@@ -202,6 +205,7 @@ function createSystemDataCleanupService({
       await connection.query('UPDATE app_meta SET member_id = NULL WHERE member_id IS NOT NULL');
       await connection.query('DELETE FROM applicant_members');
       await connection.commit();
+      await clearStoredFiles(path.join(applicantFileStorageDirectoryPath, 'members'));
       return { scope: 'applicant-members', deletedMembers: members.length, deletedApplicantSubmissions: 0 };
     } catch (error) { await connection.rollback(); throw error; }
     finally { connection.release(); }

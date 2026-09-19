@@ -1,7 +1,10 @@
-async function readJsonBody(request) {
+async function readJsonBody(request, { maxBytes = 30 * 1024 * 1024 } = {}) {
   const chunks = [];
+  let size = 0;
 
   for await (const chunk of request) {
+    size += chunk.length;
+    if (size > maxBytes) throw Object.assign(new Error('요청 데이터 크기 제한을 초과했습니다.'), { statusCode: 413 });
     chunks.push(chunk);
   }
 
@@ -18,10 +21,13 @@ async function readJsonBody(request) {
   }
 }
 
-async function readBinaryBody(request) {
+async function readBinaryBody(request, { maxBytes = 256 * 1024 * 1024 } = {}) {
   const chunks = [];
+  let size = 0;
 
   for await (const chunk of request) {
+    size += chunk.length;
+    if (size > maxBytes) throw Object.assign(new Error('파일 크기 제한을 초과했습니다.'), { statusCode: 413 });
     chunks.push(chunk);
   }
 

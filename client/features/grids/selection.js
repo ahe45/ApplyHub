@@ -38,6 +38,7 @@
     }
 
     function getGridSelectableRowIds(gridKey) {
+      if (globalThis.AdmitCardRemoteGrids?.supported(gridKey)) return globalThis.AdmitCardRemoteGrids.references(gridKey).map(row => getGridRowId(gridKey,row));
       return getGridRows(gridKey).map((row) => getGridRowId(gridKey, row));
     }
 

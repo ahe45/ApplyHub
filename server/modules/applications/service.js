@@ -1,3 +1,7 @@
+const { stageAttachments } = require('./attachment-transaction');
+const { createSubmissionQuery } = require('./submission-query');
+const { allocateExamNumber } = require('./exam-number-sequence');
+const { insertRows } = require('../database/bulk-write');
 const { createFormTemplateService } = require('./form-templates');
 const applicantFormConfig = require("../../../shared/domain/applicant-form");
 const { randomInt, randomUUID } = require("crypto");
@@ -71,8 +75,9 @@ function createApplicantService({
   sendVerificationEmail,
   verifyPassword = (plainPassword, storedPassword) => String(plainPassword ?? "") === String(storedPassword ?? ""),
 }) {
+  const submissionQuery = createSubmissionQuery({ query, getByIds: getApplicantSubmissionsByIds });
   const formTemplates = createFormTemplateService({ query, getPool, createHttpError, randomUUID });
-  const documentStatusService = createDocumentStatusService({ query, getPool, getFields: getApplicantFormFields, getFieldsForSubmission: getDocumentFieldsForSubmission, getTemplateContext: getDocumentTemplateContext, getSubmission: getApplicantSubmissionById, getSubmissions: getApplicantSubmissions, createHttpError });
+  const documentStatusService = createDocumentStatusService({ query, getPool, getFields: getApplicantFormFields, getFieldsForSubmission: getDocumentFieldsForSubmission, getTemplateContext: getDocumentTemplateContext, getSubmission: getApplicantSubmissionById, getSubmissions: getApplicantSubmissions, submissionQuery, createHttpError });
   const attachmentArchiveJobs = createApplicantArchiveJobs({
     query, getSubmission: getApplicantSubmissionById, getPhoto: getApplicantSubmissionPhoto,
     getFile: getApplicantSubmissionFile, createHttpError,
@@ -299,7 +304,7 @@ function createApplicantService({
     return String(matchedNationality.label || normalizedValue).trim();
   }
 
-  function normalizeApplicantSubmissionPassword(rawPassword, existingSubmission = null) {
+  async function normalizeApplicantSubmissionPassword(rawPassword, existingSubmission = null) {
     const passwordValue = String(rawPassword ?? "");
 
     if (!passwordValue.trim()) {
@@ -325,7 +330,7 @@ function createApplicantService({
     return {
       hasPassword: true,
       shouldUpdate: true,
-      value: hashPassword(passwordValue),
+      value: await hashPassword(passwordValue),
     };
   }
 
@@ -1516,8 +1521,8 @@ function createApplicantService({
     };
   }
 
-  async function getApplicantSettings() {
-    const rows = await query(`
+  async function getApplicantSettings({ queryable = query } = {}) {
+    const rows = await executeRows(queryable,`
       SELECT
         setting_key AS settingKey,
         setting_value AS settingValue
@@ -3009,8 +3014,8 @@ function createApplicantService({
     return submission?.id ? submission : null;
   }
 
-  async function getApplicantSubmissionPhoto(submissionId) {
-    const submission = await getApplicantSubmissionById(submissionId, {
+  async function getApplicantSubmissionPhoto(submissionId, existingSubmission = null) {
+    const submission = existingSubmission || await getApplicantSubmissionById(submissionId, {
       includeInternal: true,
     });
     const internalPhotoValue = submission?.internalPhotoValue && typeof submission.internalPhotoValue === "object" ? submission.internalPhotoValue : null;
@@ -3054,8 +3059,8 @@ function createApplicantService({
     throw createHttpError(404, "접수 사진을 찾을 수 없습니다.", "APPLICANT_SUBMISSION_PHOTO_NOT_FOUND");
   }
 
-  async function getApplicantSubmissionFile(submissionId, fieldKey = "") {
-    const submission = await getApplicantSubmissionById(submissionId, {
+  async function getApplicantSubmissionFile(submissionId, fieldKey = "", existingSubmission = null) {
+    const submission = existingSubmission || await getApplicantSubmissionById(submissionId, {
       includeInternal: true,
     });
     const normalizedFieldKey = String(fieldKey || "").trim();
@@ -3207,6 +3212,8 @@ function createApplicantService({
   }
 
   async function migrateApplicantPhotoStorage() {
+    let migratedCount = 0, lastId = 0, lastKey = "";
+    while (true) {
     const photoRows = await query(`
       SELECT
         s.id,
@@ -3216,10 +3223,11 @@ function createApplicantService({
       FROM app_subm s
       LEFT JOIN app_meta meta
         ON meta.id = s.id
-      WHERE s.answer_data LIKE '%"hasPhoto"%'
-      ORDER BY s.id ASC, s.field_key ASC
-    `);
-    let migratedCount = 0;
+      WHERE s.answer_data LIKE '%"hasPhoto"%' AND (s.id, s.field_key) > (?, ?)
+      ORDER BY s.id ASC, s.field_key ASC LIMIT 100
+    `, [lastId,lastKey]);
+    if (!photoRows.length) break;
+    lastId=photoRows.at(-1).id;lastKey=photoRows.at(-1).fieldKey;
 
     for (const photoRow of Array.isArray(photoRows) ? photoRows : []) {
       const normalizedExamineeNo = String(photoRow?.examineeNo || "").trim();
@@ -3232,6 +3240,9 @@ function createApplicantService({
         continue;
       }
 
+      const currentPath = path.join(rootDir, applicantPhotoStorageDirName, path.basename(normalizedStoredPhotoValue.fileName || ''));
+      if (!storedPhotoValue.base64 && normalizedStoredPhotoValue.fileName?.startsWith(normalizedExamineeNo + '.')
+        && await require('fs').promises.stat(currentPath).then(stat=>stat.isFile(),()=>false)) continue;
       let photoBuffer = null;
       const normalizedBase64 = String(storedPhotoValue?.base64 || "").trim();
 
@@ -3267,12 +3278,15 @@ function createApplicantService({
       migratedCount += 1;
     }
 
+    }
     return {
       migratedCount,
     };
   }
 
   async function migrateApplicantFileAnswerData() {
+    let migratedCount = 0, lastId = 0, lastKey = "";
+    while (true) {
     const fileRows = await query(
       `
         SELECT
@@ -3282,10 +3296,12 @@ function createApplicantService({
         FROM app_subm s
         INNER JOIN app_form ff ON ff.field_key = s.field_key
         WHERE ff.input_type = 'file'
-          AND s.answer_data LIKE '%"originalFileName"%'
-      `,
+          AND s.answer_data LIKE '%"originalFileName"%' AND (s.id, s.field_key) > (?, ?)
+        ORDER BY s.id, s.field_key LIMIT 100
+      `, [lastId,lastKey],
     );
-    let migratedCount = 0;
+    if (!fileRows.length) break;
+    lastId=fileRows.at(-1).id;lastKey=fileRows.at(-1).fieldKey;
 
     for (const fileRow of fileRows) {
       const normalizedStoredFileValue = normalizeApplicantStoredFileValue(parseApplicantStoredFileAnswerData(fileRow?.answerData));
@@ -3298,6 +3314,7 @@ function createApplicantService({
       migratedCount += 1;
     }
 
+    }
     return {
       migratedCount,
     };
@@ -3581,13 +3598,13 @@ function createApplicantService({
   function buildApplicantSystemRecord(submission = {}) {
     const systemValues = {
       name: submission.name || "",
-      birth: "",
+      birth: submission.birth || "",
       nationality: "",
-      track: "",
-      admission: "",
-      series: "",
-      unit: "",
-      major: "",
+      track: submission.track || "",
+      admission: submission.admission || "",
+      series: submission.series || "",
+      unit: submission.unit || "",
+      major: submission.major || "",
       admissionCode: "",
       seriesCode: "",
       unitCode: "",
@@ -3626,7 +3643,7 @@ function createApplicantService({
 
     if (includePhoto && normalizedSubmissionId > 0) {
       try {
-        photoRecord = await getApplicantSubmissionPhoto(normalizedSubmissionId);
+        photoRecord = await getApplicantSubmissionPhoto(normalizedSubmissionId, submission);
       } catch (error) {
         if (error?.errorCode !== "APPLICANT_SUBMISSION_PHOTO_NOT_FOUND") {
           throw error;
@@ -3830,23 +3847,24 @@ function createApplicantService({
       );
     }
 
-    for (let sequence = sequenceStart; sequence < sequenceStart + 500000; sequence += 1) {
-      const candidateValue = hasStructuredSettings
-        ? buildApplicantExamNoFromComponents(settings, applicationRecord, matchedRecruitmentUnit, sequence)
-        : buildApplicantExamNoCandidate(pattern, sourceDate, sequence, matchedRecruitmentUnit);
-      const [rows] = await connection.query(
-        `
-          SELECT examinee_no FROM app_meta WHERE examinee_no = ? LIMIT 1
-        `,
-        [candidateValue],
-      );
-
-      if (rows.length === 0) {
-        return candidateValue;
-      }
+    let parts, minDigits, maxDigits;
+    if (hasStructuredSettings) {
+      const values = selectedComponents.map(key => key === 'sequence' ? null : resolveApplicantExamNoComponentValue(key, applicationRecord, matchedRecruitmentUnit));
+      const position = selectedComponents.indexOf('sequence');
+      minDigits = maxDigits = normalizeApplicantExamNoDigitCount(settings.digitCount ?? APPLICANT_DEFAULT_EXAM_NO_DIGIT_COUNT) - values.reduce((n, value) => n + (value?.length || 0), 0);
+      if (minDigits < 1) throw createHttpError(400, '수험번호의 순번 자릿수가 부족합니다.');
+      parts = [values.slice(0, position).join(''), values.slice(position + 1).join('')];
+    } else {
+      const marker = '__SEQUENCE__';
+      const rendered = buildApplicantExamNoCandidate(pattern.replace(/\{SEQ(?::\d{1,2})?\}/g, marker), sourceDate, 1, matchedRecruitmentUnit);
+      parts = rendered.split(marker);
+      minDigits = Math.max(1, Number(/\{SEQ(?::(\d{1,2}))?\}/.exec(pattern)?.[1] || 1));
+      maxDigits = Math.max(minDigits, Math.min(16, Math.floor((30 - parts.join('').length) / (parts.length - 1))));
     }
-
-    throw createHttpError(500, "사용 가능한 수험번호를 생성하지 못했습니다.", "APPLICANT_EXAM_NO_GENERATION_FAILED");
+    return allocateExamNumber(connection, { parts, minDigits, maxDigits, start: sequenceStart, createHttpError,
+      build: sequence => hasStructuredSettings
+        ? buildApplicantExamNoFromComponents(settings, applicationRecord, matchedRecruitmentUnit, sequence)
+        : buildApplicantExamNoCandidate(pattern, sourceDate, sequence, matchedRecruitmentUnit) });
   }
 
   async function prepareApplicantSubmissionExamNo(connection, submission = {}, settings = {}, options = {}) {
@@ -4146,7 +4164,7 @@ function createApplicantService({
       includeInternal: true,
     });
 
-    if (!lookupTargetSubmission.hasPassword || !verifyPassword(password, lookupTargetSubmission.passwordHash)) {
+    if (!lookupTargetSubmission.hasPassword || !(await verifyPassword(password, lookupTargetSubmission.passwordHash))) {
       throw createHttpError(401, "비밀번호가 일치하지 않습니다.", "APPLICANT_LOOKUP_PASSWORD_INVALID");
     }
 
@@ -4169,6 +4187,17 @@ function createApplicantService({
   }
 
   async function saveApplicantSubmission(payload = {}) {
+    for (let attempt = 0; ; attempt++) {
+      try { return await saveApplicantSubmissionAttempt(payload); }
+      catch (error) {
+        const retry = error.code === 'ER_LOCK_DEADLOCK' || (error.code === 'ER_DUP_ENTRY' && String(error.message).includes('uniq_app_meta_examinee_no'));
+        if (!retry || attempt >= 2) throw error;
+        await new Promise(resolve => setTimeout(resolve, 20 * (attempt + 1)));
+      }
+    }
+  }
+
+  async function saveApplicantSubmissionAttempt(payload = {}) {
     const accessRecord = getPublicAccessRecordOrThrow(payload.accessToken, [
       APPLICANT_PUBLIC_ACCESS_TYPES.lookup,
       APPLICANT_PUBLIC_ACCESS_TYPES.verified,
@@ -4221,10 +4250,11 @@ function createApplicantService({
       },
     );
     const passwordPayload = accessRecord.memberId
-      ? { shouldUpdate: !existingSubmission?.passwordHash, value: existingSubmission?.passwordHash || hashPassword(randomUUID()) }
-      : normalizeApplicantSubmissionPassword(payload.password, existingSubmission);
+      ? { shouldUpdate: !existingSubmission?.passwordHash, value: existingSubmission?.passwordHash || await hashPassword(randomUUID()) }
+      : await normalizeApplicantSubmissionPassword(payload.password, existingSubmission);
     const connection = await getPool().getConnection();
 
+    let attachments, committed = false;
     try {
       await connection.beginTransaction();
 
@@ -4260,35 +4290,8 @@ function createApplicantService({
         await connection.query("UPDATE app_meta SET member_id = ? WHERE id = ?", [accessRecord.memberId, submissionId]);
       }
 
-      for (const answerRow of submissionArtifacts.answerRows) {
-        await connection.query(
-          `
-            INSERT INTO app_subm (
-              id,
-              applicant_name,
-              email,
-              password_hash,
-              status,
-              field_key,
-              answer_data,
-              created_at,
-              updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `,
-          [
-            submissionId,
-            applicantName,
-            email,
-            passwordHashValue,
-            submissionStatus,
-            answerRow.fieldKey,
-            answerRow.answerData,
-            createdAtValue,
-            updatedAtValue,
-          ],
-        );
-      }
+      await insertRows(connection, 'app_subm', ['id','applicant_name','email','password_hash','status','field_key','answer_data','created_at','updated_at'],
+        submissionArtifacts.answerRows.map(answer => [submissionId, applicantName, email, passwordHashValue, submissionStatus, answer.fieldKey, answer.answerData, createdAtValue, updatedAtValue]));
 
       const savedSubmission = await getApplicantSubmissionById(submissionId, {
         queryable,
@@ -4299,7 +4302,7 @@ function createApplicantService({
         throw createHttpError(500, "접수 정보를 저장하지 못했습니다.", "APPLICANT_SUBMISSION_SAVE_FAILED");
       }
 
-      const applicantSettings = await getApplicantSettings();
+      const applicantSettings = await getApplicantSettings({ queryable });
       const preparedSubmissionRecord = await prepareApplicantSubmissionExamNo(connection, savedSubmission, applicantSettings, {
         uploadedFileUploads: submissionArtifacts.fileUploads,
         uploadedPhotoValue: submissionArtifacts.photoUpload,
@@ -4320,24 +4323,19 @@ function createApplicantService({
           [submissionId, preparedSubmissionRecord.examineeNo],
         );
 
+      attachments = await stageAttachments([preparedSubmissionRecord.applicantPhotoRecord, ...(preparedSubmissionRecord.applicantFileRecords || [])]);
+      const result = await getApplicantSubmissionById(submissionId, {queryable});
       await connection.commit();
-      const persistTasks = [];
-
-      if (preparedSubmissionRecord.applicantPhotoRecord) {
-        persistTasks.push(persistApplicantPhotoFile(preparedSubmissionRecord.applicantPhotoRecord));
-      }
-
-      if (Array.isArray(preparedSubmissionRecord.applicantFileRecords) && preparedSubmissionRecord.applicantFileRecords.length > 0) {
-        persistTasks.push(...preparedSubmissionRecord.applicantFileRecords.map((storedFileRecord) => persistApplicantFile(storedFileRecord)));
-      }
-
-      await Promise.all(persistTasks);
-      return getApplicantSubmissionById(submissionId);
+      committed = true;
+      return result;
     } catch (error) {
-      await connection.rollback();
+      if (!committed) {
+        try { await attachments?.rollback(); } finally { await connection.rollback(); }
+      }
       throw error;
     } finally {
       connection.release();
+      if (committed) await attachments?.finalize();
     }
   }
 
@@ -4360,6 +4358,7 @@ function createApplicantService({
 
     const connection = await getPool().getConnection();
 
+    let attachments, committed = false;
     try {
       await connection.beginTransaction();
       const queryable = connection.query.bind(connection);
@@ -4386,7 +4385,7 @@ function createApplicantService({
         queryable,
         includeInternal: true,
       });
-      const applicantSettings = await getApplicantSettings();
+      const applicantSettings = await getApplicantSettings({ queryable });
       const preparedSubmissionRecord = await prepareApplicantSubmissionExamNo(connection, savedSubmission, applicantSettings, {
         uploadedPhotoValue: {
           fieldKey: photoAnswerItem.fieldKey,
@@ -4409,20 +4408,19 @@ function createApplicantService({
         [normalizedSubmissionId, preparedSubmissionRecord.examineeNo],
       );
 
+      attachments = await stageAttachments([preparedSubmissionRecord.applicantPhotoRecord, ...(preparedSubmissionRecord.applicantFileRecords || [])]);
+      const result = await getApplicantSubmissionById(normalizedSubmissionId, {queryable});
       await connection.commit();
-      const persistTasks = [];
-
-      if (preparedSubmissionRecord.applicantPhotoRecord) {
-        persistTasks.push(persistApplicantPhotoFile(preparedSubmissionRecord.applicantPhotoRecord));
-      }
-
-      await Promise.all(persistTasks);
-      return getApplicantSubmissionById(normalizedSubmissionId);
+      committed = true;
+      return result;
     } catch (error) {
-      await connection.rollback();
+      if (!committed) {
+        try { await attachments?.rollback(); } finally { await connection.rollback(); }
+      }
       throw error;
     } finally {
       connection.release();
+      if (committed) await attachments?.finalize();
     }
   }
 
@@ -4552,6 +4550,7 @@ function createApplicantService({
       ));
     const storedFiles = new Map(records.map(record => [record.fieldKey, JSON.stringify(buildStoredApplicantFileAnswerData(record))]));
     const connection = await getPool().getConnection();
+    let attachments, committed = false;
     try {
       await connection.beginTransaction();
       const [owned] = await connection.query("SELECT id FROM app_meta WHERE id = ? AND member_id = ? FOR UPDATE", [submission.id, member.id]);
@@ -4560,17 +4559,20 @@ function createApplicantService({
       const original = answerRows[0];
       if (!original) throw createHttpError(404, "접수 정보를 찾을 수 없습니다.");
       for (const record of records) {
-        await persistApplicantFile(record);
+
         // A replacement upload supersedes the review of the previous file.
         await connection.query('DELETE ds FROM app_document_status ds INNER JOIN app_form f ON f.id = ds.field_id WHERE ds.submission_id = ? AND f.field_key = ?', [submission.id, record.fieldKey]);
       }
-      for (const answer of artifacts.answerRows) {
-        await connection.query("INSERT INTO app_subm (id,applicant_name,email,password_hash,status,field_key,answer_data,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,NOW()) ON DUPLICATE KEY UPDATE answer_data = VALUES(answer_data), updated_at = NOW()", [submission.id, original.applicant_name, original.email, original.password_hash, original.status, answer.fieldKey, storedFiles.get(answer.fieldKey) ?? answer.answerData, original.created_at]);
-      }
+      await insertRows(connection, 'app_subm', ['id','applicant_name','email','password_hash','status','field_key','answer_data','created_at','updated_at'],
+        artifacts.answerRows.filter(answer => Object.hasOwn(answers, answer.fieldKey)).map(answer => [submission.id, original.applicant_name, original.email, original.password_hash, original.status, answer.fieldKey, storedFiles.get(answer.fieldKey) ?? answer.answerData, original.created_at, new Date()]),
+        'ON DUPLICATE KEY UPDATE answer_data = VALUES(answer_data), updated_at = VALUES(updated_at)');
+      attachments = await stageAttachments(records);
+      const result = await getApplicantSubmissionById(submission.id, {queryable:connection.query.bind(connection)});
       await connection.commit();
-      return getApplicantSubmissionById(submission.id);
-    } catch (error) { await connection.rollback(); throw error; }
-    finally { connection.release(); }
+      committed = true;
+      return result;
+    } catch (error) { if (!committed) { try { await attachments?.rollback(); } finally { await connection.rollback(); } } throw error; }
+    finally { connection.release(); if (committed) await attachments?.finalize(); }
   }
 
   async function getApplicantPublicForm() {
@@ -4636,6 +4638,7 @@ function createApplicantService({
     getApplicantSubmissionsByIds,
     getMemberApplicationContext,
     getMemberDocumentStatus,
+    submissionQuery,
     documentStatusService,
     saveMemberDocuments,
 

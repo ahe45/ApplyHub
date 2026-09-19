@@ -1,3 +1,5 @@
+const archiver = require('archiver');
+const { pipeline } = require('node:stream/promises');
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -40,6 +42,8 @@ function createAdmitCardPdfService({
 }) {
   let preferredBrowserPath = "";
   const browserProfiles = new WeakMap();
+  const browserSlots = new WeakSet();
+  let activeBrowsers = 0;
 
   async function removeBrowserProfile(directory) {
     const resolved = path.resolve(directory);
@@ -74,6 +78,7 @@ function createAdmitCardPdfService({
       await browser.close();
     } catch (error) {
     } finally {
+      if (browserSlots.delete(browser)) activeBrowsers--;
       const directory = browserProfiles.get(browser);
       browserProfiles.delete(browser);
       if (directory) await removeBrowserProfile(directory);
@@ -434,6 +439,14 @@ function createAdmitCardPdfService({
   }
 
   async function openPdfBrowser() {
+    if(activeBrowsers >= 2) throw createHttpError(429, 'PDF 변환 작업을 처리하고 있습니다. 잠시 후 다시 시도하세요.');
+    activeBrowsers++;
+    try {
+      const browser=await launchPdfBrowser();browserSlots.add(browser);return browser;
+    } catch(error) {activeBrowsers--;throw error;}
+  }
+
+  async function launchPdfBrowser() {
     const candidates = [...new Set([preferredBrowserPath, ...browserExecutablePaths])].filter(candidate => candidate && fs.existsSync(candidate));
     if (!candidates.length) {
       throw createHttpError(500, "PDF 생성을 위한 Microsoft Edge 또는 Google Chrome 실행 파일을 찾을 수 없습니다.", "ADMIT_CARD_PDF_BROWSER_NOT_FOUND");
@@ -761,265 +774,81 @@ function createAdmitCardPdfService({
     });
   }
 
-  async function buildBatchAdmitCardPdfBuffer(examineeNos, options = {}) {
-    const normalizedExamineeNos = normalizeExamineeNoList(examineeNos);
-
-    if (normalizedExamineeNos.length === 0) {
-      throw createHttpError(400, "출력 대상 수험번호가 필요합니다.");
-    }
-
-    options.onPhaseChange?.({
-      phase: "preparing",
-      completedCount: 0,
-      totalCount: normalizedExamineeNos.length,
-      countUnit: "examinee",
-      completedPageCount: 0,
-      totalPageCount: 0,
-      examineeTotalCount: normalizedExamineeNos.length,
-      outputMode: "combined-pdf",
-    });
-
-    const [template, examinees] = await Promise.all([
-      getActiveTemplate(),
-      getBatchExamineeRecords(normalizedExamineeNos),
-    ]);
+  async function buildBatchAdmitCardFile(examineeNos, options = {}, zipped = false) {
+    const numbers = normalizeExamineeNoList(examineeNos);
+    if (!numbers.length || numbers.length > 2000) throw createHttpError(400, '출력 대상은 1~2,000명이어야 합니다.');
+    const template = await getActiveTemplate();
     const renderTemplate = createBatchTemplateRenderer(template.contentHtml);
-    const totalExamineeCount = normalizedExamineeNos.length;
-    let completedCount = 0;
-
-    options.onPhaseChange?.({
-      phase: "rendering",
-      completedCount,
-      totalCount: totalExamineeCount,
-      countUnit: "examinee",
-      completedPageCount: 0,
-      totalPageCount: 0,
-      examineeTotalCount: totalExamineeCount,
-      outputMode: "combined-pdf",
-    });
-
-    const renderedSheets = [];
-
-    for (const examinee of examinees) {
-      throwIfBatchAdmitCardCancelled(options);
-
-      const renderedSheet = await renderTemplate(examinee);
-
-      throwIfBatchAdmitCardCancelled(options);
-
-      renderedSheets.push(renderedSheet);
-      completedCount += 1;
-      options.onProgress?.({
-        phase: "rendering",
-        completedCount,
-        totalCount: totalExamineeCount,
-        countUnit: "examinee",
-        completedPageCount: 0,
-        totalPageCount: 0,
-        examineeTotalCount: totalExamineeCount,
-        outputMode: "combined-pdf",
-        examineeNo: examinee.examineeNo,
-      });
-    }
-
-    let measuredTotalPageCount = 0;
-    throwIfBatchAdmitCardCancelled(options);
-
-    const { pdfBuffer, totalPageCount } = await buildAdmitCardPdfDocument(`수험표 ${totalExamineeCount}명`, renderedSheets, {
-      onMeasure: ({ totalPageCount: nextTotalPageCount }) => {
-        measuredTotalPageCount = Math.max(0, Number(nextTotalPageCount || 0));
-        options.onPhaseChange?.({
-          phase: "finalizing",
-          completedCount: measuredTotalPageCount,
-          totalCount: measuredTotalPageCount,
-          countUnit: "page",
-          completedPageCount: measuredTotalPageCount,
-          totalPageCount: measuredTotalPageCount,
-          examineeTotalCount: totalExamineeCount,
-          outputMode: "combined-pdf",
-        });
-      },
-      registerCancelHandler: options.registerCancelHandler,
-      shouldCancel: options.shouldCancel,
-    });
-    const finalizedTotalPageCount = Math.max(measuredTotalPageCount, Number(totalPageCount || 0));
-
-    throwIfBatchAdmitCardCancelled(options);
-
-    options.onPhaseChange?.({
-      phase: "ready",
-      completedCount: finalizedTotalPageCount,
-      totalCount: finalizedTotalPageCount,
-      countUnit: "page",
-      completedPageCount: finalizedTotalPageCount,
-      totalPageCount: finalizedTotalPageCount,
-      examineeTotalCount: totalExamineeCount,
-      outputMode: "combined-pdf",
-    });
-
-    return pdfBuffer;
-  }
-
-  async function buildBatchAdmitCardZipBuffer(examineeNos, options = {}) {
-    const normalizedExamineeNos = normalizeExamineeNoList(examineeNos);
-
-    if (normalizedExamineeNos.length === 0) {
-      throw createHttpError(400, "출력 대상 수험번호가 필요합니다.");
-    }
-
-    options.onPhaseChange?.({
-      phase: "preparing",
-      completedCount: 0,
-      totalCount: normalizedExamineeNos.length,
-      countUnit: "file",
-      completedPageCount: 0,
-      totalPageCount: 0,
-      examineeTotalCount: normalizedExamineeNos.length,
-      outputMode: "pdf-zip",
-    });
-
-    const [template, examinees] = await Promise.all([
-      getActiveTemplate(),
-      getBatchExamineeRecords(normalizedExamineeNos),
-    ]);
-    const renderTemplate = createBatchTemplateRenderer(template.contentHtml);
-    const totalExamineeCount = normalizedExamineeNos.length;
-    const zip = new AdmZip();
-    const zipEntryMethod = getBatchAdmitCardZipEntryMethod(totalExamineeCount);
-    let completedCount = 0;
-
-    options.onPhaseChange?.({
-      phase: "rendering",
-      completedCount,
-      totalCount: totalExamineeCount,
-      countUnit: "file",
-      completedPageCount: 0,
-      totalPageCount: 0,
-      examineeTotalCount: totalExamineeCount,
-      outputMode: "pdf-zip",
-    });
-
-    const chunkSize = getBatchAdmitCardZipChunkSize(totalExamineeCount);
-    const examineeChunks = createChunkedArray(examinees, chunkSize);
-    const workerCount = getBatchAdmitCardZipWorkerCount(totalExamineeCount, chunkSize);
-    const workers = await Promise.all(
-      Array.from({ length: workerCount }, async () => {
-        const browser = await openPdfBrowser();
-        const page = await createPdfBrowserPage(browser);
-
-        return {
-          browser,
-          page,
-        };
-      }),
-    );
-    const cancelBrowsers = async () => {
-      await Promise.allSettled(workers.map((worker) => closePdfBrowser(worker.browser)));
-    };
-
-    options.registerCancelHandler?.(cancelBrowsers);
-
+    const { browser, page } = await openPdfBrowserPage();
+    const combined = zipped ? null : await PDFDocument.create();
+    const temporary = zipped && !options.outputPath ? await fs.promises.mkdtemp(path.join(os.tmpdir(), 'applyhub-pdf-result-')) : null;
+    const outputPath = options.outputPath || (temporary && path.join(temporary, 'tickets.zip'));
+    let archive, output, completion, streamError, completed = 0, pageCount = 0, renderedBytes = 0;
+    const cancel = async () => { archive?.destroy(createBatchAdmitCardCancelledError()); await closePdfBrowser(browser); };
+    options.registerCancelHandler?.(cancel);
     try {
-      let nextChunkIndex = 0;
-
-      await Promise.all(
-        workers.map(async ({ page }) => {
-          while (true) {
+      if (zipped) {
+        archive = archiver('zip', { store: true });
+        output = fs.createWriteStream(outputPath, { flags: 'wx' });
+        completion = pipeline(archive, output);
+        completion.catch(error => { streamError = error; });
+        archive.on('warning', error => archive.destroy(error));
+      }
+      for (let offset = 0; offset < numbers.length; offset += 40) {
+        throwIfBatchAdmitCardCancelled(options);
+        const records = await getBatchExamineeRecords(numbers.slice(offset, offset + 40));
+        const sheets = await renderBatchTemplateChunk(records, renderTemplate);
+        const rendered = await buildAdmitCardPdfDocumentWithPage(page, '수험표', sheets.map(item => item.renderedSheet), options);
+        pageCount += rendered.totalPageCount;
+        renderedBytes += rendered.pdfBuffer.length;
+        if(renderedBytes > 512 * 1024 * 1024) throw createHttpError(413, '출력 파일이 512MB를 초과합니다. 대상을 나누어 출력하세요.');
+        if (zipped) {
+          const buffers = await splitPdfBufferBySheetPageCounts(rendered.pdfBuffer, rendered.sheetPageCounts, options);
+          for (let index = 0; index < buffers.length; index++) {
+            if (streamError) throw streamError;
             throwIfBatchAdmitCardCancelled(options);
-
-            const currentChunkIndex = nextChunkIndex;
-            nextChunkIndex += 1;
-
-            if (currentChunkIndex >= examineeChunks.length) {
-              return;
-            }
-
-            const currentChunk = examineeChunks[currentChunkIndex];
-            const renderedEntries = await renderBatchTemplateChunk(currentChunk, renderTemplate);
-
-            throwIfBatchAdmitCardCancelled(options);
-
-            const { pdfBuffer, sheetPageCounts } = await buildAdmitCardPdfDocumentWithPage(
-              page,
-              `수험표 ${currentChunkIndex * chunkSize + 1}-${currentChunkIndex * chunkSize + renderedEntries.length}`,
-              renderedEntries.map((entry) => entry.renderedSheet),
-              {
-                shouldCancel: options.shouldCancel,
-                skipBufferPageCount: true,
-              },
-            );
-            const splitPdfBuffers = await splitPdfBufferBySheetPageCounts(pdfBuffer, sheetPageCounts, {
-              shouldCancel: options.shouldCancel,
-            });
-
-            if (splitPdfBuffers.length !== renderedEntries.length) {
-              throw createHttpError(500, "생성된 PDF를 개별 수험표 파일로 분리할 수 없습니다.");
-            }
-
-            renderedEntries.forEach(({ examinee }, entryIndex) => {
-              const fileBaseName = sanitizeBatchAdmitCardEntryBaseName(
-                String(examinee?.examineeNo || "").trim() || String(examinee?.name || "").trim(),
-                `admit-card-${currentChunkIndex * chunkSize + entryIndex + 1}`,
-              );
-
-              const zipEntry = zip.addFile(`${fileBaseName}.pdf`, splitPdfBuffers[entryIndex]);
-
-              if (zipEntry?.header) {
-                zipEntry.header.method = zipEntryMethod;
-              }
-
-              completedCount += 1;
-              options.onProgress?.({
-                phase: "rendering",
-                completedCount,
-                totalCount: totalExamineeCount,
-                countUnit: "file",
-                completedPageCount: 0,
-                totalPageCount: 0,
-                examineeTotalCount: totalExamineeCount,
-                outputMode: "pdf-zip",
-                examineeNo: examinee.examineeNo,
-              });
+            await new Promise((resolve,reject) => {
+              const clean = () => { archive.off('entry',done); archive.off('error',failed); output.off('error',failed); };
+              const done = () => { clean(); resolve(); }, failed = error => { clean(); reject(error); };
+              archive.once('entry',done); archive.once('error',failed); output.once('error',failed);
+              archive.append(buffers[index], { name: sanitizeBatchAdmitCardEntryBaseName(records[index].examineeNo) + '.pdf' });
             });
           }
-        }),
-      );
+          if (archive.pointer() > 512 * 1024 * 1024) throw createHttpError(413, '출력 파일이 512MB를 초과합니다. 대상을 나누어 출력하세요.');
+        } else {
+          const source = await PDFDocument.load(rendered.pdfBuffer);
+          for (const copied of await combined.copyPages(source, source.getPageIndices())) combined.addPage(copied);
+        }
+        completed += records.length;
+        options.onProgress?.({ phase: 'rendering', completedCount: completed, totalCount: numbers.length, completedPageCount: pageCount,
+          totalPageCount: pageCount, examineeTotalCount: numbers.length, countUnit: zipped ? 'file' : 'examinee', outputMode: zipped ? 'pdf-zip' : 'combined-pdf' });
+      }
+      throwIfBatchAdmitCardCancelled(options);
+      options.onPhaseChange?.({ phase: 'finalizing', completedCount: completed, totalCount: numbers.length });
+      if (zipped) {
+        await archive.finalize(); await completion;
+        return options.outputPath ? null : await fs.promises.readFile(outputPath);
+      }
+      const buffer = Buffer.from(await combined.save());
+      if (buffer.length > 512 * 1024 * 1024) throw createHttpError(413, '출력 파일이 너무 큽니다. 대상을 나누어 출력하세요.');
+      if (outputPath) { await fs.promises.writeFile(outputPath, buffer); return null; }
+      return buffer;
+    } catch (error) {
+      archive?.destroy(); output?.destroy();
+      await completion?.catch(() => {});
+      if (outputPath) await fs.promises.unlink(outputPath).catch(() => {});
+      throw error;
     } finally {
       options.registerCancelHandler?.(null);
-      await Promise.allSettled(workers.map((worker) => closePdfBrowser(worker.browser)));
+      await closePdfBrowser(browser);
+      if (temporary) {
+        await fs.promises.unlink(path.join(temporary, 'tickets.zip')).catch(() => {});
+        await fs.promises.rmdir(temporary).catch(() => {});
+      }
     }
-
-    throwIfBatchAdmitCardCancelled(options);
-
-    options.onPhaseChange?.({
-      phase: "finalizing",
-      completedCount,
-      totalCount: totalExamineeCount,
-      countUnit: "file",
-      completedPageCount: 0,
-      totalPageCount: 0,
-      examineeTotalCount: totalExamineeCount,
-      outputMode: "pdf-zip",
-    });
-
-    throwIfBatchAdmitCardCancelled(options);
-    const zipBuffer = zip.toBuffer();
-
-    throwIfBatchAdmitCardCancelled(options);
-
-    options.onPhaseChange?.({
-      phase: "ready",
-      completedCount,
-      totalCount: totalExamineeCount,
-      countUnit: "file",
-      completedPageCount: 0,
-      totalPageCount: 0,
-      examineeTotalCount: totalExamineeCount,
-      outputMode: "pdf-zip",
-    });
-
-    return zipBuffer;
   }
+  async function buildBatchAdmitCardPdfBuffer(numbers, options = {}) { return buildBatchAdmitCardFile(numbers, options, false); }
+  async function buildBatchAdmitCardZipBuffer(numbers, options = {}) { return buildBatchAdmitCardFile(numbers, options, true); }
 
   return Object.freeze({
     buildAdmitCardPdfBuffer,

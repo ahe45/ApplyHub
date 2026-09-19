@@ -58,7 +58,7 @@ function createAuthAccountAdminService({
           )
           VALUES (?, ?, ?, ?, 1, NULL)
         `,
-        [nextAccount.id, nextAccount.name, nextAccount.role, hashPassword(initialPassword)],
+        [nextAccount.id, nextAccount.name, nextAccount.role, await hashPassword(initialPassword)],
       );
     } catch (error) {
       if (error?.code === "ER_DUP_ENTRY") {
@@ -101,7 +101,7 @@ function createAuthAccountAdminService({
           password_temporary = 1
         WHERE login_id = ?
       `,
-      [hashPassword(initialPassword), accountId],
+      [await hashPassword(initialPassword), accountId],
     );
 
     destroySessionsByAccountId(accountId);

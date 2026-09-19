@@ -255,7 +255,7 @@
     }
 
     function renderGridPagination({ currentPage, endRowNumber, gridKey, startRowNumber, tableState, totalPages, totalRows, visiblePageNumbers }) {
-      const pageSizeOptions = [10, 20, 50, 100, 500, 1000, 2000, 0];
+      const pageSizeOptions = globalThis.AdmitCardRemoteGrids?.supported(gridKey) ? [10, 20, 50, 100, 200] : [10, 20, 50, 100, 500, 1000, 2000, 0];
       const currentPageSize = Number(tableState.pageSize || 0);
       const pageSizeLabel = currentPageSize > 0 ? `${currentPageSize}개` : "모두 표시";
 

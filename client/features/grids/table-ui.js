@@ -113,12 +113,13 @@
       const columns = getGridColumns(gridKey);
       const rows = getGridRows(gridKey);
       const tableState = getTableState(gridKey);
-      const totalRows = rows.length;
+      const remote = globalThis.AdmitCardRemoteGrids?.meta(gridKey);
+      const totalRows = remote ? remote.total : rows.length;
       const totalPages = getTotalPages(totalRows, tableState.pageSize);
       const currentPage = getGridPage(gridKey, totalPages);
       const pageSize = Number(tableState.pageSize || 0);
       const startIndex = pageSize > 0 ? (currentPage - 1) * pageSize : 0;
-      const visibleRows = pageSize > 0 ? rows.slice(startIndex, startIndex + pageSize) : rows;
+      const visibleRows = remote ? rows : pageSize > 0 ? rows.slice(startIndex, startIndex + pageSize) : rows;
       const selectableRowIds = selectable ? getGridSelectableRowIds(gridKey) : [];
       const selectionState = getGridSelectionState(gridKey, selectableRowIds);
       const visiblePageNumbers = getVisiblePageNumbers(totalPages, currentPage);

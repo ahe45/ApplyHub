@@ -1,3 +1,5 @@
+const { writeBackup } = require('./backup-writer');
+const { insertRows } = require('../../database/bulk-write');
 const AdmZip = require("adm-zip");
 const { normalizeLegacyBackupRow } = require('../../database/schema-maintenance');
 
@@ -383,12 +385,13 @@ function createSystemBackupService({
     try {
       await ensureSystemAutoBackupDirectory();
       const backupArchive = await buildSystemBackupArchive({
+        preferFile: true,
         includeDatabase: normalizedSettings.includeDatabase,
         includedAssetKeys: normalizedSettings.includedAssetKeys,
       });
       const targetPath = path.join(systemAutoBackupDirectoryPath, backupArchive.fileName || "system-backup.zip");
 
-      await fs.promises.writeFile(targetPath, backupArchive.archiveBuffer);
+      try { await fs.promises.copyFile(backupArchive.filePath, targetPath); } finally { await backupArchive.dispose(); }
       await pruneSystemAutoBackupArchives(normalizedSettings.retentionCount);
 
       systemBackupAutomationRuntimeState = {
@@ -771,7 +774,7 @@ function createSystemBackupService({
           continue;
         }
 
-        if (!directoryEntry.isFile()) {
+        if (!directoryEntry.isFile() || /\.[a-f0-9-]{36}\.(pending|previous)$/.test(directoryEntry.name)) {
           continue;
         }
 
@@ -789,95 +792,28 @@ function createSystemBackupService({
     return walk(directoryPath);
   }
 
+  let buildingBackup = false;
   async function buildSystemBackupArchive(options = {}) {
-    const createdAt = new Date();
-    const createdAtIso = createdAt.toISOString();
-    const zipArchive = new AdmZip();
-    const includeDatabase = options?.includeDatabase !== false;
-    const includedAssetKeySet = getNormalizedIncludedAssetKeySet(options.includedAssetKeys);
-
-    if (!includeDatabase && includedAssetKeySet.size === 0) {
-      throw createBackupError(400, "백업할 항목을 하나 이상 선택하세요.", "SYSTEM_BACKUP_SELECTION_REQUIRED");
-    }
-
-    const manifest = {
-      schemaVersion: backupSchemaVersion,
-      createdAt: createdAtIso,
-      databaseName: String(databaseName || "applyhub").trim() || "applyhub",
-      databaseIncluded: includeDatabase,
-      tables: [],
-      assets: [],
-    };
-
-    if (includeDatabase) {
-      for (const tableDefinition of tableDefinitions) {
-        const tablePayload = await getTableBackupPayload(tableDefinition);
-        manifest.tables.push({
-          tableName: tablePayload.tableName,
-          rowCount: tablePayload.rows.length,
-          archivePath: `tables/${tablePayload.tableName}.json`,
-        });
-
-        zipArchive.addFile(
-          `tables/${tablePayload.tableName}.json`,
-          Buffer.from(JSON.stringify(tablePayload.rows, null, 2), "utf8"),
-        );
+    if (buildingBackup) throw createBackupError(409, '이미 시스템 백업을 생성하고 있습니다.');
+    buildingBackup = true;
+    try {
+      const createdAt = new Date();
+      const includeDatabase = options.includeDatabase !== false;
+      const included = getNormalizedIncludedAssetKeySet(options.includedAssetKeys);
+      if (!includeDatabase && !included.size) throw createBackupError(400, '백업할 항목을 선택하세요.');
+      const manifest = { schemaVersion: backupSchemaVersion, createdAt: createdAt.toISOString(), databaseName, databaseIncluded: includeDatabase, tables: [], assets: [] };
+      const files = [];
+      for (const asset of assetDefinitions) {
+        const entries = included.has(asset.assetKey) ? await collectDirectoryFileEntries(asset.directoryPath,asset.archivePrefix) : [];
+        manifest.assets.push({assetKey:asset.assetKey,archivePrefix:asset.archivePrefix,included:included.has(asset.assetKey),fileCount:entries.length,totalBytes:entries.reduce((sum,file)=>sum+file.size,0)});
+        files.push(...entries);
       }
-    }
-
-    for (const assetDefinition of assetDefinitions) {
-      const isIncluded = includedAssetKeySet.has(assetDefinition.assetKey);
-      const fileEntries = isIncluded
-        ? await collectDirectoryFileEntries(assetDefinition.directoryPath, assetDefinition.archivePrefix)
-        : [];
-      let assetSize = 0;
-
-      if (isIncluded) {
-        for (const fileEntry of fileEntries) {
-          zipArchive.addLocalFile(fileEntry.absolutePath, path.posix.dirname(fileEntry.archivePath), path.posix.basename(fileEntry.archivePath));
-          assetSize += fileEntry.size;
-        }
-      }
-
-      manifest.assets.push({
-        assetKey: assetDefinition.assetKey,
-        archivePrefix: assetDefinition.archivePrefix,
-        included: isIncluded,
-        fileCount: fileEntries.length,
-        totalBytes: assetSize,
-      });
-    }
-
-    zipArchive.addFile("manifest.json", Buffer.from(JSON.stringify(manifest, null, 2), "utf8"));
-    zipArchive.addFile(
-      "README.txt",
-      Buffer.from(
-        [
-          "AdmitCard system backup archive",
-          `Created at: ${createdAtIso}`,
-          `Database: ${manifest.databaseName}`,
-          `Database included: ${includeDatabase ? "yes" : "no"}`,
-          "",
-          "Contents:",
-          "- manifest.json: backup summary metadata",
-          "- tables/*.json: database snapshots in restore order when included",
-          "- files/*: uploaded assets and stored photos when included",
-        ].join("\n"),
-        "utf8",
-      ),
-    );
-
-    const safeDatabaseName = String(manifest.databaseName || "applyhub")
-      .trim()
-      .replace(/[^A-Za-z0-9._-]+/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "") || "applyhub";
-
-    return {
-      archiveBuffer: zipArchive.toBuffer(),
-      fileName: `${safeDatabaseName}-backup-${buildBackupTimestamp(createdAt)}.zip`,
-      manifest,
-    };
+      const result = await writeBackup({rootDir,getPool,tables:tableDefinitions,assets:files,manifest,columnsFor:getTableColumnDefinitions,normalizeRow:normalizeBackupRow});
+      const fileName = String(databaseName).replace(/[^A-Za-z0-9._-]/g,'-')+'-backup-'+buildBackupTimestamp(createdAt)+'.zip';
+      if (options.preferFile) return {...result,fileName,manifest};
+      try { return {archiveBuffer:await fs.promises.readFile(result.filePath),fileName,manifest}; }
+      finally { await result.dispose(); }
+    } finally { buildingBackup = false; }
   }
 
   function parseArchiveJson(zipArchive, entryPath, errorMessage, errorCode) {
@@ -1239,6 +1175,8 @@ function createSystemBackupService({
         const columnDefinitions = await getTableColumnDefinitions(connection.query.bind(connection), tableName);
         const knownColumns = new Set(columnDefinitions.map((columnDefinition) => String(columnDefinition.columnName || "").trim()));
 
+        let pendingColumns = null, pendingRows = [];
+        const flush = async () => { if (pendingRows.length) await insertRows(connection, tableName, pendingColumns, pendingRows); pendingRows = []; };
         for (const row of tablePayload.rows) {
           const rowObject = row && typeof row === "object" && !Array.isArray(row) ? row : null;
 
@@ -1272,9 +1210,14 @@ function createSystemBackupService({
             normalizeRestoreValue(rowObject[columnDefinition.columnName], columnDefinition),
           );
 
-          await connection.query(insertSql, insertValues);
+          const columnNames = insertColumns.map(column => column.columnName);
+          if (pendingColumns && JSON.stringify(pendingColumns) !== JSON.stringify(columnNames)) await flush();
+          pendingColumns = columnNames;
+          pendingRows.push(insertValues);
+          if (pendingRows.length >= 100) await flush();
           restoredRowCount += 1;
         }
+        await flush();
       }
     } finally {
       await connection.query(`SET FOREIGN_KEY_CHECKS = 1`);
@@ -1416,6 +1359,7 @@ function createSystemBackupService({
       await connection.beginTransaction();
 
       ({ restoredRowCount } = await restoreTables(connection, tablePayloads));
+      await connection.query("DELETE FROM app_exam_sequence");
       await connection.query("DELETE FROM applicant_member_sessions");
       await connection.query("DELETE FROM applicant_member_verifications");
       await connection.query("DELETE FROM applicant_member_recovery");
@@ -1423,6 +1367,8 @@ function createSystemBackupService({
       swapRecords = await swapAssets(stagedAssets, tempRoot);
       await connection.commit();
       didCommit = true;
+      connection.release();
+      connection = null;
 
       try {
         await resetAutoIncrementCounters(tablePayloads);

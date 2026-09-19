@@ -1,3 +1,5 @@
+const fs = require('node:fs');
+const { pipeline } = require('node:stream/promises');
 const { exactRoute, regexRoute } = require("../router");
 
 function decodeRouteParams(groups = {}) {
@@ -7,6 +9,15 @@ function decodeRouteParams(groups = {}) {
 }
 
 function createAdmitCardRoutes(deps) {
+  async function streamJob(response, job, disposition) {
+    const file = await fs.promises.open(job.filePath, 'r');
+    try {
+      const stat = await file.stat();
+      response.writeHead(200, { 'Content-Type': job.fileContentType || 'application/pdf', 'Content-Length': stat.size,
+        'Content-Disposition': deps.buildContentDisposition(disposition, job.fileName), 'Cache-Control': 'no-store' });
+      await pipeline(file.createReadStream(), response);
+    } finally { await file.close().catch(() => {}); }
+  }
   return [
 
     exactRoute("POST", "/api/admit-cards/jobs", async ({ request, response, authenticatedAccount }) => {
@@ -53,20 +64,11 @@ function createAdmitCardRoutes(deps) {
           throw deps.createHttpError(409, job.error || "수험표 파일 생성을 취소했습니다.", job.errorCode || "BATCH_JOB_CANCELLED");
         }
 
-        if (job.status !== "completed" || !job.fileBuffer) {
+        if (job.status !== "completed" || !job.filePath) {
           throw deps.createHttpError(409, "수험표 파일 생성이 아직 완료되지 않았습니다.", "BATCH_JOB_NOT_READY");
         }
 
-        return deps.sendBinary(
-          response,
-          200,
-          {
-            "Content-Type": job.fileContentType || "application/octet-stream",
-            "Content-Disposition": deps.buildContentDisposition("attachment", job.fileName || "admit-cards.pdf"),
-            "Cache-Control": "no-store",
-          },
-          job.fileBuffer,
-        );
+        return streamJob(response, job, 'attachment');
       },
       { getParams: (match) => decodeRouteParams(match.groups) },
     ),
@@ -88,20 +90,11 @@ function createAdmitCardRoutes(deps) {
           throw deps.createHttpError(409, "통합 PDF 출력 작업이 아닙니다.", "BATCH_JOB_INVALID_OUTPUT_MODE");
         }
 
-        if (job.status !== "completed" || !job.fileBuffer) {
+        if (job.status !== "completed" || !job.filePath) {
           throw deps.createHttpError(409, "수험표 PDF 생성이 아직 완료되지 않았습니다.", "BATCH_JOB_NOT_READY");
         }
 
-        return deps.sendBinary(
-          response,
-          200,
-          {
-            "Content-Type": "application/pdf",
-            "Content-Disposition": deps.buildContentDisposition("inline", job.fileName || "admit-cards.pdf"),
-            "Cache-Control": "no-store",
-          },
-          job.fileBuffer,
-        );
+        return streamJob(response, job, 'inline');
       },
       { getParams: (match) => decodeRouteParams(match.groups) },
     ),

@@ -188,6 +188,8 @@
     const { getPrintHistorySummaryExamineeRows } = printHistorySummaryHelpers;
 
     function getGridRows(gridKey) {
+      const remote = globalThis.AdmitCardRemoteGrids?.rows(gridKey);
+      if (remote) return remote;
       const baseRows = getBaseGridRows(gridKey);
       const filteredRows = applyGridFilters(baseRows, gridKey);
       return applyGridSort(filteredRows, gridKey);

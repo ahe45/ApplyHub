@@ -49,7 +49,7 @@ function createAuthSessionService({
 
     const account = await getAccountAuthRecord(accountId);
 
-    if (!account || !verifyPassword(password, account.passwordValue)) {
+    if (!account || !(await verifyPassword(password, account.passwordValue))) {
       throw createHttpError(401, "계정 ID 또는 비밀번호가 올바르지 않습니다.", "INVALID_CREDENTIALS");
     }
 
@@ -123,7 +123,7 @@ function createAuthSessionService({
       throw createHttpError(400, "비밀번호는 4자 이상이어야 합니다.", "PASSWORD_TOO_SHORT");
     }
 
-    if (verifyPassword(nextPassword, account.passwordValue)) {
+    if (await verifyPassword(nextPassword, account.passwordValue)) {
       throw createHttpError(400, "초기 비밀번호와 다른 비밀번호를 설정하세요.", "PASSWORD_MUST_CHANGE");
     }
 
@@ -140,7 +140,7 @@ function createAuthSessionService({
           last_login_at = NOW()
         WHERE login_id = ?
       `,
-      [hashPassword(nextPassword), account.id],
+      [await hashPassword(nextPassword), account.id],
     );
 
     destroySession(sessionId);

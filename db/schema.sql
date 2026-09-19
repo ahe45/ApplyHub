@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS app_meta (
   field_overrides_json MEDIUMTEXT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uniq_app_meta_member (member_id),
-  KEY idx_app_meta_examinee_no (examinee_no)
+  UNIQUE KEY uniq_app_meta_examinee_no (examinee_no)
 );
 
 CREATE TABLE IF NOT EXISTS applicant_members (
@@ -255,3 +255,9 @@ CREATE TABLE IF NOT EXISTS app_document_status (
         CONSTRAINT fk_document_status_submission FOREIGN KEY (submission_id) REFERENCES app_meta(id) ON DELETE CASCADE,
         CONSTRAINT fk_document_status_field FOREIGN KEY (field_id) REFERENCES app_form(id) ON DELETE CASCADE
       );
+
+CREATE TABLE IF NOT EXISTS app_exam_sequence (
+  group_key CHAR(64) NOT NULL PRIMARY KEY,
+  next_value BIGINT UNSIGNED NOT NULL,
+  initialized TINYINT NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

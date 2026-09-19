@@ -1,6 +1,7 @@
+const { createMemberFileStorage } = require('./member-files');
 const { getMemberBirthDate } = require('../../../shared/domain/applicant-form');
 
-function createMemberAdminService({ query, getSettings, createHttpError }) {
+function createMemberAdminService({ query, getSettings, createHttpError, readMemberFile }) {
   const parse = value => { try { return JSON.parse(value || '{}'); } catch { return {}; } };
   async function list({ search = '', status = '', page = 1 } = {}) {
     const keyword = String(search).trim().slice(0, 100).toLowerCase();
@@ -35,7 +36,7 @@ function createMemberAdminService({ query, getSettings, createHttpError }) {
     const answers = Object.entries(profile).map(([key, value]) => {
       const question = settings.questions.find(q => q.key === key);
       const label = question?.label || ({ birth: '생년월일', phone: '연락처', address: '주소' })[key] || '이전 가입 항목';
-      if (value && typeof value === 'object') return { key, label, fileName: String(value.fileName || '첨부파일'), isFile: !!value.base64 };
+      if (value && typeof value === 'object') return { key, label, fileName: String(value.fileName || '첨부파일'), isFile: !!(value.base64 || value.storageKey) };
       return { key, label, inputType: question?.inputType || (key === 'birth' ? 'birthdate' : 'text'), value: String(value ?? '') };
     });
     const consents = parse(row.consent_json);
@@ -47,8 +48,9 @@ function createMemberAdminService({ query, getSettings, createHttpError }) {
   async function attachment(id, key) {
     const row = await getRow(id), profile = parse(row.profile_json);
     const file = Object.hasOwn(profile, key) ? profile[key] : null;
-    if (!file || typeof file.base64 !== 'string') throw createHttpError(404, '첨부파일을 찾을 수 없습니다.');
-    return { fileName: String(file.fileName || '첨부파일'), buffer: Buffer.from(file.base64, 'base64') };
+    if (!file || (!file.base64 && !file.storageKey)) throw createHttpError(404, '첨부파일을 찾을 수 없습니다.');
+    try { return { fileName: String(file.fileName || '첨부파일'), buffer: await (readMemberFile || createMemberFileStorage().read)(file) }; }
+    catch (error) { if(error.code === 'ENOENT') throw createHttpError(404,'첨부파일을 찾을 수 없습니다.'); throw error; }
   }
   return { list, detail, attachment };
 }

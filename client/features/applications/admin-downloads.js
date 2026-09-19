@@ -83,7 +83,7 @@
     }
 
     async function downloadApplicantSubmissions() {
-      const filteredRows = getFilteredRows("applicantHistoryGrid", state.applicantManager?.submissions);
+      const filteredRows = globalScope.AdmitCardRemoteGrids?.references("applicantHistoryGrid") || getFilteredRows("applicantHistoryGrid", state.applicantManager?.submissions);
 
       if (!Array.isArray(filteredRows) || filteredRows.length === 0) {
         showToast("필터링된 데이터가 없습니다.", "error", 4200);
@@ -98,7 +98,7 @@
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            rows: filteredRows,
+            submissionIds: filteredRows.map(row => row.id),
           }),
         });
 
@@ -111,7 +111,7 @@
     }
 
     async function downloadApplicantSubmissionPhotos() {
-      const filteredRows = getFilteredRows("applicantHistoryGrid", state.applicantManager?.submissions);
+      const filteredRows = globalScope.AdmitCardRemoteGrids?.references("applicantHistoryGrid") || getFilteredRows("applicantHistoryGrid", state.applicantManager?.submissions);
 
       if (!Array.isArray(filteredRows) || filteredRows.length === 0) {
         showToast("필터링된 데이터가 없습니다.", "error", 4200);
@@ -126,7 +126,7 @@
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            rows: filteredRows,
+            submissionIds: filteredRows.map(row => row.id),
           }),
         });
 

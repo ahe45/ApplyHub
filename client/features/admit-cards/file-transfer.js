@@ -88,7 +88,7 @@
     const filteredRows = typeof getGridRows === "function" ? getGridRows("printHistoryGrid") : [];
     const summaryExaminees = typeof getPrintHistorySummaryExamineeRows === "function" ? getPrintHistorySummaryExamineeRows() : [];
 
-    if ((!Array.isArray(filteredRows) || filteredRows.length === 0) && (!Array.isArray(summaryExaminees) || summaryExaminees.length === 0)) {
+    if (!globalThis.AdmitCardRemoteGrids && (!Array.isArray(filteredRows) || filteredRows.length === 0) && (!Array.isArray(summaryExaminees) || summaryExaminees.length === 0)) {
       showToast("필터링된 데이터가 없습니다.", "error", 4200);
       return;
     }
@@ -101,8 +101,7 @@
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          rows: filteredRows,
-          summaryExaminees,
+          filters: globalThis.AdmitCardRemoteGrids?.requestFor('printHistoryGrid') || {},
         }),
       });
       const contentType = response.headers.get("content-type") || "";

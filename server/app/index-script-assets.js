@@ -11,6 +11,7 @@ const indexScriptSources = Object.freeze([
   "./client/app/app-state.js",
   "./client/app/html-utils.js",
   "./client/app/grid-row-store.js",
+  "./client/app/remote-grids.js",
   "./client/app/bootstrap-data.js",
   "./client/app/bootstrap-loader.js",
   "./client/features/app/busy-overlays.js",

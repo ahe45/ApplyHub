@@ -102,7 +102,7 @@ function createApplicantArchiveJobs({ query, getSubmission, getPhoto, getFile, c
         if (job.options.photos) candidates.push({ kind: 'photo', label: '수험생사진' });
         for (const candidate of candidates) {
           let file;
-          try { file = candidate.kind === 'photo' ? await getPhoto(id) : await getFile(id, candidate.key); }
+          try { file = candidate.kind === 'photo' ? await getPhoto(id, submission) : await getFile(id, candidate.key, submission); }
           catch (error) { if (error.statusCode === 404 || error.status === 404) { job.missing++; continue; } throw error; }
           const buffer = file.fileBlob || file.photoBlob;
           if (!buffer?.length) { job.missing++; continue; }

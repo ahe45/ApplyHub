@@ -22,7 +22,7 @@ function createSystemAccountBootstrapService({
       }
 
       const rawPasswordValue = String(account.passwordValue || initialPassword);
-      const nextPasswordValue = hashPassword(rawPasswordValue);
+      const nextPasswordValue = await hashPassword(rawPasswordValue);
       const nextPasswordTemporary =
         rawPasswordValue === defaultInitialPassword || rawPasswordValue === initialPassword ? 1 : 0;
 
@@ -84,17 +84,17 @@ function createSystemAccountBootstrapService({
         defaultSeedAccounts[0].id,
         defaultSeedAccounts[0].name,
         defaultSeedAccounts[0].role,
-        hashPassword(initialPassword),
+        await hashPassword(initialPassword),
         1,
         defaultSeedAccounts[1].id,
         defaultSeedAccounts[1].name,
         defaultSeedAccounts[1].role,
-        hashPassword(initialPassword),
+        await hashPassword(initialPassword),
         1,
         defaultSeedAccounts[2].id,
         defaultSeedAccounts[2].name,
         defaultSeedAccounts[2].role,
-        hashPassword(initialPassword),
+        await hashPassword(initialPassword),
         1,
       ],
     );

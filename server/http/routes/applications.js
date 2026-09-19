@@ -1,3 +1,4 @@
+const {sendDataExport} = require('../../modules/applications/data-export');
 const { exactRoute, regexRoute } = require("../router");
 const { isViewAccessibleForRole } = require("../../../shared/app-config");
 
@@ -27,7 +28,26 @@ function createApplicantRoutes(deps) {
     }
   }
 
+  async function requireListAccess(account, kind = '') {
+    const roles = await deps.getRoleMenuVisibilitySettings();
+    const view = kind === 'print' ? 'printHistory' : kind === 'ticket' ? 'admitCardLookup' : kind === 'dashboard' ? 'dashboard' : 'applicantHistory';
+    if (!account || !isViewAccessibleForRole(view,account.role,{roleMenuVisibility:roles})) throw deps.createHttpError(403,'조회 권한이 없습니다.');
+  }
   return [
+    exactRoute('POST','/api/applicant-submissions/list',async ({request,response,authenticatedAccount}) => {
+      const body = await deps.readJsonBody(request);
+      await requireListAccess(authenticatedAccount, body.kind);
+      const queries = deps.applicantService.submissionQuery;
+      if (body.kind === 'dashboard') return deps.sendJson(response,200,await queries.dashboard(body));
+      if (body.optionsKey) return deps.sendJson(response,200,{values:await queries.options(body,body.optionsKey)});
+      const result = await queries.list(body);
+      result.references = await queries.references(body);
+      return deps.sendJson(response,200,result);
+    }),
+    regexRoute('GET',/^\/api\/applicant-submissions\/(?<submissionId>\d+)$/,async ({response,params,authenticatedAccount}) => {
+      await requireListAccess(authenticatedAccount);
+      return deps.sendJson(response,200,await deps.applicantService.getApplicantSubmissionById(params.submissionId));
+    }),
     exactRoute('GET', '/api/applicant-document-status', async ({ response, requestUrl, authenticatedAccount }) => {
       await requireDocumentAccess(authenticatedAccount);
       return deps.sendJson(response, 200, await deps.applicantService.documentStatusService.list(Object.fromEntries(requestUrl.searchParams)), { 'Cache-Control': 'no-store' });
@@ -111,36 +131,16 @@ function createApplicantRoutes(deps) {
       );
     }),
 
-    exactRoute("POST", "/api/applicant-submissions/export.xlsx", async ({ request, response }) => {
+    exactRoute("POST", "/api/applicant-submissions/export.xlsx", async ({ request, response, authenticatedAccount }) => {
+      await requireArchiveAccess(authenticatedAccount);
       const body = await deps.readJsonBody(request);
-      const workbookBuffer = await deps.buildApplicantSubmissionExportBuffer(Array.isArray(body?.rows) ? body.rows : []);
-
-      return deps.sendBinary(
-        response,
-        200,
-        {
-          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "Content-Disposition": deps.buildContentDisposition("attachment", "접수 이력 데이터.xlsx"),
-          "Cache-Control": "no-store",
-        },
-        workbookBuffer,
-      );
+      return sendDataExport({service:deps.applicantService,query:deps.query,body,response,buildContentDisposition:deps.buildContentDisposition,kind:'applications'});
     }),
 
-    exactRoute("POST", "/api/applicant-submissions/photos.zip", async ({ request, response }) => {
+    exactRoute("POST", "/api/applicant-submissions/photos.zip", async ({ request, response, authenticatedAccount }) => {
+      await requireArchiveAccess(authenticatedAccount);
       const body = await deps.readJsonBody(request);
-      const zipBuffer = await deps.buildApplicantSubmissionPhotoArchiveBuffer(Array.isArray(body?.rows) ? body.rows : []);
-
-      return deps.sendBinary(
-        response,
-        200,
-        {
-          "Content-Type": "application/zip",
-          "Content-Disposition": deps.buildContentDisposition("attachment", "접수 이력 수험생 사진.zip"),
-          "Cache-Control": "no-store",
-        },
-        zipBuffer,
-      );
+      return sendDataExport({service:deps.applicantService,query:deps.query,body,response,buildContentDisposition:deps.buildContentDisposition,kind:'photos'});
     }),
 
     regexRoute(

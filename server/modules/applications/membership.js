@@ -1,3 +1,4 @@
+const { createMemberFileStorage } = require('./member-files');
 const { randomBytes, randomInt, createHash, scrypt, timingSafeEqual } = require("crypto");
 const { promisify } = require("util");
 const { normalizeQuestions, validateAnswers } = require('./signup-questions');
@@ -48,7 +49,8 @@ function normalizeSignupSettings(value = {}) {
   };
 }
 
-function createApplicantMembershipService({ query, getPool, createHttpError, sendEmail, env = {} }) {
+function createApplicantMembershipService({ query, getPool, createHttpError, sendEmail, rootDir = process.cwd(), env = {} }) {
+  const memberFiles = createMemberFileStorage(rootDir);
   const showDevelopmentCode = String(env.NODE_ENV || '').trim().toLowerCase() === 'development'
     && String(env.APPLICANT_SIGNUP_CODE_PREVIEW || '').trim().toLowerCase() === 'true';
   const fail = (status, message, fieldKey = '') => {
@@ -89,6 +91,7 @@ function createApplicantMembershipService({ query, getPool, createHttpError, sen
     )`);
     const columns = await query("SHOW COLUMNS FROM app_meta LIKE 'member_id'");
     if (!columns.length) await query("ALTER TABLE app_meta ADD COLUMN member_id BIGINT UNSIGNED NULL, ADD UNIQUE KEY uniq_app_meta_member (member_id)");
+    await memberFiles.migrate(query);
   }
   async function getSettings() {
     const [row] = await query("SELECT setting_value AS value FROM system_set WHERE setting_key = 'applicantSignupSettings'");
@@ -136,7 +139,7 @@ function createApplicantMembershipService({ query, getPool, createHttpError, sen
   }
   const publicMember = (row, settings = {}) => {
     const member = { id: Number(row.id), loginId: row.email, name: row.name, email: row.email,
-      emailVerified: Boolean(row.email_verified), profile: JSON.parse(row.profile_json || "{}") };
+      emailVerified: Boolean(row.email_verified), profile: Object.fromEntries(Object.entries(JSON.parse(row.profile_json || "{}")).map(([key,value]) => [key, value && typeof value === 'object' && !Array.isArray(value) ? { fileName: value.fileName, mimeType: value.mimeType, size: value.size, hasFile: !!(value.storageKey || value.base64) } : value])) };
     return { ...member, birthDate: getMemberBirthDate(member, settings.questions) };
   };
   function cookie(request, response, token = "") {
@@ -149,7 +152,7 @@ function createApplicantMembershipService({ query, getPool, createHttpError, sen
   async function session(request) {
     const token = sessionToken(request);
     if (!/^[a-f0-9]{64}$/.test(token)) return null;
-    const [row] = await query("SELECT m.* FROM applicant_members m JOIN applicant_member_sessions s ON s.member_id = m.id WHERE s.token_hash = ? AND s.expires_at > NOW() AND m.email_verified = 1", [digest(token)]);
+    const [row] = await query("SELECT m.id,m.name,m.email,m.email_verified,m.profile_json FROM applicant_members m JOIN applicant_member_sessions s ON s.member_id = m.id WHERE s.token_hash = ? AND s.expires_at > NOW() AND m.email_verified = 1", [digest(token)]);
     return row ? publicMember(row, await getSettings()) : null;
   }
   async function requireMember(request) {
@@ -177,8 +180,11 @@ function createApplicantMembershipService({ query, getPool, createHttpError, sen
     catch (error) { fail(400, error.message, error.fieldKey); }
     const hash = await passwordHash(password);
     const token = request && response ? randomBytes(32).toString('hex') : '';
-    const connection = await getPool().getConnection();
+    const storedFiles = await memberFiles.store(profile);
+    profile = storedFiles.profile;
+    let connection, committed = false;
     try {
+      connection = await getPool().getConnection();
       await connection.beginTransaction();
       let verified = false;
       {
@@ -197,13 +203,17 @@ function createApplicantMembershipService({ query, getPool, createHttpError, sen
         await connection.query('INSERT INTO applicant_member_sessions (token_hash,member_id,expires_at) VALUES (?,?,DATE_ADD(NOW(), INTERVAL 12 HOUR))', [digest(token), created.insertId]);
       }
       await connection.commit();
+      committed = true;
       if (token) cookie(request, response, token);
       return { ok: true, ...(token ? { member: publicMember({ id: created.insertId, email, name, email_verified: 1, profile_json: JSON.stringify(profile) }, settings), accountType: 'applicant', redirectTo: '/applicant' } : {}) };
     } catch (error) {
-      await connection.rollback();
+      if (!committed) {
+        if (connection) await connection.rollback();
+        await storedFiles.rollback();
+      }
       if (error.code === "ER_DUP_ENTRY") fail(409, "이미 사용 중인 이메일입니다.", 'email');
       throw error;
-    } finally { connection.release(); }
+    } finally { connection?.release(); }
   }
   async function login(payload, request, response) {
     throttle(`login:${request.socket?.remoteAddress}`, 30);
@@ -235,6 +245,6 @@ function createApplicantMembershipService({ query, getPool, createHttpError, sen
     return { ...settings, terms, termsTitle: terms[0]?.title || '', termsText: terms[0]?.text || '', termsVersion: signupTermsVersion(settings) };
   }
   const recovery = createMemberRecovery({ query, getPool, fail, throttle, normalizeEmail, passwordHash, sendEmail });
-  return { initialize, getSettings, saveSettings, publicSettings, sendCode, verifyCode, register, login, logout, session, requireMember, requestRecovery: recovery.request, completeRecovery: recovery.complete };
+  return { readMemberFile: memberFiles.read, initialize, getSettings, saveSettings, publicSettings, sendCode, verifyCode, register, login, logout, session, requireMember, requestRecovery: recovery.request, completeRecovery: recovery.complete };
 }
 module.exports = { createApplicantMembershipService, normalizeSignupSettings };

@@ -6,7 +6,7 @@
     const count = value => Number(value || 0).toLocaleString("ko-KR");
     const shortDate = value => value ? `${value.slice(5,7)}.${value.slice(8,10)} ${value.slice(11,16)}` : "—";
     function renderDashboard() {
-      const info = data.buildDashboardData(state.applicantManager, state.headerFilters, Date.now() + (state.bootstrap.serverTimeOffsetMs || 0));
+      const info = { ...data.buildDashboardData({...state.applicantManager,submissions:[]}, state.headerFilters, Date.now() + (state.bootstrap.serverTimeOffsetMs || 0)), ...globalThis.AdmitCardRemoteGrids?.dashboard() };
       const canViewHistory = isViewAccessible("applicantHistory");
       const url = mode => esc(data.historyUrl(mode, state.headerFilters, info.today));
       const metric = (mode, label, value, detail) => {

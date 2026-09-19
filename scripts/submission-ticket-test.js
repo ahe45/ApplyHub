@@ -74,7 +74,7 @@ async function verifySubmissionTickets({ services, call, base, query, submission
   assert.deepEqual(await query("SHOW TABLES LIKE 'examinee'"), [], 'Migration removes the backed-up legacy roster');
   const backup = await services.systemService.buildSystemBackupArchive({includeDatabase: true, includedAssetKeys: []});
   assert(backup.archiveBuffer.length > 0);
-  const browser = await puppeteer.launch({executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true, args: ['--no-sandbox']});
+  const browser = await puppeteer.launch({executablePath: process.env.EDGE_PATH || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true, args: ['--no-sandbox']});
   try {
     const page = await browser.newPage();
     const errors = [];

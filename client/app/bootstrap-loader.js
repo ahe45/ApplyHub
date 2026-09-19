@@ -49,7 +49,8 @@
       }
 
       try {
-        const payload = await apiRequest("/api/bootstrap");
+        const payload = await apiRequest('/api/bootstrap?view=' + encodeURIComponent(state.currentView || 'dashboard'));
+        globalThis.AdmitCardRemoteGrids?.configure({state,apiRequest,renderView});
         applyBootstrapPayload(payload);
         if (typeof loadCurrentViewData === "function") {
           await loadCurrentViewData();
