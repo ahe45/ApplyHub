@@ -34,7 +34,8 @@
 .applicant-public-body .applicant-public-actions:has(> .applicant-public-back-button) { flex-wrap: nowrap; justify-content: flex-start; }
 .applicant-public-body .applicant-public-actions:has(> .applicant-public-back-button) > :is(button, a) { flex: 1 1 0; }
 .applicant-public-body .applicant-public-actions > .applicant-public-back-button:only-child { flex: 0 1 calc((100% - 10px) / 2); }
-.applicant-public-body .applicant-public-date-select-grid { grid-template-columns: minmax(0, 1fr); }
+.applicant-public-body .applicant-public-date-select-grid { grid-template-columns: repeat(var(--date-part-count, 3), minmax(0, 1fr)); gap: 8px; }
+.applicant-public-body .applicant-public-date-select-grid select { width: 100%; min-width: 0; padding-inline: 8px; }
 .applicant-public-body .applicant-member-birthdate .applicant-public-date-select-grid { grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)); gap: 8px; }
 .applicant-public-body .applicant-member-birthdate select { width: 100%; min-width: 0; padding-inline: 8px; }
 .applicant-public-body .applicant-member-terms { padding: 16px; }

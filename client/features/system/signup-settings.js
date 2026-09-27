@@ -87,6 +87,7 @@
     catch (error) { status = error.message; redraw(); return; }
     const q = { key: editor.editingId || `extra_${crypto.randomUUID()}`, label: editor.questionText, description: editor.questionDescription, labelEn: editor.questionTextEn || '', descriptionEn: editor.questionDescriptionEn || '',
       inputType: editor.inputType, required: editor.required, options: editor.options, optionsEn: editor.optionsEn || {}, customOptionLabel: editor.customOptionLabel || '',
+      ...(['date', 'daterange'].includes(editor.inputType) ? { dateParts: editor.dateParts || ['year', 'month', 'day'] } : {}),
       fileNamePattern: editor.fileNamePattern || '', allowedExtensions: editor.allowedExtensions || [], ...choice };
     delete q.optionKoreanEdits;
     const questions = editor.editingId ? settings.questions.map(old => old.key === editor.editingId ? q : old) : [...settings.questions, q];
@@ -178,6 +179,13 @@
     }
     const input = event.target.closest('[data-signup-field-input]'); if (!input || busy) return;
     const key = input.dataset.signupFieldInput;
+    if (key.startsWith('datePart:')) {
+      const parts = new Set(editor.dateParts || ['year', 'month', 'day']);
+      if (input.checked) parts.add(key.split(':')[1]); else if (parts.size > 1) parts.delete(key.split(':')[1]);
+      editor.dateParts = scope.AdmitCardApplicantFormConfig.normalizeDateParts([...parts]);
+      redraw();
+      return;
+    }
     if (coreKeys.includes(editor.editingId) && ['required', 'inputType'].includes(key)) return;
     if (key.startsWith('optionKorean:')) { editor.optionKoreanEdits = { ...editor.optionKoreanEdits, [Number(key.split(':')[1])]: input.value }; return; }
     if (key.startsWith('optionEnglish:')) { const option = editor.options[Number(key.split(':')[1])]; if (option !== undefined) editor.optionsEn = { ...editor.optionsEn, [option]: input.value }; return; }

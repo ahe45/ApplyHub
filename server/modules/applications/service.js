@@ -27,7 +27,6 @@ const { createApplicantArchiveJobs } = require("./archive-jobs");
 const {
 
   APPLICANT_CODE_PATTERN,
-  APPLICANT_DATE_PATTERN,
   APPLICANT_DEFAULT_EXAM_NO_COMPONENTS,
   APPLICANT_DEFAULT_EXAM_NO_DIGIT_COUNT,
   APPLICANT_DEFAULT_RECRUITMENT_EXAM_NO_PATTERN,
@@ -220,8 +219,8 @@ function createApplicantService({
       return "";
     }
 
-    if (!APPLICANT_DATE_PATTERN.test(normalizedValue)) {
-      throw createHttpError(400, `${label} 형식은 YYYY-MM-DD여야 합니다.`, "APPLICANT_DATE_INVALID");
+    if (!applicantFormConfig.isValidDateValue(normalizedValue, options)) {
+      throw createHttpError(400, `${label} 날짜를 설정된 형식에 맞게 선택하세요.`, "APPLICANT_DATE_INVALID");
     }
 
     return normalizedValue;
@@ -394,6 +393,7 @@ function createApplicantService({
         allowCustomOption,
         customOptionLabel,
         fileNamePattern: String(parsedValue.fileNamePattern || ""),
+        dateParts: parsedValue.dateParts,
         allowedExtensions: Array.isArray(parsedValue.allowedExtensions) ? parsedValue.allowedExtensions : [],
       };
     } catch (error) {
@@ -454,6 +454,7 @@ function createApplicantService({
       questionTextEn: String(row.questionTextEn || "").trim(),
       questionDescriptionEn: String(row.questionDescriptionEn || "").trim(),
       inputType: String(row.inputType || "text").trim(),
+      ...(['date', 'daterange'].includes(row.inputType) ? { dateParts: applicantFormConfig.normalizeDateParts(optionConfig.dateParts) } : {}),
       systemFieldKey: String(row.systemFieldKey || "").trim(),
       options,
       optionValuesText: options.join("\n"),
@@ -2119,6 +2120,11 @@ function createApplicantService({
     const allowCustomOption = normalizeApplicantAllowCustomOption(payload, existingField) || Boolean(customOptionLabel);
     const fieldKey = String(existingField.fieldKey || payload.fieldKey || `${buildApplicantFieldKey(questionText).slice(0, 45)}-${randomUUID().slice(0, 8)}`).trim();
     let fileSettings = { fileNamePattern: "", allowedExtensions: [] };
+    let dateSettings = {};
+    if (['date', 'daterange'].includes(inputType)) {
+      try { dateSettings = { dateParts: applicantFormConfig.normalizeDateParts(payload.dateParts === undefined ? existingField.dateParts : payload.dateParts) }; }
+      catch (error) { throw createHttpError(400, error.message, 'APPLICANT_DATE_SETTINGS_INVALID'); }
+    }
     if (inputType === "file") {
       try { fileSettings = normalizeFileUploadSettings({ ...existingField, ...payload }); }
       catch (error) { throw createHttpError(400, error.message, "APPLICANT_FILE_SETTINGS_INVALID"); }
@@ -2147,6 +2153,7 @@ function createApplicantService({
     }
 
     if (inputType === "multiselect" && systemFieldKey) throw createHttpError(400, "복수 선택은 일반 항목으로 등록하세요.", "APPLICANT_FIELD_MAPPING_INVALID");
+    if (inputType === 'daterange' && systemFieldKey) throw createHttpError(400, '기간은 일반 항목으로 등록하세요.', 'APPLICANT_FIELD_MAPPING_INVALID');
 
     if (inputType === "photo" && systemFieldKey && systemFieldKey !== "photo") {
       throw createHttpError(400, "사진 업로드 항목은 수험생 사진 시스템 항목에만 연결할 수 있습니다.", "APPLICANT_FIELD_PHOTO_MAPPING_INVALID");
@@ -2169,6 +2176,7 @@ function createApplicantService({
       questionDescriptionEn,
       inputType,
       ...fileSettings,
+      ...dateSettings,
       systemFieldKey,
       options,
       optionsEn,
@@ -2218,6 +2226,7 @@ function createApplicantService({
         normalizedPayload.systemFieldKey,
         JSON.stringify({
           items: normalizedPayload.options,
+          dateParts: normalizedPayload.dateParts,
           optionsEn: normalizedPayload.optionsEn,
           allowCustomOption: normalizedPayload.allowCustomOption === true,
           customOptionLabel: normalizedPayload.customOptionLabel,
@@ -2268,6 +2277,7 @@ function createApplicantService({
         normalizedPayload.systemFieldKey,
         JSON.stringify({
           items: normalizedPayload.options,
+          dateParts: normalizedPayload.dateParts,
           optionsEn: normalizedPayload.optionsEn,
           allowCustomOption: normalizedPayload.allowCustomOption === true,
           customOptionLabel: normalizedPayload.customOptionLabel,
@@ -3397,9 +3407,16 @@ function createApplicantService({
       };
     }
 
+    if (field.inputType === 'daterange') {
+      try { return applicantFormConfig.validateDateRangeAnswer(field, rawValue); }
+      catch (error) { throw createHttpError(400, error.message, 'APPLICANT_DATE_RANGE_INVALID'); }
+    }
+
     if (field.inputType === "date" || field.inputType === "birthdate") {
       return normalizeApplicantDate(rawValue, field.questionText, {
         required: field.required,
+        inputType: field.inputType,
+        dateParts: field.dateParts,
       });
     }
 

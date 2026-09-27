@@ -24,6 +24,7 @@ function normalizeSignupSettings(value = {}) {
     label: String(field.label || "").trim().slice(0, 100),
     required: field.required === true,
     inputType: field.inputType || 'text',
+    dateParts: field.dateParts,
     description: field.description || '',
     labelEn: field.labelEn || '',
     descriptionEn: field.descriptionEn || '',

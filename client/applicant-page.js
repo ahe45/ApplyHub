@@ -1605,40 +1605,17 @@
     return submission?.answerMap && typeof submission.answerMap === "object" ? submission.answerMap : {};
   }
 
-  function parseApplicantDateParts(value = "") {
-    const normalizedValue = String(value || "").trim();
-    const matchedDate = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalizedValue);
-
-    if (!matchedDate) {
-      return {
-        year: "",
-        month: "",
-        day: "",
-      };
-    }
-
-    return {
-      year: matchedDate[1],
-      month: matchedDate[2],
-      day: matchedDate[3],
-    };
+  function parseApplicantDateParts(value = "", field = {}) {
+    return applicantFormConfig.parseDateValue(value, field);
   }
 
-  function buildApplicantDateValueFromParts(parts = {}) {
-    const year = String(parts?.year || "").trim();
-    const month = String(parts?.month || "").trim();
-    const day = String(parts?.day || "").trim();
-
-    if (!year || !month || !day) {
-      return "";
-    }
-
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  function buildApplicantDateValueFromParts(parts = {}, field = {}) {
+    return applicantFormConfig.buildDateValue(parts, field);
   }
 
-  function getApplicantDatePartState(fieldKey = "") {
+  function getApplicantDatePartState(fieldKey = "", edge = '') {
     const normalizedFieldKey = String(fieldKey || "").trim();
-    const storedParts = state.fieldUi?.dateParts?.[normalizedFieldKey];
+    const storedParts = state.fieldUi?.dateParts?.[edge ? `${normalizedFieldKey}:${edge}` : normalizedFieldKey];
 
     if (storedParts && typeof storedParts === "object") {
       return {
@@ -1648,7 +1625,8 @@
       };
     }
 
-    return parseApplicantDateParts(state.draftAnswers?.[normalizedFieldKey]);
+    const value = state.draftAnswers?.[normalizedFieldKey];
+    return parseApplicantDateParts(edge ? applicantFormConfig.parseDateRange(value)[edge] : value, getApplicantFormFieldByKey(normalizedFieldKey));
   }
 
   function getApplicantDateDayCount(year, month) {
@@ -1667,17 +1645,20 @@
         return;
       }
 
-      if (field.inputType === "date" || field.inputType === "birthdate") {
-        const existingParts = preserveExisting ? state.fieldUi?.dateParts?.[fieldKey] : null;
+      if (['date', 'birthdate', 'daterange'].includes(field.inputType)) {
+        for (const edge of (field.inputType === 'daterange' ? ['start', 'end'] : [''])) {
+          const stateKey = edge ? `${fieldKey}:${edge}` : fieldKey;
+          const existingParts = preserveExisting ? state.fieldUi?.dateParts?.[stateKey] : null;
 
-        nextDateParts[fieldKey] =
-          existingParts && typeof existingParts === "object"
-            ? {
-                year: String(existingParts.year || ""),
-                month: String(existingParts.month || ""),
-                day: String(existingParts.day || ""),
-              }
-            : parseApplicantDateParts(state.draftAnswers[fieldKey]);
+          nextDateParts[stateKey] =
+            existingParts && typeof existingParts === "object"
+              ? {
+                  year: String(existingParts.year || ""),
+                  month: String(existingParts.month || ""),
+                  day: String(existingParts.day || ""),
+                }
+              : parseApplicantDateParts(edge ? applicantFormConfig.parseDateRange(state.draftAnswers[fieldKey])[edge] : state.draftAnswers[fieldKey], field);
+        }
       }
 
       if (field.inputType === "select" && field.allowCustomOption === true) {
@@ -1780,7 +1761,10 @@
     }
 
     if (normalizedInputType === "date") {
-      return "2026-09-01";
+      return applicantFormConfig.buildDateValue({ year: '2026', month: '09', day: '01' }, field);
+    }
+    if (normalizedInputType === 'daterange') {
+      return applicantFormConfig.buildDateRangeValue(...['01', '15'].map(day => applicantFormConfig.buildDateValue({ year: '2026', month: '09', day }, field)));
     }
 
     if (normalizedInputType === "birthdate") {
@@ -2511,7 +2495,9 @@
       <div class="applicant-public-field">
         <label>${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn)} ${requiredBadge}</label>
         ${fieldDescriptionMarkup}
-        ${applicantPublicRenderingHelpersModule.renderDateSelectControls({ fieldKey: field.fieldKey, inputType: field.inputType, parts: dateParts, label: field.questionText, labelEn: field.questionTextEn, disabled: isReadOnly })}
+        ${field.inputType === 'daterange'
+          ? applicantPublicRenderingHelpersModule.renderDateRangeControls({ fieldKey: field.fieldKey, inputType: field.inputType, dateParts: field.dateParts, rangeParts: Object.fromEntries(['start', 'end'].map(edge => [edge, getApplicantDatePartState(field.fieldKey, edge)])), label: field.questionText, labelEn: field.questionTextEn, disabled: isReadOnly })
+          : applicantPublicRenderingHelpersModule.renderDateSelectControls({ fieldKey: field.fieldKey, inputType: field.inputType, dateParts: field.dateParts, parts: dateParts, label: field.questionText, labelEn: field.questionTextEn, disabled: isReadOnly })}
         <input type="hidden" data-applicant-field-key="${escapeAttribute(field.fieldKey)}" value="${escapeAttribute(fieldValue || "")}" />
       </div>
     `;
@@ -2703,7 +2689,7 @@
       `;
     }
 
-    if (field.inputType === "date" || field.inputType === "birthdate") {
+    if (['date', 'birthdate', 'daterange'].includes(field.inputType)) {
       return renderApplicantDateField(field, fieldValue, requiredBadge, fieldDescriptionMarkup, isReadOnly);
     }
 
@@ -3451,9 +3437,18 @@
       const value = state.draftAnswers[field.fieldKey];
       const missing = isApplicantUploadField(field) ? !(value?.file || value?.hasFile || value?.hasPhoto) : !String(value || '').trim();
       const parts = state.fieldUi?.dateParts?.[field.fieldKey];
-      const partialDate = ['date', 'birthdate'].includes(field.inputType) && parts && Object.values(parts).some(Boolean) && !value;
-      if ((field.required && missing) || partialDate) {
-        const error = { fieldKey: field.fieldKey, message: isApplicantUploadField(field) ? '파일을 업로드해 주세요.' : partialDate ? '날짜를 모두 선택해 주세요.' : '필수 항목을 입력하거나 선택해 주세요.' };
+      const partialDate = ['date', 'birthdate'].includes(field.inputType) && parts && applicantFormConfig.getDateParts(field).some(part => parts[part]) && !value;
+      let rangeError = '';
+      if (field.inputType === 'daterange') {
+        const started = ['start', 'end'].some(edge => applicantFormConfig.getDateParts(field).some(part => getApplicantDatePartState(field.fieldKey, edge)[part]));
+        if (started && !value) rangeError = '시작일과 종료일을 모두 선택하세요.';
+        else {
+          try { applicantFormConfig.validateDateRangeAnswer(field, value); }
+          catch (error) { rangeError = error.message; }
+        }
+      }
+      if ((field.required && missing) || partialDate || rangeError) {
+        const error = { fieldKey: field.fieldKey, message: rangeError || (isApplicantUploadField(field) ? '파일을 업로드해 주세요.' : partialDate ? '날짜를 모두 선택해 주세요.' : '필수 항목을 입력하거나 선택해 주세요.') };
         globalThis.AdmitCardPublicFormFeedback.status(control, error.message, true);
         firstError ||= error;
       }
@@ -4034,8 +4029,9 @@
     const datePart = String(element.dataset.applicantDatePart || "").trim();
 
     if (dateFieldKey && datePart) {
+      const edge = element.dataset.applicantDateEdge || '';
       const nextParts = {
-        ...getApplicantDatePartState(dateFieldKey),
+        ...getApplicantDatePartState(dateFieldKey, edge),
         [datePart]: String(element.value || "").trim(),
       };
       const maxDay = getApplicantDateDayCount(nextParts.year, nextParts.month);
@@ -4044,8 +4040,11 @@
         nextParts.day = "";
       }
 
-      state.fieldUi.dateParts[dateFieldKey] = nextParts;
-      state.draftAnswers[dateFieldKey] = buildApplicantDateValueFromParts(nextParts);
+      state.fieldUi.dateParts[edge ? `${dateFieldKey}:${edge}` : dateFieldKey] = nextParts;
+      const field = getApplicantFormFieldByKey(dateFieldKey);
+      state.draftAnswers[dateFieldKey] = edge
+        ? applicantFormConfig.buildDateRangeValue(...['start', 'end'].map(side => buildApplicantDateValueFromParts(getApplicantDatePartState(dateFieldKey, side), field)))
+        : buildApplicantDateValueFromParts(nextParts, field);
       persistApplicantPublicState();
       render();
       document.getElementById(element.id)?.focus();

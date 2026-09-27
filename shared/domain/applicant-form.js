@@ -92,6 +92,8 @@
     Object.freeze({ key: "nationality", label: "국적" }),
     Object.freeze({ key: "select", label: "단일 선택" }),
     Object.freeze({ key: "multiselect", label: "복수 선택" }),
+    Object.freeze({ key: "date", label: "날짜" }),
+    Object.freeze({ key: "daterange", label: "기간" }),
     Object.freeze({ key: "birthdate", label: "생년월일" }),
     Object.freeze({ key: "photo", label: "사진 업로드" }),
     Object.freeze({ key: "file", label: "파일 업로드" }),
@@ -104,7 +106,8 @@
     nationality: '국가명을 검색한 뒤 목록에서 선택합니다.',
     select: '등록한 선택지 중 하나를 선택합니다. 직접 입력 항목도 추가할 수 있습니다.',
     multiselect: '등록한 선택지 중 여러 항목을 선택합니다. 직접 입력 항목도 추가할 수 있습니다.',
-    date: '연도, 월, 일을 선택합니다.',
+    date: '설정한 날짜 형식에 따라 연도, 월, 일 중 필요한 부분만 선택합니다.',
+    daterange: '설정한 날짜 형식으로 시작일과 종료일을 선택합니다.',
     birthdate: '생년월일의 연도, 월, 일을 선택합니다.',
     time: '시간과 분을 입력합니다.',
     photo: 'JPG·PNG 사진을 업로드합니다.',
@@ -114,8 +117,62 @@
   const applicationAnswerTypeOptions = Object.freeze(answerTypeOptions.filter(option => option.key !== 'birthdate'));
   const signupAnswerTypeOptions = Object.freeze(answerTypeOptions.filter(option => !['photo', 'file'].includes(option.key)));
   const isChoiceInputType = type => ['select', 'multiselect'].includes(type);
+  const datePartKeys = Object.freeze(['year', 'month', 'day']);
+  function normalizeDateParts(value) {
+    if (value === undefined) return [...datePartKeys];
+    if (!Array.isArray(value) || !value.length || value.some(part => !datePartKeys.includes(part)) || new Set(value).size !== value.length) {
+      throw new Error('날짜 형식에서 연, 월, 일 중 하나 이상을 선택하세요.');
+    }
+    // A day needs a month when a year is requested; standalone days remain valid.
+    const requiresMonth = value.includes('year') && value.includes('day');
+    return datePartKeys.filter(part => value.includes(part) || (part === 'month' && requiresMonth));
+  }
+  function getDateParts(field = {}) {
+    return normalizeDateParts(field.inputType === 'birthdate' ? undefined : field.dateParts);
+  }
+  function parseDateValue(value, field = {}) {
+    const parts = getDateParts(field), values = String(value || '').split('-');
+    if (values.length !== parts.length) return {};
+    return Object.fromEntries(parts.map((part, index) => [part, values[index]]));
+  }
+  function buildDateValue(values = {}, field = {}) {
+    const parts = getDateParts(field);
+    return parts.every(part => values[part]) ? parts.map(part => String(values[part]).padStart(part === 'year' ? 4 : 2, '0')).join('-') : '';
+  }
+  function getDateDayCount(year, month) {
+    if (!month) return 31;
+    const numericYear = Number(year || 2000), numericMonth = Number(month);
+    const leap = numericYear % 4 === 0 && (numericYear % 100 !== 0 || numericYear % 400 === 0);
+    return [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][numericMonth - 1] || 31;
+  }
+  function isValidDateValue(value, field = {}) {
+    const parts = getDateParts(field), values = parseDateValue(value, field);
+    if (!parts.every(part => (part === 'year' ? /^\d{4}$/ : /^\d{2}$/).test(values[part] || ''))) return false;
+    if (parts.includes('year') && Number(values.year) < 1) return false;
+    if (parts.includes('month') && (Number(values.month) < 1 || Number(values.month) > 12)) return false;
+    if (parts.includes('day') && (Number(values.day) < 1 || Number(values.day) > getDateDayCount(values.year, values.month))) return false;
+    return true;
+  }
   function normalizeChoiceTranslations(options = [], translations = {}) {
     return Object.fromEntries(options.map(option => [option, Object.hasOwn(translations || {}, option) ? String(translations[option] || '').trim().slice(0, 200) : '']));
+  }
+  function parseDateRange(value) {
+    const values = String(value || '').split(' ~ ');
+    return values.length === 2 ? { start: values[0], end: values[1] } : { start: '', end: '' };
+  }
+  function buildDateRangeValue(start, end) {
+    return start && end ? `${start} ~ ${end}` : '';
+  }
+  function validateDateRangeAnswer(field, raw) {
+    if (raw == null || raw === '') {
+      if (field.required) throw new Error('시작일과 종료일을 모두 선택하세요.');
+      return '';
+    }
+    if (typeof raw !== 'string' || raw.length > 23) throw new Error('올바른 기간을 선택하세요.');
+    const { start, end } = parseDateRange(raw);
+    if (!isValidDateValue(start, field) || !isValidDateValue(end, field)) throw new Error('시작일과 종료일을 올바르게 선택하세요.');
+    if (start > end) throw new Error('종료일은 시작일보다 빠를 수 없습니다.');
+    return buildDateRangeValue(start, end);
   }
   function parseMultiSelectValue(value) {
     if (Array.isArray(value)) return value.filter(item => typeof item === 'string');
@@ -536,6 +593,16 @@
   }
 
   return Object.freeze({
+    datePartKeys,
+    normalizeDateParts,
+    getDateParts,
+    parseDateValue,
+    buildDateValue,
+    getDateDayCount,
+    isValidDateValue,
+    parseDateRange,
+    buildDateRangeValue,
+    validateDateRangeAnswer,
     isApplicantScheduleEnabled,
     signupAnswerTypeOptions,
     isChoiceInputType,

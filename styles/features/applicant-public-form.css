@@ -204,9 +204,14 @@
 
 .applicant-public-date-select-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--date-part-count, 3), minmax(0, 1fr));
   gap: 10px;
 }
+.applicant-public-date-select-grid[data-date-part-count="1"] { --date-part-count: 1; }
+.applicant-public-date-select-grid[data-date-part-count="2"] { --date-part-count: 2; }
+.applicant-public-date-range { display: grid; gap: 14px; min-width: 0; }
+.applicant-public-date-range-endpoint { display: grid; gap: 8px; min-width: 0; }
+.applicant-public-date-range-endpoint > span { font-size: 13px; font-weight: 600; color: var(--glass-ink); }
 
 .applicant-public-field label {
   color: var(--glass-ink);
@@ -536,7 +541,7 @@
   }
 
   .applicant-public-date-select-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(var(--date-part-count, 3), minmax(0, 1fr));
   }
 
 }

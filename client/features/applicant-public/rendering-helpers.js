@@ -1,11 +1,11 @@
 (function (globalScope, factory) {
   if (typeof module === "object" && module.exports) {
-    module.exports = factory();
+    module.exports = factory(require('../../../shared/domain/applicant-form'));
     return;
   }
 
-  globalScope.AdmitCardApplicantPublicRenderingHelpers = factory();
-})(typeof globalThis !== "undefined" ? globalThis : this, () => {
+  globalScope.AdmitCardApplicantPublicRenderingHelpers = factory(globalScope.AdmitCardApplicantFormConfig);
+})(typeof globalThis !== "undefined" ? globalThis : this, (applicantFormConfig) => {
   function escapeHtml(value) {
     return String(value ?? "")
       .replaceAll("&", "&amp;")
@@ -65,11 +65,11 @@
   }
 
   function getDateDayCount(year, month) {
-    return Number(year) > 0 && Number(month) >= 1 && Number(month) <= 12 ? new Date(Number(year), Number(month), 0).getDate() : 31;
+    return applicantFormConfig.getDateDayCount(year, month);
   }
   function getDateYearOptions(inputType, selectedYear = '') {
     const current = new Date().getFullYear();
-    let start = current - (inputType === 'birthdate' ? 120 : 10), end = current + (inputType === 'birthdate' ? 0 : 20);
+    let start = current - 120, end = current + (inputType === 'birthdate' ? 0 : 20);
     if (Number.isInteger(Number(selectedYear)) && Number(selectedYear) > 0) { start = Math.min(start, Number(selectedYear)); end = Math.max(end, Number(selectedYear)); }
     const years = Array.from({ length: end - start + 1 }, (_, index) => String(start + index));
     return inputType === 'birthdate' ? years.reverse() : years;
@@ -77,9 +77,16 @@
   function renderDateOptions(values, selected, label) {
     return `<option value="">${escapeHtml(label)}</option>` + values.map(value => `<option value="${escapeAttribute(value)}" ${value === selected ? 'selected' : ''}>${escapeHtml(value)}</option>`).join('');
   }
-  function renderDateSelectControls({ fieldKey, inputType, parts = {}, prefix = 'applicant', label = '', labelEn = '', required = false, disabled = false }) {
+  function renderDateSelectControls({ fieldKey, inputType, dateParts, dateEdge = '', parts = {}, prefix = 'applicant', label = '', labelEn = '', required = false, disabled = false }) {
+    const selectedParts = applicantFormConfig.getDateParts({ inputType, dateParts });
     const values = { year: getDateYearOptions(inputType, parts.year), month: Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')), day: Array.from({ length: getDateDayCount(parts.year, parts.month) }, (_, i) => String(i + 1).padStart(2, '0')) };
-    return `<div class="applicant-public-date-select-grid">${['year', 'month', 'day'].map(part => `<select id="${prefix === 'applicant' ? 'field' : 'member-date'}-${escapeAttribute(fieldKey)}-${part}" data-${prefix}-date-field-key="${escapeAttribute(fieldKey)}" data-${prefix}-date-part="${part}" data-i18n-aria-label-en="${escapeAttribute(labelEn || label)} ${part}" aria-label="${escapeAttribute(label)} ${({ year: '연도', month: '월', day: '일' })[part]}" ${required ? 'required' : ''} ${disabled ? 'disabled' : ''}>${renderDateOptions(values[part], parts[part], ({year: '연', month: '월', day: '일'})[part])}</select>`).join('')}</div>`;
+    return `<div class="applicant-public-date-select-grid" data-date-part-count="${selectedParts.length}">${selectedParts.map(part => `<select id="${prefix === 'applicant' ? 'field' : 'member-date'}-${escapeAttribute(fieldKey)}${dateEdge ? '-' + dateEdge : ''}-${part}" data-${prefix}-date-field-key="${escapeAttribute(fieldKey)}" data-${prefix}-date-part="${part}" ${dateEdge ? `data-${prefix}-date-edge="${dateEdge}"` : ''} data-i18n-aria-label-en="${escapeAttribute(labelEn || label)} ${part}" aria-label="${escapeAttribute(label)} ${({ year: '연도', month: '월', day: '일' })[part]}" ${required ? 'required' : ''} ${disabled ? 'disabled' : ''}>${renderDateOptions(values[part], parts[part], ({year: '연', month: '월', day: '일'})[part])}</select>`).join('')}</div>`;
+  }
+  function renderDateRangeControls({ rangeParts = {}, ...options }) {
+    return `<div class="applicant-public-date-range">${['start', 'end'].map(edge => {
+      const label = edge === 'start' ? '시작일' : '종료일', labelEn = edge === 'start' ? 'Start date' : 'End date';
+      return `<div class="applicant-public-date-range-endpoint" data-date-range-edge="${edge}"><span>${renderAuthoredText(label, labelEn)}</span>${renderDateSelectControls({ ...options, dateEdge: edge, parts: rangeParts[edge] || {}, label: `${options.label || ''} ${label}`, labelEn: `${options.labelEn || options.label || ''} ${labelEn}` })}</div>`;
+    }).join('')}</div>`;
   }
   function formatNationalitySelection(option) {
     return option ? [option.label, option.englishLabel, option.code].filter(Boolean).join(' · ') : '';
@@ -173,6 +180,7 @@
     getDateYearOptions,
     renderDateOptions,
     renderDateSelectControls,
+    renderDateRangeControls,
     renderNationalityOptions,
     formatNationalitySelection,
     getApplicantHomeActionIconMarkup,

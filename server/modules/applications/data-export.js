@@ -7,6 +7,7 @@ const ExcelJS = require('exceljs');
 const archiver = require('archiver');
 const {getApplicantStatusLabel, findApplicantScheduleRecord} = require('../../../shared/domain/applicant-form');
 const {printHistoryExportColumns, printHistorySummaryExportColumns} = require('../admit-cards/config');
+const {createMemberExport} = require('./member-export');
 let active = 0;
 
 async function sendDataExport({service, query, body, response, buildContentDisposition, kind}) {
@@ -20,11 +21,12 @@ async function sendDataExport({service, query, body, response, buildContentDispo
     const ids = [...new Set(requestedIds.map(Number))].filter(id=>Number.isSafeInteger(id)&&id>0);
     if (kind !== 'print' && !ids.length) throw Object.assign(new Error('다운로드할 접수 이력이 없습니다.'),{statusCode:400});
     if (ids.length > 50000) throw Object.assign(new Error('한 번에 최대 50,000건을 다운로드할 수 있습니다.'),{statusCode:400});
-    async function* submissions() {
+    async function* submissions(memberExport) {
       for (let offset=0;offset<ids.length;offset+=100) {
         const chunk=ids.slice(offset,offset+100);
         const byId=new Map((await service.getApplicantSubmissionsByIds(chunk)).map(row=>[Number(row.id),row]));
-        for(const id of chunk) if(byId.has(id)) yield byId.get(id);
+        const memberRecords=memberExport ? await memberExport.loadRecords([...byId.keys()]) : new Map();
+        for(const id of chunk) if(byId.has(id)) yield {...byId.get(id),...memberRecords.get(id)};
       }
     }
     if (kind === 'photos') {
@@ -74,10 +76,11 @@ async function sendDataExport({service, query, body, response, buildContentDispo
         summary.commit();
       } else {
         const [maximum]=await query('SELECT COALESCE(MAX(n),0) AS n FROM (SELECT COUNT(*) AS n FROM app_subm GROUP BY id) counts');
+        const memberExport=await createMemberExport(query,ids);
         const fixed=[['접수번호','id',14],['이름','name',20],['이메일','email',28],['상태','statusLabel',12],['수험번호','examineeNo',18],['접수일시','createdAt',22],['최종수정','updatedAt',22]].map(([header,key,width])=>({header,key,width}));
-        const columns=[...fixed,...Array.from({length:Number(maximum.n)},(_,i)=>({header:'질문'+(i+1),key:'answer'+(i+1),width:24}))];
+        const columns=[...fixed,...memberExport.columns,...Array.from({length:Number(maximum.n)},(_,i)=>({header:'질문'+(i+1),key:'answer'+(i+1),width:24}))];
         const target=sheet('접수이력',columns), schedules=await service.getApplicantSchedules();
-        for await(const row of submissions()) {
+        for await(const row of submissions(memberExport)) {
           const record={...row,statusLabel:getApplicantStatusLabel(row.status,findApplicantScheduleRecord(schedules,row)||{})};
           (row.answerItems||[]).forEach((answer,i)=>{record['answer'+(i+1)]=['photo','file'].includes(answer.inputType)?(answer.value?.hasPhoto||answer.value?.hasFile?answer.value.fileName:'미등록'):Array.isArray(answer.value)?answer.value.join(', '):String(answer.value??'');});
           target.addRow(record).commit();

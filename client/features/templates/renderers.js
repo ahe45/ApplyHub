@@ -639,6 +639,17 @@
                 </select>
               </label>`}
 
+              ${['date', 'daterange'].includes(editorState.inputType) ? `<fieldset class="field applicant-date-format-settings">
+                <legend>날짜 형식</legend>
+                <div class="inline-actions">${['year', 'month', 'day'].map(part => {
+                  const selected = applicantFormConfig.normalizeDateParts(editorState.dateParts);
+                  const monthRequired = part === 'month' && selected.includes('year') && selected.includes('day');
+                  return `<label class="checkbox-field"><input type="checkbox" data-applicant-field-input="datePart:${part}" ${selected.includes(part) ? 'checked' : ''} ${!isEditorActive || monthRequired || (selected.length === 1 && selected.includes(part)) ? 'disabled' : ''} /><span>${({year: '연', month: '월', day: '일'})[part]}</span></label>`;
+                }).join('')}</div>
+                <p class="muted applicant-answer-type-help">선택한 부분만 입력받습니다. 하나 이상 선택하세요. 연과 일을 함께 사용하면 월도 포함됩니다. 일만 단독으로 사용할 수 있습니다.</p>
+                ${editorState.inputType === 'daterange' ? '<p class="muted">시작일과 종료일에 같은 날짜 형식을 적용합니다.</p>' : ''}
+              </fieldset>` : ''}
+
               ${
                 ["select", "multiselect"].includes(editorState.inputType)
                   ? `

@@ -212,6 +212,7 @@
         questionTextEn: field.questionTextEn || "",
         questionDescriptionEn: field.questionDescriptionEn || "",
         inputType: field.inputType || "text",
+        dateParts: field.dateParts ? [...field.dateParts] : ['year', 'month', 'day'],
         fileNamePattern: field.fileNamePattern || "",
         allowedExtensions: (field.allowedExtensions || []).join(", "),
         systemFieldKey: field.systemFieldKey || "",
@@ -230,6 +231,15 @@
       const editorState = state.applicantManager.fieldEditor || createEmptyApplicantFieldEditor();
 
       if (editorState.isActive !== true) {
+        return;
+      }
+
+      if (fieldName.startsWith('datePart:')) {
+        const part = fieldName.split(':')[1];
+        const parts = new Set(editorState.dateParts || ['year', 'month', 'day']);
+        if (value === true) parts.add(part); else if (parts.size > 1) parts.delete(part);
+        editorState.dateParts = globalScope.AdmitCardApplicantFormConfig.normalizeDateParts([...parts]);
+        renderView();
         return;
       }
 
@@ -257,7 +267,7 @@
         nextEditorState.customOptionLabel = "";
       }
 
-      if (fieldName === "inputType" && normalizedValue === "multiselect") nextEditorState.systemFieldKey = "";
+      if (fieldName === "inputType" && ['multiselect', 'daterange'].includes(normalizedValue)) nextEditorState.systemFieldKey = "";
 
       if (fieldName === "inputType") {
         if (normalizedValue === "file") {
@@ -319,6 +329,7 @@
             questionTextEn: editorState.questionTextEn || "",
             questionDescriptionEn: editorState.questionDescriptionEn || "",
             inputType: editorState.inputType,
+            ...(['date', 'daterange'].includes(editorState.inputType) ? { dateParts: editorState.dateParts || ['year', 'month', 'day'] } : {}),
             fileNamePattern: editorState.fileNamePattern || "",
             allowedExtensions: editorState.allowedExtensions || "",
             systemFieldKey: editorState.systemFieldKey,

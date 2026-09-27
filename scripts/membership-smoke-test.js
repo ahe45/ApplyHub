@@ -263,6 +263,10 @@ async function run() {
       await require('./choice-settings-checks').runChoiceSettingsChecks({ services, members, query, base, call, memberCookie: login.cookie, submissionId: submission.id });
       return;
     }
+    if (process.argv.includes('--date-settings') || process.argv.includes('--period-settings')) {
+      await require('./date-settings-checks').runDateSettingsChecks({ services, members, query, base, call, getDeliveredCode: () => deliveredCode, inputType: process.argv.includes('--period-settings') ? 'daterange' : 'date' });
+      return;
+    }
     if (process.argv.includes('--public-language')) {
       await require('./public-language-checks').runPublicLanguageChecks({ services, members, query, base, call, memberCookie: login.cookie, submissionId: submission.id });
       return;

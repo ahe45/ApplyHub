@@ -11,6 +11,24 @@ async function verifyApplicantArchive({ services, call, base, memberCookie, subm
   const adminSetup = await call('/api/auth/password/setup', { password: 'ArchiveTest1234', passwordConfirm: 'ArchiveTest1234' }, adminLogin.cookie);
   assert.equal(adminSetup.status, 200);
   const cookie = adminSetup.cookie || adminLogin.cookie;
+  const exportResponse = await fetch(base + '/api/applicant-submissions/export.xlsx', {
+    method: 'POST', headers: { cookie, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ submissionIds: [submissionId] }),
+  });
+  assert.equal(exportResponse.status, 200);
+  const workbook = new (require('exceljs').Workbook)();
+  await workbook.xlsx.load(Buffer.from(await exportResponse.arrayBuffer()));
+  const exportSheet = workbook.getWorksheet('접수이력');
+  const exportHeaders = exportSheet.getRow(1).values;
+  const exportedValue = header => exportSheet.getRow(2).getCell(exportHeaders.indexOf(header)).value;
+  assert.equal(exportSheet.rowCount, 2);
+  assert.equal(exportedValue('회원가입 · 이름'), '회원 테스트');
+  assert.equal(exportedValue('회원가입 · 이메일'), 'member01@example.test');
+  assert.equal(exportedValue('회원가입 · 생년월일'), '2001-02-03');
+  assert.equal(exportedValue('회원가입 · 주소'), '서울');
+  assert(exportedValue('회원가입일시'));
+  assert(!exportHeaders.some(header => header.includes('비밀번호')));
+  console.log('PASS: authenticated submission XLSX download includes linked membership information');
   const create = async options => {
     const response = await call(root, { ...naming.defaults, scope: 'all', ...options }, cookie);
     assert.equal(response.status, 202, JSON.stringify(response));

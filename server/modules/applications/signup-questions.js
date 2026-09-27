@@ -1,4 +1,4 @@
-const { isChoiceInputType, normalizeChoiceTranslations, validateMultiSelectAnswer } = require('../../../shared/domain/applicant-form');
+const { isChoiceInputType, normalizeChoiceTranslations, validateMultiSelectAnswer, normalizeDateParts, isValidDateValue, validateDateRangeAnswer } = require('../../../shared/domain/applicant-form');
 const { answerTypeOptions, nationalityOptions } = require('../../../shared/domain/applicant-form');
 const { normalizeFileUploadSettings, isAllowedUploadExtension, formatUploadFileBaseName } = require('../../../shared/domain/applicant-form');
 const coreQuestions = [
@@ -29,6 +29,7 @@ function normalizeQuestions(value, legacy) {
     return { key, label, labelEn: String(q.labelEn || q.questionTextEn || '').trim().slice(0, 100),
       description: String(q.description || q.questionDescription || '').slice(0, 1000),
       descriptionEn: String(q.descriptionEn || q.questionDescriptionEn || '').trim().slice(0, 1000), inputType,
+      ...(['date', 'daterange'].includes(inputType) ? { dateParts: normalizeDateParts(q.dateParts) } : {}),
       ...(inputType === 'file' ? normalizeFileUploadSettings(q, 'signup') : {}),
       optionsEn: isChoiceInputType(inputType) ? normalizeChoiceTranslations(options, q.optionsEn) : {},
       required: core ? true : q.required === true, options: isChoiceInputType(inputType) ? options : [], customOptionLabel: isChoiceInputType(inputType) ? customOptionLabel : '' };
@@ -44,6 +45,7 @@ function validateAnswers(questions, payload, context = {}) {
   for (const q of questions.filter(q => !coreKeys.has(q.key))) {
     try {
     const raw = payload[q.key];
+    if (q.inputType === 'daterange') { profile[q.key] = validateDateRangeAnswer(q, raw); continue; }
     if (['photo', 'file'].includes(q.inputType)) {
       if (!raw?.base64) { if (q.required) throw new Error(`${q.label} 파일을 업로드하세요.`); continue; }
       if (typeof raw.base64 !== 'string' || raw.base64.length > 7 * 1024 * 1024 || !/^[A-Za-z0-9+/]+={0,2}$/.test(raw.base64)) throw new Error('파일 형식이 올바르지 않습니다.');
@@ -67,7 +69,7 @@ function validateAnswers(questions, payload, context = {}) {
     const value = q.inputType === 'phone' ? rawText.replace(/\D+/g, '') : rawText;
     if (q.required && !value) throw new Error(`${q.label} 항목을 입력하세요.`);
     if (value.length > (q.inputType === 'textarea' ? 10000 : 500)) throw new Error(`${q.label} 답변이 너무 깁니다.`);
-    if (value && ['date', 'birthdate'].includes(q.inputType) && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString().slice(0,10) !== value || (q.inputType === 'birthdate' && Date.parse(value) > Date.now()))) throw new Error('올바른 날짜를 입력하세요.');
+    if (value && ['date', 'birthdate'].includes(q.inputType) && (!isValidDateValue(value, q) || (q.inputType === 'birthdate' && Date.parse(value) > Date.now()))) throw new Error('올바른 날짜를 입력하세요.');
     if (q.inputType === 'phone' && rawText && (!value || !/^\d{1,20}$/.test(value))) throw new Error('연락처는 20자리 이하의 숫자로 입력하세요.');
     if (value && q.inputType === 'time' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) throw new Error('올바른 시간을 입력하세요.');
     if (value && q.inputType === 'nationality' && !nationalityOptions.some(n => n.code === value)) throw new Error('국적 목록에서 선택하세요.');

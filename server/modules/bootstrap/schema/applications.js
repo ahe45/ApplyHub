@@ -5,7 +5,7 @@ function createApplicantSchemaBootstrap({
   hasTable,
   query,
 }) {
-  const applicantFieldInputTypeSql = "ENUM('text', 'textarea', 'select', 'date', 'birthdate', 'time', 'photo', 'file', 'phone', 'nationality', 'multiselect')";
+  const applicantFieldInputTypeSql = "ENUM('text', 'textarea', 'select', 'date', 'birthdate', 'time', 'photo', 'file', 'phone', 'nationality', 'multiselect', 'daterange')";
   const applicantSubmissionStatusSql = "ENUM('submitted', 'promoted')";
 
   async function renameLegacyTableIfNeeded(legacyTableName, nextTableName) {
@@ -471,7 +471,8 @@ function createApplicantSchemaBootstrap({
         !String(inputTypeColumn?.Type || "").includes("'phone'") ||
         !String(inputTypeColumn?.Type || "").includes("'nationality'") ||
         !String(inputTypeColumn?.Type || "").includes("'file'") ||
-        !String(inputTypeColumn?.Type || "").includes("'multiselect'")
+        !String(inputTypeColumn?.Type || "").includes("'multiselect'") ||
+        !String(inputTypeColumn?.Type || "").includes("'daterange'")
       ) {
         await query(`ALTER TABLE app_form MODIFY COLUMN input_type ${applicantFieldInputTypeSql} NOT NULL DEFAULT 'text'`);
       }
@@ -491,7 +492,8 @@ function createApplicantSchemaBootstrap({
         !String(inputTypeColumn?.Type || "").includes("'phone'") ||
         !String(inputTypeColumn?.Type || "").includes("'nationality'") ||
         !String(inputTypeColumn?.Type || "").includes("'file'") ||
-        !String(inputTypeColumn?.Type || "").includes("'multiselect'")
+        !String(inputTypeColumn?.Type || "").includes("'multiselect'") ||
+        !String(inputTypeColumn?.Type || "").includes("'daterange'")
       ) {
         await query(`ALTER TABLE app_form MODIFY COLUMN input_type ${applicantFieldInputTypeSql} NOT NULL DEFAULT 'text'`);
       }

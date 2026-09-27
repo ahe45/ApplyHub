@@ -154,9 +154,13 @@
         control = `<input class="public-localized-file-input" id="member-file-${esc(q.key)}" type="file" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" data-member-file="${esc(q.key)}" data-member-file-type="${q.inputType}" accept="${esc(extensions.map(e => '.' + e).join(','))}" ${q.required ? 'required' : ''} /><label class="ghost-button public-file-choose" for="member-file-${esc(q.key)}">파일 선택</label><small>허용 확장자: ${esc(extensions.join(', '))} · 파일당 5MB, 전체 8MB 이하</small><span data-member-upload-preview="${esc(q.key)}"></span>`;
       } else if (q.inputType === 'textarea') {
         control = `<textarea name="${esc(name)}" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" rows="4" maxlength="10000" ${q.required ? 'required' : ''}>${esc(value)}</textarea>`;
+      } else if (q.inputType === 'daterange') {
+        const range = scope.AdmitCardApplicantFormConfig.parseDateRange(value);
+        const rangeParts = Object.fromEntries(['start', 'end'].map(edge => [edge, scope.AdmitCardApplicantFormConfig.parseDateValue(range[edge], q)]));
+        control = controls.renderDateRangeControls({ fieldKey: q.key, inputType: q.inputType, dateParts: q.dateParts, rangeParts, prefix: 'member', label: q.label, labelEn: q.labelEn, required: q.required }) + `<input type="hidden" name="${esc(name)}" data-member-date-value="${esc(q.key)}" value="${esc(value)}" />`;
       } else if (['date', 'birthdate'].includes(q.inputType)) {
-        const [year = '', month = '', day = ''] = value.split('-');
-        control = `<div ${q.inputType === 'birthdate' ? 'class="applicant-member-birthdate"' : ''}>${controls.renderDateSelectControls({ fieldKey: q.key, inputType: q.inputType, parts: { year, month, day }, prefix: 'member', label: q.label, labelEn: q.labelEn, required: q.required })}</div><input type="hidden" name="${esc(name)}" data-member-date-value="${esc(q.key)}" value="${esc(value)}" />`;
+        const parts = scope.AdmitCardApplicantFormConfig.parseDateValue(value, q);
+        control = `<div ${q.inputType === 'birthdate' ? 'class="applicant-member-birthdate"' : ''}>${controls.renderDateSelectControls({ fieldKey: q.key, inputType: q.inputType, dateParts: q.dateParts, parts, prefix: 'member', label: q.label, labelEn: q.labelEn, required: q.required })}</div><input type="hidden" name="${esc(name)}" data-member-date-value="${esc(q.key)}" value="${esc(value)}" />`;
       } else if (q.inputType === 'nationality') {
         const selected = scope.AdmitCardApplicantFormConfig.findApplicantNationalityOption(value);
         control = `<div class="applicant-public-nationality-combobox"><input type="search" data-member-nationality-search="${esc(q.key)}" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" value="${esc(controls.formatNationalitySelection(selected))}" placeholder="국가를 검색하세요" autocomplete="off" spellcheck="false" ${q.required ? 'required' : ''} /><input type="hidden" name="${esc(name)}" value="${esc(selected?.code || '')}" /><div class="applicant-public-nationality-picker" data-member-nationality-picker="${esc(q.key)}"></div></div><small class="applicant-public-file-note">국가명을 검색한 뒤 목록에서 선택하세요.</small>`;
@@ -182,16 +186,32 @@
       const date = event.target.closest('[data-member-date-field-key]');
       if (date) {
         const q = settings.questions.find(q => q.key === date.dataset.memberDateFieldKey), field = date.closest('.applicant-public-field');
-        const parts = Object.fromEntries([...field.querySelectorAll('[data-member-date-part]')].map(select => [select.dataset.memberDatePart, select.value]));
+        const endpoint = date.closest('[data-date-range-edge]') || field;
+        const parts = Object.fromEntries([...endpoint.querySelectorAll('[data-member-date-part]')].map(select => [select.dataset.memberDatePart, select.value]));
         const dayCount = controls.getDateDayCount(parts.year, parts.month);
         if (Number(parts.day) > dayCount) parts.day = '';
-        const daySelect = field.querySelector('[data-member-date-part=day]');
-        daySelect.innerHTML = controls.renderDateOptions(Array.from({ length: dayCount }, (_, i) => String(i + 1).padStart(2, '0')), parts.day, '일');
-        const value = parts.year && parts.month && parts.day ? `${parts.year}-${parts.month}-${parts.day}` : '';
+        const daySelect = endpoint.querySelector('[data-member-date-part=day]');
+        if (daySelect) daySelect.innerHTML = controls.renderDateOptions(Array.from({ length: dayCount }, (_, i) => String(i + 1).padStart(2, '0')), parts.day, '일');
+        let value = scope.AdmitCardApplicantFormConfig.buildDateValue(parts, q);
+        if (q.inputType === 'daterange') {
+          const dates = ['start', 'end'].map(edge => scope.AdmitCardApplicantFormConfig.buildDateValue(Object.fromEntries([...field.querySelectorAll(`[data-member-date-edge=${edge}]`)].map(select => [select.dataset.memberDatePart, select.value])), q));
+          value = scope.AdmitCardApplicantFormConfig.buildDateRangeValue(...dates);
+          const inputs = [...field.querySelectorAll('[data-member-date-part]')];
+          const hasValue = inputs.some(input => input.value);
+          inputs.forEach(input => { input.required = q.required || hasValue; input.setCustomValidity(''); });
+          let message = '';
+          if (value) {
+            try { scope.AdmitCardApplicantFormConfig.validateDateRangeAnswer(q, value); }
+            catch (error) { message = error.message; }
+          }
+          field.querySelector('[data-member-date-edge=end]').setCustomValidity(message);
+          field.querySelector('[data-member-date-value]').value = value;
+          return;
+        }
         field.querySelector('[data-member-date-value]').value = value;
         field.querySelectorAll('[data-member-date-part]').forEach(select => { select.required = q.required || Object.values(parts).some(Boolean); });
         const today = new Date(), localToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        daySelect.setCustomValidity(q.inputType === 'birthdate' && value > localToday ? '생년월일은 오늘 이전 날짜로 선택하세요.' : '');
+        if (daySelect) daySelect.setCustomValidity(q.inputType === 'birthdate' && value > localToday ? '생년월일은 오늘 이전 날짜로 선택하세요.' : '');
         return;
       }
       const select = event.target.closest('[data-member-select]');
