@@ -5,7 +5,7 @@ const {pipeline, finished} = require('stream/promises');
 const {once} = require('events');
 const ExcelJS = require('exceljs');
 const archiver = require('archiver');
-const {getApplicantStatusLabel, findApplicantScheduleRecord} = require('../../../shared/domain/applicant-form');
+const {getApplicantStatusLabel, findApplicantScheduleRecord, findApplicantNationalityOption} = require('../../../shared/domain/applicant-form');
 const {printHistoryExportColumns, printHistorySummaryExportColumns} = require('../admit-cards/config');
 const {createMemberExport} = require('./member-export');
 let active = 0;
@@ -19,6 +19,7 @@ async function sendDataExport({service, query, body, response, buildContentDispo
     const filePath = path.join(directory, kind === 'photos' ? 'photos.zip' : 'export.xlsx');
     const requestedIds=Array.isArray(body.submissionIds)?body.submissionIds:Array.isArray(body.rows)?body.rows.map(row=>row.id):[];
     const ids = [...new Set(requestedIds.map(Number))].filter(id=>Number.isSafeInteger(id)&&id>0);
+    if (kind === 'applications') ids.sort((left, right) => left - right);
     if (kind !== 'print' && !ids.length) throw Object.assign(new Error('다운로드할 접수 이력이 없습니다.'),{statusCode:400});
     if (ids.length > 50000) throw Object.assign(new Error('한 번에 최대 50,000건을 다운로드할 수 있습니다.'),{statusCode:400});
     async function* submissions(memberExport) {
@@ -82,7 +83,13 @@ async function sendDataExport({service, query, body, response, buildContentDispo
         const target=sheet('접수이력',columns), schedules=await service.getApplicantSchedules();
         for await(const row of submissions(memberExport)) {
           const record={...row,statusLabel:getApplicantStatusLabel(row.status,findApplicantScheduleRecord(schedules,row)||{})};
-          (row.answerItems||[]).forEach((answer,i)=>{record['answer'+(i+1)]=['photo','file'].includes(answer.inputType)?(answer.value?.hasPhoto||answer.value?.hasFile?answer.value.fileName:'미등록'):Array.isArray(answer.value)?answer.value.join(', '):String(answer.value??'');});
+          (row.answerItems||[]).forEach((answer,i)=>{
+            record['answer'+(i+1)] = answer.inputType==='nationality'
+              ? (findApplicantNationalityOption(answer.value)?.label || String(answer.value??''))
+              : ['photo','file'].includes(answer.inputType)
+                ? (answer.value?.hasPhoto||answer.value?.hasFile?answer.value.fileName:'미등록')
+                : Array.isArray(answer.value)?answer.value.join(', '):String(answer.value??'');
+          });
           target.addRow(record).commit();
         }
         target.commit();

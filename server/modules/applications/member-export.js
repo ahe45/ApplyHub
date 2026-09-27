@@ -1,18 +1,20 @@
 const { normalizeSignupSettings } = require('./membership');
+const { findApplicantNationalityOption } = require('../../../shared/domain/applicant-form');
 
 // Authentication fields are never part of a membership information export.
 const excludedKeys = new Set(['loginId', 'password', 'passwordConfirm', 'password_hash', 'name', 'email', '__proto__', 'constructor', 'prototype']);
 
-function formatMemberAnswer(value) {
-  if (Array.isArray(value)) return value.map(formatMemberAnswer).join(', ');
+function formatMemberAnswer(value, inputType) {
+  if (Array.isArray(value)) return value.map(item => formatMemberAnswer(item, inputType)).join(', ');
   if (value && typeof value === 'object') return String(value.fileName || '');
+  if (inputType === 'nationality') return findApplicantNationalityOption(value)?.label || String(value ?? '');
   return String(value ?? '');
 }
 
 async function createMemberExport(query, submissionIds) {
   const [settingsRow] = await query("SELECT setting_value AS value FROM system_set WHERE setting_key = 'applicantSignupSettings'");
   const settings = normalizeSignupSettings(settingsRow ? JSON.parse(settingsRow.value) : {});
-  const fields = new Map(settings.questions.filter(question => !excludedKeys.has(question.key)).map(question => [question.key, question.label]));
+  const fields = new Map(settings.questions.filter(question => !excludedKeys.has(question.key)).map(question => [question.key, { label: question.label, inputType: question.inputType }]));
 
   async function loadMembers(ids) {
     if (!ids.length) return new Map();
@@ -32,14 +34,14 @@ async function createMemberExport(query, submissionIds) {
     for (const member of members.values()) {
       for (const key of Object.keys(member.profile)) {
         if (!excludedKeys.has(key) && !fields.has(key)) {
-          fields.set(key, key === 'birth' ? '생년월일' : key === 'phone' ? '연락처' : `기존 질문 (${key})`);
+          fields.set(key, { label: key === 'birth' ? '생년월일' : key === 'phone' ? '연락처' : `기존 질문 (${key})` });
         }
       }
     }
   }
 
-  const profileColumns = [...fields].map(([fieldKey, label], index) => ({
-    header: `회원가입 · ${label}`, key: `memberAnswer${index + 1}`, fieldKey, width: 24,
+  const profileColumns = [...fields].map(([fieldKey, field], index) => ({
+    header: `회원가입 · ${field.label}`, key: `memberAnswer${index + 1}`, fieldKey, inputType: field.inputType, width: 24,
   }));
   const columns = [
     { header: '회원가입 · 이름', key: 'memberName', width: 20 },
@@ -54,7 +56,7 @@ async function createMemberExport(query, submissionIds) {
       memberName: member.name,
       memberEmail: member.email,
       memberCreatedAt: member.createdAt,
-      ...Object.fromEntries(profileColumns.map(column => [column.key, formatMemberAnswer(member.profile[column.fieldKey])])),
+      ...Object.fromEntries(profileColumns.map(column => [column.key, formatMemberAnswer(member.profile[column.fieldKey], column.inputType)])),
     }]));
   }
 
