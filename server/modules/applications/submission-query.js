@@ -22,6 +22,8 @@ const summarySql = `SELECT applicant.*, CASE WHEN applicant.status <> 'promoted'
 const source = filters => filters.kind === 'print'
   ? `SELECT COALESCE(a.id,0) AS id,p.id AS historyId,p.examinee_no AS examineeNo,DATE_FORMAT(p.printed_at,'%Y-%m-%d %H:%i:%s') AS printedAt,${['name','email','status','statusLabel','hasPassword','createdAt','updatedAt','fieldOverridesJson','hasPhoto',...keys].map(key=>'a.'+quote(key)).join(',')} FROM print_log p LEFT JOIN (${summarySql}) a ON a.examineeNo=p.examinee_no`
   : summarySql;
+const defaultOrder = filters => filters.kind === 'print' ? 'printedAt DESC,historyId DESC'
+  : filters.kind === 'ticket' ? 'updatedAt DESC,id DESC' : 'id ASC';
 
 function createSubmissionQuery({ query, getByIds }) {
   const columns = new Set(['id','name','email','examineeNo','status','statusLabel','historyId','printedAt','createdAt','updatedAt','hasPhoto',...keys]);
@@ -68,7 +70,7 @@ function createSubmissionQuery({ query, getByIds }) {
     const pageSize=Math.max(1,Math.min(200,Math.floor(Number(filters.pageSize)||20)));
     const total=Number(count.total),page=Math.min(Math.max(1,Math.floor(Number(filters.page)||1)),Math.max(1,Math.ceil(total/pageSize)));
     const sorts=(Array.isArray(filters.sort)?filters.sort:[]).filter(rule=>columns.has(rule.key) && (filters.kind === 'print' || !['printedAt','historyId'].includes(rule.key))).map(rule=>`${quote(rule.key)} ${rule.direction === 'asc'?'ASC':'DESC'}`);
-    const rows=await query(`SELECT *${from}${where} ORDER BY ${sorts.length?sorts.join(',')+',':''}${filters.kind==='print'?'printedAt DESC,historyId DESC':'updatedAt DESC,id DESC'} LIMIT ? OFFSET ?`,[...params,pageSize,(page-1)*pageSize]);
+    const rows=await query(`SELECT *${from}${where} ORDER BY ${sorts.length?sorts.join(',')+',':''}${defaultOrder(filters)} LIMIT ? OFFSET ?`,[...params,pageSize,(page-1)*pageSize]);
     let resultRows=rows.map(normalize);
     if(details && rows.length) {
       const detailsById=new Map((await getByIds(rows.map(row=>row.id))).map(row=>[Number(row.id),row]));
@@ -82,13 +84,13 @@ function createSubmissionQuery({ query, getByIds }) {
   }
   async function ids(filters = {}) {
     const c=conditions(filters);
-    return (await query(`SELECT id FROM (${source(filters)}) summary${c.where} ORDER BY updatedAt DESC,id DESC`,c.params)).map(row=>Number(row.id));
+    return (await query(`SELECT id FROM (${source(filters)}) summary${c.where} ORDER BY ${defaultOrder(filters)}`,c.params)).map(row=>Number(row.id));
   }
   async function references(filters = {}) {
     if (filters.kind === 'print') return [];
     const c=conditions(filters);
     const sorts=(Array.isArray(filters.sort)?filters.sort:[]).filter(rule=>columns.has(rule.key) && !['printedAt','historyId'].includes(rule.key)).map(rule=>quote(rule.key)+(rule.direction==='asc'?' ASC':' DESC'));
-    return query(`SELECT id,examineeNo FROM (${source(filters)}) summary${c.where} ORDER BY ${sorts.length?sorts.join(',')+',':''}updatedAt DESC,id DESC`,c.params);
+    return query(`SELECT id,examineeNo FROM (${source(filters)}) summary${c.where} ORDER BY ${sorts.length?sorts.join(',')+',':''}${defaultOrder(filters)}`,c.params);
   }
   async function options(filters, key) {
     if (!columns.has(key) || (filters.kind !== 'print' && ['printedAt','historyId'].includes(key))) return [];

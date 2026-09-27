@@ -122,7 +122,7 @@
           defaultSortRules: [{ key: "id", direction: "asc" }],
         }),
         applicantHistoryGrid: createTableState({
-          defaultSortRules: [{ key: "examineeNo", direction: "asc" }],
+          defaultSortRules: [{ key: "id", direction: "asc" }],
         }),
         applicantRecruitmentGrid: createTableState(),
         applicantScheduleGrid: createTableState(),

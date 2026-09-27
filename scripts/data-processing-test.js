@@ -11,18 +11,26 @@ const {readJsonBody}=require('../server/http/body');
 async function verifyDataProcessing({services,query,pool,root,base,call,submissionId,memberCookie}) {
   const original=await services.applicantService.getApplicantSubmissionById(submissionId);
   for(let i=0;i<44;i++) {
-    const result=await query('INSERT INTO app_meta (examinee_no) VALUES (?)',['TEST'+String(i).padStart(5,'0')]);
+    const result=await query('INSERT INTO app_meta (examinee_no) VALUES (?)',['TEST'+String(43-i).padStart(5,'0')]);
     await query('INSERT INTO app_subm (id,applicant_name,email,password_hash,status,field_key,answer_data,created_at,updated_at) SELECT ?,?,email,password_hash,status,field_key,answer_data,created_at,updated_at FROM app_subm WHERE id=?',[result.insertId,'성능검증'+String(i).padStart(2,'0'),submissionId]);
   }
   const login=await call('/api/auth/login',{id:'admin',password:'1111'});
   const setup=await call('/api/auth/password/setup',{password:'DataTest12345',passwordConfirm:'DataTest12345'},login.cookie);
   assert.equal(setup.status,200);const cookie=setup.cookie||login.cookie;
   const list=body=>call('/api/applicant-submissions/list',body,cookie);
-  const first=await list({kind:'history',page:1,pageSize:20,sort:[{key:'id',direction:'asc'}]});
+  const first=await list({kind:'history',page:1,pageSize:20});
   assert.equal(first.status,200,JSON.stringify(first.body));assert.equal(first.body.total,45);assert.equal(first.body.rows.length,20);
   assert.equal(first.body.rows[0].answerItems,undefined);assert.equal(first.body.rows[0].answerMap,undefined);
-  const second=await list({kind:'history',page:2,pageSize:20,sort:[{key:'id',direction:'asc'}]});
+  const second=await list({kind:'history',page:2,pageSize:20});
   assert.equal(second.body.rows.length,20);assert(!first.body.rows.some(a=>second.body.rows.some(b=>a.id===b.id)));
+  const expectedIds=(await query('SELECT DISTINCT id FROM app_subm ORDER BY id ASC')).map(row=>Number(row.id));
+  assert.deepEqual(first.body.rows.map(row=>row.id),expectedIds.slice(0,20));
+  assert.deepEqual(second.body.rows.map(row=>row.id),expectedIds.slice(20,40));
+  assert.deepEqual(first.body.references.map(row=>Number(row.id)),expectedIds);
+  const descending=await list({kind:'history',pageSize:20,sort:[{key:'id',direction:'desc'}]});
+  assert.deepEqual(descending.body.rows.map(row=>row.id),expectedIds.slice().reverse().slice(0,20),'Explicit sorting still overrides the default');
+  const cleared=await list({kind:'history',pageSize:20,sort:[]});
+  assert.deepEqual(cleared.body.rows.map(row=>row.id),expectedIds.slice(0,20),'Clearing sort returns to ascending submission IDs');
   assert.equal((await list({kind:'ticket',examineeName:'성능검증00'})).body.total,1);
   assert.equal((await list({kind:'history',columns:{statusLabel:[first.body.rows[0].statusLabel]}})).body.total,45);
   const facets=await list({kind:'history',optionsKey:'name'});assert.equal(facets.body.values.length,45);
@@ -79,6 +87,15 @@ async function verifyDataProcessing({services,query,pool,root,base,call,submissi
     for(const [url,grid,total] of [['/applicant-history','applicantHistoryGrid',45],['/admit-cards','admitCardLookupGrid',45],['/print-history','printHistoryGrid',2]]) {
       await page.goto(base+url,{waitUntil:'networkidle2'});
       await page.waitForFunction((key,count)=>globalThis.AdmitCardRemoteGrids?.meta(key)?.total===count,{},grid,total);
+      if(grid==='applicantHistoryGrid') {
+        assert.deepEqual(await page.evaluate(()=>globalThis.AdmitCardRemoteGrids.requestFor('applicantHistoryGrid').sort),[{key:'id',direction:'asc'}]);
+        const visible=await page.evaluate(()=>getGridRows('applicantHistoryGrid').map(row=>row.id));
+        assert.deepEqual(visible,expectedIds.slice(0,visible.length));
+        await page.click('[data-grid-key="applicantHistoryGrid"][data-grid-page="2"]');
+        await page.waitForFunction(()=>globalThis.AdmitCardRemoteGrids.meta('applicantHistoryGrid').page===2);
+        const next=await page.evaluate(()=>getGridRows('applicantHistoryGrid').map(row=>row.id));
+        assert.deepEqual(next,expectedIds.slice(visible.length,visible.length+next.length));
+      }
       assert.deepEqual(errors,[],url);
     }
   } finally {await browser.close();}

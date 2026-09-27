@@ -115,7 +115,9 @@
 
       if (pageTrigger) {
         const tableState = getTableState(pageTrigger.dataset.gridKey);
-        const totalPages = getTotalPages(getGridRows(pageTrigger.dataset.gridKey).length, tableState.pageSize);
+        const remote = globalThis.AdmitCardRemoteGrids?.meta(pageTrigger.dataset.gridKey);
+        const totalRows = remote ? remote.total : getGridRows(pageTrigger.dataset.gridKey).length;
+        const totalPages = getTotalPages(totalRows, tableState.pageSize);
         const currentPage = getGridPage(pageTrigger.dataset.gridKey, totalPages);
 
         if (pageTrigger.dataset.gridNav === "prev") {
