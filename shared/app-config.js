@@ -225,7 +225,6 @@
       schoolName: String(settings?.schoolName || "").trim(),
       logoImageUrl: normalizeSuperAdminImageUrl(settings?.logoImageUrl),
       backgroundImageUrl: normalizeSuperAdminImageUrl(settings?.backgroundImageUrl),
-      recruitmentEnabled: settings?.recruitmentEnabled !== false,
     });
   const resolveSuperAdminLogoImageUrl = (settings = {}) =>
     normalizeSuperAdminSettings(settings).logoImageUrl || defaultLoginBrandMarkPath;

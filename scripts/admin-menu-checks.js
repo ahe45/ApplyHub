@@ -69,12 +69,14 @@ async function runAdminMenuChecks({ services, query, base, call }) {
   assert.equal((await call('/api/accounts/ordinary-test', {}, adminCookie, 'DELETE')).status, 200);
   assert.equal((await call('/api/accounts/' + ids[0], { name: '슈퍼관리자 테스트' }, superCookie, 'PUT')).status, 200);
 
-  const branding = { ...(await services.systemService.getSuperAdminSettings()), schoolName: '보존대학교', logoImageUrl: '/client/assets/logo.png', recruitmentEnabled: false };
-  assert.equal((await call('/api/super-admin/settings', branding, superCookie, 'PUT')).status, 200);
+  const branding = { ...(await services.systemService.getSuperAdminSettings()), schoolName: '보존대학교', logoImageUrl: '/client/assets/logo.png' };
+  const brandingSave = await call('/api/super-admin/settings', {...branding, recruitmentEnabled: false}, superCookie, 'PUT');
+  assert.equal(brandingSave.status, 200);
+  assert.equal(Object.hasOwn(brandingSave.body, 'recruitmentEnabled'), false, 'Obsolete visibility setting is ignored');
   const roleMenuVisibility = await services.systemService.getRoleMenuVisibilitySettings();
   for (const role of ['관리자', '운영자']) {
     for (const view of ['applicantRecruitmentManagement', 'applicantScheduleManagement', 'applicantQuestionTemplateManagement', 'applicantHistory', 'applicantDocumentManagement']) {
-      assert(config.isViewAccessibleForRole(view, role, { roleMenuVisibility }), `${role}: hiding the user application button preserves ${view}`);
+      assert(config.isViewAccessibleForRole(view, role, { roleMenuVisibility }), `${role}: branding changes preserve ${view}`);
       const response = await fetch(base + config.getViewRoutePath(view), { headers: { Cookie: cookies[role] }, redirect: 'manual' });
       assert.equal(response.status, 200, `${role}: direct navigation to ${view} stays accessible`);
     }
@@ -131,6 +133,7 @@ async function runAdminMenuChecks({ services, query, base, call }) {
           await page.waitForSelector('#superAdminSchoolName');
           assert.equal(await page.$eval('#superAdminSchoolName', el => el.value), branding.schoolName);
           assert(await page.$('#superAdminLogoImageInput'));
+          assert.equal(await page.$('#superAdminRecruitmentEnabled'), null);
           await page.$eval('#superAdminSchoolName', el => { el.value = '변경대학교'; el.dispatchEvent(new Event('input', { bubbles: true })); });
           const [saved] = await Promise.all([
             page.waitForResponse(response => response.url().endsWith('/api/super-admin/settings') && response.request().method() === 'PUT'),

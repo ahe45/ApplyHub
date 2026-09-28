@@ -46,7 +46,6 @@ function createSystemSettingsService({
       schoolName: "",
       logoImageUrl: "",
       backgroundImageUrl: "",
-      recruitmentEnabled: true,
     };
   }
 
@@ -392,6 +391,7 @@ function createSystemSettingsService({
       initialPassword: parseSystemInitialPassword(rowsByKey.get("initialPassword")),
       autoLogoutMinutes: parseAutoLogoutMinutes(rowsByKey.get("autoLogoutMinutes")),
       admissionHomepageUrl: parseAdmissionHomepageUrl(rowsByKey.get("admissionHomepageUrl")),
+      applicantSubmissionEditEnabled: rowsByKey.get("applicantSubmissionEditEnabled") === "true",
       applicantExamNoDigitCount: parseApplicantExamNoDigitCount(rowsByKey.get("applicantExamNoDigitCount")),
       applicantExamNoComponents: parseApplicantExamNoComponents(rowsByKey.get("applicantExamNoComponentsJson")),
     };
@@ -454,6 +454,7 @@ function createSystemSettingsService({
       initialPassword,
       autoLogoutMinutes,
       admissionHomepageUrl,
+      applicantSubmissionEditEnabled: payload.applicantSubmissionEditEnabled === true,
       applicantExamNoDigitCount,
       applicantExamNoComponents,
     };
@@ -470,6 +471,7 @@ function createSystemSettingsService({
           'initialPassword',
           'autoLogoutMinutes',
           'admissionHomepageUrl',
+          'applicantSubmissionEditEnabled',
           'applicantExamNoDigitCount',
           'applicantExamNoComponentsJson'
         )
@@ -513,6 +515,7 @@ function createSystemSettingsService({
           ('initialPassword', ?),
           ('autoLogoutMinutes', ?),
           ('admissionHomepageUrl', ?),
+          ('applicantSubmissionEditEnabled', ?),
           ('applicantExamNoDigitCount', ?),
           ('applicantExamNoComponentsJson', ?)
         ON DUPLICATE KEY UPDATE
@@ -522,6 +525,7 @@ function createSystemSettingsService({
         nextSettings.initialPassword,
         String(nextSettings.autoLogoutMinutes),
         nextSettings.admissionHomepageUrl,
+        String(nextSettings.applicantSubmissionEditEnabled),
         String(nextSettings.applicantExamNoDigitCount),
         JSON.stringify(nextSettings.applicantExamNoComponents),
       ],

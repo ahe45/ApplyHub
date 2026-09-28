@@ -923,6 +923,7 @@
 
     function cloneSystemSettingsSnapshot(snapshot = {}) {
       return {
+        applicantSubmissionEditEnabled: snapshot.applicantSubmissionEditEnabled === true,
         initialPassword: normalizeSystemSettingsTextSnapshotValue(snapshot.initialPassword),
         autoLogoutMinutes: normalizeSystemSettingsNumericSnapshotValue(snapshot.autoLogoutMinutes, { emptyValue: "0" }),
         admissionHomepageUrl: normalizeSystemSettingsTextSnapshotValue(snapshot.admissionHomepageUrl),
@@ -964,6 +965,7 @@
       const systemSettingsSource = source && typeof source === "object" ? source : {};
 
       return cloneSystemSettingsSnapshot({
+        applicantSubmissionEditEnabled: systemSettingsSource.applicantSubmissionEditEnabled === true,
         initialPassword: String(systemSettingsSource.initialPassword ?? "").trim(),
         autoLogoutMinutes: String(systemSettingsSource.autoLogoutMinutes ?? "").trim(),
         admissionHomepageUrl: String(systemSettingsSource.admissionHomepageUrl ?? "").trim(),
@@ -979,6 +981,7 @@
       const right = cloneSystemSettingsSnapshot(rightSnapshot);
 
       return (
+        left.applicantSubmissionEditEnabled === right.applicantSubmissionEditEnabled &&
         left.initialPassword === right.initialPassword &&
         left.autoLogoutMinutes === right.autoLogoutMinutes &&
         left.admissionHomepageUrl === right.admissionHomepageUrl &&
@@ -999,8 +1002,7 @@
       return (
         left.schoolName === right.schoolName &&
         left.logoImageUrl === right.logoImageUrl &&
-        left.backgroundImageUrl === right.backgroundImageUrl &&
-        left.recruitmentEnabled === right.recruitmentEnabled
+        left.backgroundImageUrl === right.backgroundImageUrl
       );
     }
 
@@ -1014,7 +1016,6 @@
       state.superAdmin.schoolName = nextSnapshot.schoolName;
       state.superAdmin.logoImageUrl = nextSnapshot.logoImageUrl;
       state.superAdmin.backgroundImageUrl = nextSnapshot.backgroundImageUrl;
-      state.superAdmin.recruitmentEnabled = nextSnapshot.recruitmentEnabled;
       state.superAdmin.savedSnapshot = cloneSuperAdminSnapshot(nextSnapshot);
       state.superAdmin.hasUnsavedChanges = false;
       state.superAdmin.uploadingField = "";
@@ -1042,10 +1043,6 @@
         return normalizedSnapshot.backgroundImageUrl ? "사용자 업로드" : "기본 배경";
       }
 
-      if (summaryKey === "recruitmentEnabled") {
-        return normalizedSnapshot.recruitmentEnabled ? "표시함" : "숨김";
-      }
-
       return "-";
     }
 
@@ -1056,7 +1053,6 @@
         { key: "schoolName", label: "학교명" },
         { key: "logoImageUrl", label: "로고 이미지" },
         { key: "backgroundImageUrl", label: "배경 이미지" },
-        { key: "recruitmentEnabled", label: "접수 버튼 표시 여부" },
       ];
 
       return summaryDefinitions
@@ -1090,6 +1086,8 @@
 
     function formatSystemSettingsSummaryValue(summaryKey, snapshot = {}) {
       const normalizedSnapshot = cloneSystemSettingsSnapshot(snapshot);
+
+      if (summaryKey === "applicantSubmissionEditEnabled") return normalizedSnapshot.applicantSubmissionEditEnabled ? "허용" : "허용 안 함";
 
       if (summaryKey === "initialPassword") {
         return normalizedSnapshot.initialPassword || "미설정";
@@ -1125,6 +1123,7 @@
         { key: "initialPassword", label: "초기 비밀번호" },
         { key: "autoLogoutMinutes", label: "자동 로그아웃 시간" },
         { key: "admissionHomepageUrl", label: "입학처 홈페이지 링크" },
+        { key: "applicantSubmissionEditEnabled", label: "접수 후 수정 허용" },
         { key: "applicantExamNoDigitCount", label: "수험번호 자리수" },
         { key: "applicantExamNoComponents", label: "수험번호 자동 생성 조합" },
       ];
@@ -1352,6 +1351,7 @@
       state.systemSettings.initialPassword = nextSettings.initialPassword;
       state.systemSettings.autoLogoutMinutes = nextSettings.autoLogoutMinutes;
       state.systemSettings.admissionHomepageUrl = nextSettings.admissionHomepageUrl;
+      state.systemSettings.applicantSubmissionEditEnabled = nextSettings.applicantSubmissionEditEnabled;
       state.systemSettings.applicantExamNoDigitCount = nextSettings.applicantExamNoDigitCount;
       state.systemSettings.applicantExamNoComponents = [...nextSettings.applicantExamNoComponents];
       state.systemSettings.savedSnapshot = buildSystemSettingsSnapshot(nextSettings);
@@ -1450,6 +1450,7 @@
         initialPassword,
         autoLogoutMinutes,
         admissionHomepageUrl,
+        applicantSubmissionEditEnabled: state.systemSettings.applicantSubmissionEditEnabled === true,
         applicantExamNoDigitCount,
         applicantExamNoComponents,
       };
@@ -1470,8 +1471,6 @@
 
       if (normalizedField === "schoolName") {
         state.superAdmin.schoolName = String(value || "");
-      } else if (normalizedField === "recruitmentEnabled") {
-        state.superAdmin.recruitmentEnabled = value !== false;
       } else {
         return;
       }

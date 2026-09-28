@@ -6,6 +6,9 @@ const formConfig = require('../shared/domain/applicant-form');
 
 async function runScheduleSettingsChecks({ services, query, base, call, memberCookie, submissionId }) {
   const service = services.applicantService;
+  const branding = await services.systemService.getSuperAdminSettings();
+  await query("UPDATE system_set SET setting_value = ? WHERE setting_key = 'superAdminSettingsJson'", [JSON.stringify({...branding, recruitmentEnabled: false})]);
+  assert.equal(Object.hasOwn((await call('/api/public/applicant-form', null, '', 'GET')).body.superAdminSettings, 'recruitmentEnabled'), false, 'Legacy hidden-button values no longer affect applicants');
   const enabledKeys = ['applicantScheduleEnabled', 'documentSubmissionScheduleEnabled', 'admitCardLookupScheduleEnabled'];
   const dateKeys = enabledKeys.flatMap(key => [key.replace('Enabled', 'StartAt'), key.replace('Enabled', 'EndAt')]);
   const original = (await service.getApplicantSchedules())[0];

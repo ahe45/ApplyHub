@@ -1122,6 +1122,7 @@ function createApplicantService({
 
     return {
       admissionHomepageUrl: String(rowsByKey.get("admissionHomepageUrl") || "").trim(),
+      applicantSubmissionEditEnabled: rowsByKey.get("applicantSubmissionEditEnabled") === "true",
     };
   }
 
@@ -1541,7 +1542,7 @@ function createApplicantService({
         setting_value AS settingValue
       FROM system_set
       WHERE setting_key IN (
-        'admissionHomepageUrl'
+        'admissionHomepageUrl', 'applicantSubmissionEditEnabled'
       )
     `);
 
@@ -4203,9 +4204,9 @@ function createApplicantService({
     };
   }
 
-  async function saveApplicantSubmission(payload = {}) {
+  async function saveApplicantSubmission(payload = {}, options = {}) {
     for (let attempt = 0; ; attempt++) {
-      try { return await saveApplicantSubmissionAttempt(payload); }
+      try { return await saveApplicantSubmissionAttempt(payload, options); }
       catch (error) {
         const retry = error.code === 'ER_LOCK_DEADLOCK' || (error.code === 'ER_DUP_ENTRY' && String(error.message).includes('uniq_app_meta_examinee_no'));
         if (!retry || attempt >= 2) throw error;
@@ -4214,13 +4215,19 @@ function createApplicantService({
     }
   }
 
-  async function saveApplicantSubmissionAttempt(payload = {}) {
+  async function saveApplicantSubmissionAttempt(payload = {}, { editExisting = false } = {}) {
     const accessRecord = getPublicAccessRecordOrThrow(payload.accessToken, [
       APPLICANT_PUBLIC_ACCESS_TYPES.lookup,
       APPLICANT_PUBLIC_ACCESS_TYPES.verified,
     ]);
-    if (accessRecord.memberId && accessRecord.submissionId) {
+    if (editExisting && (!accessRecord.memberId || !accessRecord.submissionId)) {
+      throw createHttpError(404, "수정할 접수 내역이 없습니다.", "APPLICANT_SUBMISSION_NOT_FOUND");
+    }
+    if (accessRecord.memberId && accessRecord.submissionId && !editExisting) {
       throw createHttpError(409, "이미 접수가 완료된 계정입니다. 접수는 계정당 한 번만 가능합니다.", "APPLICANT_ALREADY_SUBMITTED");
+    }
+    if (editExisting && !(await getApplicantPublicSystemSettings()).applicantSubmissionEditEnabled) {
+      throw createHttpError(403, "접수 후 수정이 허용되지 않습니다.", "APPLICANT_SUBMISSION_EDIT_DISABLED");
     }
     const applicantName = normalizeApplicantText(accessRecord.name, "이름", { maxLength: 100 });
     const email = normalizeApplicantEmail(accessRecord.email);
@@ -4244,7 +4251,9 @@ function createApplicantService({
     if (Number.isInteger(requestedSubmissionId) && requestedSubmissionId > 0) {
       existingSubmission = await getApplicantSubmissionById(requestedSubmissionId, { includeInternal: true });
 
-      if (existingSubmission.name !== applicantName || existingSubmission.email !== email) {
+      if (accessRecord.memberId
+        ? Number(existingSubmission.memberId) !== Number(accessRecord.memberId) || requestedSubmissionId !== Number(accessRecord.submissionId)
+        : existingSubmission.name !== applicantName || existingSubmission.email !== email) {
         throw createHttpError(403, "해당 접수 이력에 접근할 수 없습니다.", "APPLICANT_SUBMISSION_FORBIDDEN");
       }
     } else if (!accessRecord.memberId) {
@@ -4252,6 +4261,7 @@ function createApplicantService({
       existingSubmission = latestSubmission.id ? await getApplicantSubmissionById(latestSubmission.id, { includeInternal: true }) : null;
     }
 
+    if (editExisting) await assertApplicantSubmissionEntryIsOpen(buildApplicantSystemRecord(existingSubmission));
     await assertApplicantSubmissionEntryIsOpen(normalizedRecruitmentSelection.selection);
     const submissionArtifacts = buildApplicantSubmissionArtifacts(
       formFields,
@@ -4280,7 +4290,11 @@ function createApplicantService({
         const [members] = await connection.query("SELECT id FROM applicant_members WHERE id = ? FOR UPDATE", [accessRecord.memberId]);
         if (!members.length) throw createHttpError(401, "다시 로그인해 주세요.");
         const [owned] = await connection.query("SELECT id FROM app_meta WHERE member_id = ? FOR UPDATE", [accessRecord.memberId]);
-        if (owned.length) {
+        if (editExisting) {
+          if (owned.length !== 1 || Number(owned[0].id) !== submissionId) {
+            throw createHttpError(403, "해당 접수 이력에 접근할 수 없습니다.", "APPLICANT_SUBMISSION_FORBIDDEN");
+          }
+        } else if (owned.length) {
           throw createHttpError(409, "이미 접수가 완료된 계정입니다. 접수는 계정당 한 번만 가능합니다.", "APPLICANT_ALREADY_SUBMITTED");
         }
       }

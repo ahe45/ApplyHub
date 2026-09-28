@@ -65,6 +65,7 @@ VALUES
   ('initialPassword', '1111'),
   ('autoLogoutMinutes', '0'),
   ('admissionHomepageUrl', ''),
+  ('applicantSubmissionEditEnabled', 'false'),
   ('applicantExamNoDigitCount', '10'),
   ('applicantExamNoComponentsJson', '["admissionCode","seriesCode","unitCode","sequence",""]'),
   ('applicantExamNoPattern', 'AD-{YY}{MM}{DD}-{SEQ:4}'),

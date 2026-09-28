@@ -1518,21 +1518,20 @@
 }
 .system-settings-school-logo-preview { width: 120px; height: 64px; object-fit: contain; object-position: left center; }
 
-/* Group related settings without nesting a card around every input. */
+/* Shared controls for system settings and the super-admin email section. */
 .system-settings-view .section-header { gap: 12px 20px; }
 .system-settings-view .section-header > button { flex-shrink: 0; }
-.system-settings-layout, .email-settings-layout { display: grid; gap: 22px; }
-.system-settings-view .settings-group { min-width: 0; }
-.system-settings-view .settings-group h4 { margin: 0 0 14px; font-size: .91rem; font-weight: 750; color: var(--glass-ink); }
-.system-settings-view .settings-field-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.system-settings-view .field { min-width: 0; gap: 7px; }
-.system-settings-view .field > span, .settings-field-label { font-size: .85rem; font-weight: 600; }
-.system-settings-view .field input, .system-settings-view .field select { width: 100%; min-width: 0; min-height: 42px; padding: 9px 12px; font-size: .9rem; }
-.system-settings-view .field select { padding-right: 32px; }
-.system-settings-view .field small, .system-settings-view .settings-group small { font-size: .76rem; line-height: 1.5; }
+.email-settings-layout { display: grid; gap: 20px; }
+.email-settings-card .settings-field-pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+:is(.system-settings-view, .email-settings-card) .field { min-width: 0; gap: 7px; }
+.settings-field-label { font-size: .85rem; font-weight: 600; }
+.email-settings-card .field input, .email-settings-card .field select { width: 100%; min-width: 0; }
+.email-settings-card .field { width: 100%; max-width: 420px; }
+.email-settings-card .field:has([name="port"]) { max-width: 140px; }
+.email-settings-card .field:has([name="security"]) { max-width: 240px; }
+.email-settings-card .field:has([name="fromName"]) { max-width: 320px; }
 .settings-group-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 14px; }
 .system-settings-view .settings-group-heading h4 { margin: 0; }
-.settings-group-exam { grid-column: 1 / -1; border-top: 1px solid rgba(var(--glass-line-rgb), .8); padding-top: 20px; }
 .settings-exam-fields { display: grid; grid-template-columns: 100px repeat(5, minmax(0, 1fr)); gap: 12px; }
 .settings-logo-field { display: grid; gap: 8px; margin-top: 16px; }
 .settings-logo-row { display: flex; gap: 14px; align-items: center; }
@@ -1543,27 +1542,16 @@
 .settings-logo-actions button { flex-shrink: 0; min-height: 34px; padding: 6px 10px; font-size: .76rem; }
 applyhub-email-settings { display: block; min-width: 0; }
 .email-settings-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
-.email-settings-connection { display: grid; gap: 20px; min-width: 0; }
-.email-settings-server-row { display: grid; grid-template-columns: minmax(0, 1fr) 86px 170px; gap: 12px; }
+.email-settings-server-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
 .email-password-help { margin: 8px 0 0; font-size: .76rem; line-height: 1.5; }
 .email-settings-fields .form-actions { margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(var(--glass-line-rgb), .8); }
 .email-settings-note { margin: 10px 0 0; font-size: .76rem; line-height: 1.5; }
 .email-settings-card .system-settings-status:empty { display: none; }
-@media (min-width: 1200px) {
-  .system-settings-layout { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
-  .email-settings-layout { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
-  .settings-group-security, .settings-group-sender { padding-left: 22px; border-left: 1px solid rgba(var(--glass-line-rgb), .8); }
-  .system-settings-view .settings-group-sender .settings-field-pair { grid-template-columns: minmax(0, 1fr); gap: 16px; }
-}
 @media (max-width: 1199px) {
-  .settings-group-security, .settings-group-sender { border-top: 1px solid rgba(var(--glass-line-rgb), .8); padding-top: 20px; }
   .settings-exam-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) {
-  .system-settings-view .settings-field-pair { grid-template-columns: minmax(0, 1fr); }
   .settings-exam-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .email-settings-server-row { grid-template-columns: minmax(70px, 1fr) minmax(0, 2fr); }
-  .email-settings-server-row > :first-child { grid-column: 1 / -1; }
   .settings-logo-row { align-items: flex-start; gap: 10px; }
   .system-settings-view .section-header { align-items: flex-start; }
 }
@@ -1576,5 +1564,5 @@ applyhub-email-settings { display: block; min-width: 0; }
   .system-settings-basic-card > .section-header .menu-section-copy { display: contents !important; }
   .system-settings-basic-card > .section-header h3 { grid-column: 1; grid-row: 1; }
   .system-settings-basic-card > .section-header p { grid-column: 1 / -1; grid-row: 2; }
-  .system-settings-basic-card > .section-header > button { grid-column: 2; grid-row: 1; }
+  .system-settings-basic-card > .section-header > .inline-actions { grid-column: 2; grid-row: 1; }
 }

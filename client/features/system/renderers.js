@@ -1659,7 +1659,7 @@
           <article class="applicant-public-panel applicant-public-action-grid login-panel-card login-stage-panel applicant-notice-stage-panel">
             <div class="applicant-member-welcome"><span>나의 접수 메뉴</span><button class="ghost-button" type="button" disabled>로그아웃</button></div>
             <div class="applicant-member-menu">
-              ${["원서접수", "서류 제출", "서류 제출 확인", "접수결과 조회", "수험표 조회"].filter((label, index) => index !== 0 || state.superAdmin?.savedSnapshot?.recruitmentEnabled !== false).map((label, index) => `<button class="ghost-button applicant-member-tile" type="button" disabled><span class="applicant-member-tile-number">0${index + 1}</span><strong>${label}</strong></button>`).join("")}
+              ${["원서접수", "서류 제출", "서류 제출 확인", "접수결과 조회", "수험표 조회"].map((label, index) => `<button class="ghost-button applicant-member-tile" type="button" disabled><span class="applicant-member-tile-number">0${index + 1}</span><strong>${label}</strong></button>`).join("")}
             </div>
           </article>
           <p class="login-shell-copyright">ApplyHub · 원서접수시스템<br>© 2026 U-PLUS SYSTEM</p>
@@ -1745,30 +1745,38 @@
         <article class="form-card system-settings-basic-card">
           <div class="section-header">
             <div class="menu-section-copy"><h3>시스템 설정</h3><p>원서접수 운영에 필요한 기본 설정을 관리합니다.</p></div>
-            <button class="primary-button system-settings-save-button" data-system-settings-action="save" type="button" ${saveDisabled ? 'disabled' : ''}>${isSaving ? '저장 중...' : '기본 설정 저장'}</button>
+            <div class="inline-actions"><button class="primary-button system-settings-save-button" data-system-settings-action="save" type="button" ${saveDisabled ? 'disabled' : ''}>${isSaving ? '저장 중...' : '저장'}</button></div>
           </div>
-          <div class="system-settings-layout">
-            <section class="settings-group settings-group-school" aria-labelledby="settingsSchoolHeading">
-              <h4 id="settingsSchoolHeading">입학처 홈페이지</h4>
-              <label class="field" for="systemSettingsAdmissionHomepageUrl"><span>입학처 홈페이지</span>
+          <div class="super-admin-form">
+            <section class="super-admin-setting-card" aria-labelledby="settingsSchoolHeading">
+              <div class="system-settings-section-head"><span class="system-settings-label" id="settingsSchoolHeading">입학처 홈페이지</span><small class="muted system-settings-help">사용자 페이지에서 연결할 입학처 홈페이지 주소를 설정합니다.</small></div>
+              <label class="field super-admin-text-field" for="systemSettingsAdmissionHomepageUrl"><span>홈페이지 주소</span>
                 <input class="system-settings-input" id="systemSettingsAdmissionHomepageUrl" type="url" maxlength="500" value="${escapeAttribute(state.systemSettings.admissionHomepageUrl || '')}" placeholder="https://admission.example.ac.kr" autocomplete="off" ${disabled} />
               </label>
             </section>
-            <section class="settings-group settings-group-security" aria-labelledby="settingsSecurityHeading">
-              <h4 id="settingsSecurityHeading">계정·보안</h4>
-              <div class="settings-field-pair">
-                <label class="field" for="systemSettingsInitialPassword"><span>초기 비밀번호</span>
+            <section class="super-admin-setting-card" aria-labelledby="settingsPasswordHeading">
+              <div class="system-settings-section-head"><span class="system-settings-label" id="settingsPasswordHeading">초기 비밀번호</span><small class="muted system-settings-help">관리자 계정 생성 및 비밀번호 초기화에 사용할 값을 설정합니다.</small></div>
+                <label class="field super-admin-text-field" for="systemSettingsInitialPassword"><span>초기 비밀번호</span>
                   <input class="system-settings-input" id="systemSettingsInitialPassword" type="text" maxlength="100" value="${escapeAttribute(getSystemInitialPassword())}" autocomplete="off" ${disabled} />
-                  <small class="muted">관리자 계정 생성·초기화에 사용</small>
                 </label>
-                <label class="field" for="systemSettingsAutoLogoutMinutes"><span>자동 로그아웃 (분)</span>
-                  <input class="system-settings-input" id="systemSettingsAutoLogoutMinutes" type="number" min="0" max="${MAX_SYSTEM_AUTO_LOGOUT_MINUTES}" step="1" value="${escapeAttribute(String(state.systemSettings.autoLogoutMinutes))}" ${disabled} />
-                  <small class="muted">0분이면 자동 로그아웃 안 함</small>
-                </label>
-              </div>
             </section>
-            <section class="settings-group settings-group-exam" aria-labelledby="settingsExamHeading">
-              <div class="settings-group-heading"><h4 id="settingsExamHeading">수험번호 생성</h4><small class="muted">전체 자리수와 코드·순번의 조합 순서를 설정합니다.</small></div>
+            <section class="super-admin-setting-card" aria-labelledby="settingsLogoutHeading">
+              <div class="system-settings-section-head"><span class="system-settings-label" id="settingsLogoutHeading">자동 로그아웃</span><small class="muted system-settings-help">사용하지 않을 때 자동으로 로그아웃할 시간을 설정합니다. 0분이면 자동 로그아웃하지 않습니다.</small></div>
+                <label class="field super-admin-text-field" for="systemSettingsAutoLogoutMinutes"><span>자동 로그아웃 (분)</span>
+                  <input class="system-settings-input" id="systemSettingsAutoLogoutMinutes" type="number" min="0" max="${MAX_SYSTEM_AUTO_LOGOUT_MINUTES}" step="1" value="${escapeAttribute(String(state.systemSettings.autoLogoutMinutes))}" ${disabled} />
+                </label>
+            </section>
+            <section class="super-admin-setting-card" aria-labelledby="settingsApplicationHeading">
+              <div class="system-settings-section-head"><span class="system-settings-label" id="settingsApplicationHeading">원서접수 수정</span><small class="muted system-settings-help">허용하면 접수 기간 내에 접수결과에서 기존 원서를 수정할 수 있습니다. 접수번호와 수험번호는 유지됩니다.</small></div>
+              <label class="field super-admin-text-field" for="systemSettingsApplicantSubmissionEditEnabled"><span>접수 후 수정 허용</span>
+                <select class="system-settings-input" id="systemSettingsApplicantSubmissionEditEnabled" ${disabled}>
+                  <option value="false" ${state.systemSettings.applicantSubmissionEditEnabled ? '' : 'selected'}>허용 안 함</option>
+                  <option value="true" ${state.systemSettings.applicantSubmissionEditEnabled ? 'selected' : ''}>허용</option>
+                </select>
+              </label>
+            </section>
+            <section class="super-admin-setting-card" aria-labelledby="settingsExamHeading">
+              <div class="system-settings-section-head"><span class="system-settings-label" id="settingsExamHeading">수험번호 생성</span><small class="muted system-settings-help">전체 자리수와 코드·순번의 조합 순서를 설정합니다.</small></div>
               <div class="settings-exam-fields">
                 <label class="field" for="systemSettingsApplicantExamNoDigitCount"><span>전체 자리수</span>
                   <input class="system-settings-input" id="systemSettingsApplicantExamNoDigitCount" type="number" min="1" max="30" step="1" value="${escapeAttribute(String(state.systemSettings.applicantExamNoDigitCount || 10))}" ${disabled} />
@@ -1784,7 +1792,6 @@
           </div>
           <p class="system-settings-status${state.systemSettings.statusType === 'warning' ? ' warning' : ''}${state.systemSettings.statusMessage ? '' : ' hidden'}" id="systemSettingsStatus">${escapeHtml(state.systemSettings.statusMessage)}</p>
         </article>
-        <applyhub-email-settings></applyhub-email-settings>
       </section>`;
   }
 
@@ -1802,7 +1809,6 @@
     const backgroundImageUrl = resolveSuperAdminBackgroundImageUrl(state.superAdmin || {});
     const hasCustomLogoImage = Boolean(String(state.superAdmin?.logoImageUrl || "").trim());
     const hasCustomBackgroundImage = Boolean(String(state.superAdmin?.backgroundImageUrl || "").trim());
-    const recruitmentEnabled = state.superAdmin?.recruitmentEnabled !== false;
     const backgroundPreviewStyle = backgroundImageUrl
       ? ` style="background-image: url('${escapeAttribute(backgroundImageUrl)}');"`
       : "";
@@ -1813,7 +1819,7 @@
           <div class="section-header">
             <div class="menu-section-copy">
               <h3>슈퍼관리자</h3>
-              <p>로그인 화면 브랜딩과 접수 기능 노출 여부를 관리합니다.</p>
+              <p>학교명, 로그인 화면 이미지와 이메일 발송 설정을 관리합니다.</p>
             </div>
             <div class="inline-actions">
               <button
@@ -1913,28 +1919,7 @@
               </div>
             </section>
 
-            <section class="super-admin-setting-card">
-              <div class="system-settings-section-head">
-                <span class="system-settings-label">접수 버튼 표시 여부</span>
-                <small class="muted system-settings-help">사용자 홈 화면의 원서접수 버튼을 표시하거나 숨깁니다.</small>
-              </div>
-              <label class="super-admin-switch" for="superAdminRecruitmentEnabled">
-                <input
-                  class="sr-only"
-                  id="superAdminRecruitmentEnabled"
-                  type="checkbox"
-                  data-super-admin-toggle="recruitmentEnabled"
-                  ${recruitmentEnabled ? "checked" : ""}
-                />
-                <span class="super-admin-switch-track" aria-hidden="true">
-                  <span class="super-admin-switch-thumb"></span>
-                </span>
-                <span class="super-admin-switch-copy">
-                  <strong>${recruitmentEnabled ? "표시함" : "숨김"}</strong>
-                  <span>${recruitmentEnabled ? "사용자 홈 화면에 원서접수 버튼을 표시합니다." : "사용자 홈 화면에서 원서접수 버튼을 숨깁니다."}</span>
-                </span>
-              </label>
-            </section>
+            <applyhub-email-settings></applyhub-email-settings>
           </div>
 
           <p class="system-settings-status${statusClass}${state.superAdmin?.statusMessage ? "" : " hidden"}" id="superAdminStatus">

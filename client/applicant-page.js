@@ -252,7 +252,6 @@
     return {
       logoImageUrl: String(settings?.logoImageUrl || "").trim(),
       backgroundImageUrl: String(settings?.backgroundImageUrl || "").trim(),
-      recruitmentEnabled: settings?.recruitmentEnabled !== false,
     };
   }
 
@@ -883,7 +882,13 @@
   function getApplicantFormEditAvailabilityState() {
     if (state.mode === "documents") return getMemberDocumentEditAvailabilityState();
     if (!APPLICANT_IS_PREVIEW_MODE && membership?.member && state.currentSubmission?.id) {
-      return { isEditable: false, disabledMessage: '접수가 완료되었습니다. 접수는 계정당 한 번만 가능합니다.' };
+      if (state.formConfig.systemSettings?.applicantSubmissionEditEnabled !== true) {
+        return { isEditable: false, disabledMessage: '접수 후 수정이 허용되지 않습니다.' };
+      }
+      const originalAvailability = getApplicantApplyAvailabilityState({ target: state.currentSubmission });
+      if (!originalAvailability.isAvailable) {
+        return { isEditable: false, disabledMessage: getApplicantApplyDisabledMessage(originalAvailability) };
+      }
     }
     const applyAvailabilityState = getApplicantApplyAvailabilityState({ target: getApplicantEditableScheduleTarget() });
 
@@ -1862,6 +1867,7 @@
   }
 
   function getApplicantFormBackMode() {
+    if (state.currentSubmission?.id && state.identity.source === "lookup") return "lookup-summary";
     if (membership?.member && !hasApplicantRecruitmentSelectionStep()) return "home";
     if (APPLICANT_IS_PREVIEW_MODE) {
       return "home";
@@ -1872,6 +1878,24 @@
     }
 
     return state.identity.source === "lookup" ? getApplicantLookupResultMode() : "verify";
+  }
+
+  function beginApplicationEdit() {
+    resetMessage();
+    if (!state.currentSubmission?.id) {
+      setMessage("error", "수정할 접수 내역이 없습니다.");
+      navigateToApplicantMode("home");
+      return;
+    }
+    const availability = getApplicantFormEditAvailabilityState();
+    if (!availability.isEditable) {
+      setMessage("error", availability.disabledMessage);
+      render();
+      return;
+    }
+    applySubmissionContext({ accessToken: state.identity.accessToken, submission: state.currentSubmission, source: "lookup" });
+    closeNationalityPicker();
+    navigateToApplicantMode("form");
   }
 
   function applySubmissionContext({ accessToken = "", submission = null, source = "" }) {
@@ -2285,12 +2309,12 @@
                 : ""
             }
             ${!APPLICANT_IS_PREVIEW_MODE ? membership.home() : `<div class="applicant-public-action-stack applicant-public-home-actions">
-              ${getApplicantBrandSettings().recruitmentEnabled ? `<button
+              <button
                 class="primary-button"
                 data-applicant-action="go-verify"
                 type="button"
                 title="${escapeAttribute(applyButtonTitle)}"
-              >${renderApplicantHomeActionButtonLabel("접수하기", "apply")}</button>` : ""}
+              >${renderApplicantHomeActionButtonLabel("접수하기", "apply")}</button>
               <button
                 class="ghost-button"
                 data-applicant-action="go-lookup-summary"
@@ -2912,6 +2936,7 @@
 
   function renderForm() {
     const isPreviewMode = APPLICANT_IS_PREVIEW_MODE;
+    const isEditing = !isPreviewMode && Boolean(state.currentSubmission?.id);
     const formEditAvailabilityState = getApplicantFormEditAvailabilityState();
     const isReadOnly = !isPreviewMode && !formEditAvailabilityState.isEditable;
     const applicantScheduleState = getApplicantSubmissionScheduleState();
@@ -2926,7 +2951,7 @@
     return `
       <section class="applicant-public-step applicant-public-application-step">
         <article class="applicant-public-slab applicant-public-application-panel">
-          ${renderApplicantStepHeader('원서접수', statusMarkup)}
+          ${renderApplicantStepHeader(isEditing ? '원서접수 수정' : '원서접수', statusMarkup)}
           ${renderMessage()}
           ${
             isPreviewMode
@@ -2956,9 +2981,9 @@
                       class="primary-button"
                       type="submit"
                       ${state.isSaving || isReadOnly ? "disabled" : ""}
-                      title="${isReadOnly ? escapeAttribute(formEditAvailabilityState.disabledMessage) : "접수 완료"}"
+                      title="${isReadOnly ? escapeAttribute(formEditAvailabilityState.disabledMessage) : isEditing ? "수정 저장" : "접수 완료"}"
                     >
-                      ${state.isSaving ? "저장 중..." : "접수 완료"}
+                      ${state.isSaving ? "저장 중..." : isEditing ? "수정 저장" : "접수 완료"}
                     </button>
                   `
               }
@@ -3459,6 +3484,7 @@
 
   async function saveApplication() {
     resetMessage();
+    const isEditing = Boolean(state.currentSubmission?.id);
     const formEditAvailabilityState = getApplicantFormEditAvailabilityState();
 
     if (!APPLICANT_IS_PREVIEW_MODE && !formEditAvailabilityState.isEditable) {
@@ -3525,7 +3551,7 @@
 
     try {
       const payload = await apiRequest("/api/public/applications", {
-        method: "POST",
+        method: isEditing ? "PUT" : "POST",
         body: JSON.stringify({
           accessToken: state.identity.accessToken,
           submissionId: state.identity.submissionId || state.currentSubmission?.id || 0,
@@ -3543,8 +3569,8 @@
       await membership?.refreshApplication().catch(() => {});
       state.application.passwordConfirm = "";
       state.application.passwordConfirmTouched = false;
-      setMessage("success", "접수가 완료되었습니다.");
-      navigateToApplicantMode("result");
+      setMessage("success", isEditing ? "접수 내용을 수정했습니다." : "접수가 완료되었습니다.");
+      navigateToApplicantMode(isEditing ? "lookup-summary" : "result");
       return;
     } catch (error) {
       if (error.code === 'APPLICANT_ALREADY_SUBMITTED') {
@@ -3553,6 +3579,7 @@
         navigateToApplicantMode('home');
         return;
       }
+      if (error.code === 'APPLICANT_SUBMISSION_EDIT_DISABLED') state.formConfig.systemSettings.applicantSubmissionEditEnabled = false;
       if (error.fieldKey) fieldError = error;
       else setMessage("error", error?.message || "접수 저장에 실패했습니다.");
     } finally {
@@ -3810,25 +3837,16 @@
     }
 
     if (action === "edit-application") {
-      resetMessage();
-      const formEditAvailabilityState = getApplicantFormEditAvailabilityState();
-
-      if (!APPLICANT_IS_PREVIEW_MODE && !formEditAvailabilityState.isEditable) {
-        setMessage("error", formEditAvailabilityState.disabledMessage);
+      if (APPLICANT_IS_PREVIEW_MODE) { beginApplicationEdit(); return; }
+      try {
+        const context = await membership.refreshApplication();
+        applySubmissionContext({ ...context, source: "lookup" });
+        await loadFormConfig();
+        beginApplicationEdit();
+      } catch (error) {
+        setMessage("error", error.message);
         render();
-        return;
       }
-
-      state.application.password = "";
-      state.application.passwordConfirm = "";
-      state.application.passwordConfirmTouched = false;
-      state.draftAnswers = buildDraftAnswers(state.currentSubmission);
-      state.recruitment = getApplicantRecruitmentSelectionFromSubmission(state.currentSubmission);
-      syncApplicantRecruitmentSelection({ preserveExisting: true });
-      syncApplicantRecruitmentSelectionIntoDraftAnswers();
-      syncApplicantFieldUiState({ preserveExisting: false });
-      closeNationalityPicker();
-      navigateToApplicantMode(getApplicantFlowEntryMode());
       return;
     }
 
@@ -4217,7 +4235,6 @@
 
   membership = globalThis.createApplicantMembershipController({
     apiRequest, escapeHtml, render, navigate: navigateToApplicantMode, setMessage,
-    isApplyButtonVisible: () => getApplicantBrandSettings().recruitmentEnabled,
     getApplyAvailability: () => {
       const availability = getApplicantApplyEntryAvailabilityState();
       return { ...availability, disabledMessage: getApplicantApplyEntryDisabledMessage(availability) };
@@ -4243,6 +4260,7 @@
       state.lookup.name = member.name;
       state.lookup.email = member.email;
       applySubmissionContext({ ...context, source: "lookup" });
+      if (action === "summary") await loadFormConfig();
       for (const field of state.formConfig.fields) {
         if (!state.draftAnswers[field.fieldKey]) {
           if ((field.systemFieldKey === 'birth' || field.inputType === 'birthdate') && membership.birthDate) state.draftAnswers[field.fieldKey] = membership.birthDate;
@@ -4284,8 +4302,11 @@
     membership.initialize().then(async () => {
       await loadFormConfig();
       if (membership.member && ["form", "apply", "lookup-summary", "lookup-ticket", "documents", "document-status", "result"].includes(initialMode)) {
-        const action = ["form", "apply"].includes(initialMode) ? "apply" : initialMode === "lookup-ticket" ? "ticket" : initialMode === "documents" ? "documents" : initialMode === "document-status" ? "document-status" : "summary";
+        const context = await membership.refreshApplication();
+        const resumeEdit = ["form", "apply"].includes(initialMode) && Boolean(context.submission?.id);
+        const action = resumeEdit ? "summary" : ["form", "apply"].includes(initialMode) ? "apply" : initialMode === "lookup-ticket" ? "ticket" : initialMode === "documents" ? "documents" : initialMode === "document-status" ? "document-status" : "summary";
         await membership.handleAction(`member-${action}`);
+        if (resumeEdit) beginApplicationEdit();
       }
     }).catch((error) => { state.loadError = error.message; state.isLoadingForm = false; render(); });
   }

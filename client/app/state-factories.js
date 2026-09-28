@@ -356,6 +356,7 @@
 
   function normalizeSystemSettingsPayload(payload = {}, options = {}) {
     return {
+      applicantSubmissionEditEnabled: payload.applicantSubmissionEditEnabled === true,
       initialPassword: normalizeSystemInitialPassword(payload.initialPassword, options.defaultPassword),
       autoLogoutMinutes: String(
         normalizeSystemAutoLogoutMinutes(payload.autoLogoutMinutes, {
@@ -380,6 +381,7 @@
 
   function cloneSystemSettingsSnapshot(snapshot = {}) {
     return {
+      applicantSubmissionEditEnabled: snapshot.applicantSubmissionEditEnabled === true,
       initialPassword: String(snapshot.initialPassword ?? ""),
       autoLogoutMinutes: String(snapshot.autoLogoutMinutes ?? ""),
       admissionHomepageUrl: String(snapshot.admissionHomepageUrl ?? ""),
@@ -485,7 +487,6 @@
       schoolName: "",
       logoImageUrl: "",
       backgroundImageUrl: "",
-      recruitmentEnabled: true,
     });
   }
 
@@ -496,7 +497,6 @@
       schoolName: settings.schoolName,
       logoImageUrl: settings.logoImageUrl,
       backgroundImageUrl: settings.backgroundImageUrl,
-      recruitmentEnabled: settings.recruitmentEnabled,
       savedSnapshot: cloneSuperAdminSnapshot(settings, options.normalizeSuperAdminSettings),
       isSaving: false,
       uploadingField: "",

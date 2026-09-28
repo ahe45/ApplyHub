@@ -71,6 +71,15 @@ function createMembershipRoutes(deps) {
       return applicants.saveApplicantSubmission({ ...await body(request), accessToken: current.accessToken, submissionId: current.submission?.id || 0, password: "" });
     }),
     publicRoute("POST", "/api/public/members/documents", async ({ request }) => applicants.saveMemberDocuments(await members.requireMember(request), await body(request))),
+    publicRoute("PUT", "/api/public/applications", async ({ request }) => {
+      const current = await context(request);
+      if (!current.submission?.id) throw deps.createHttpError(404, "수정할 접수 내역이 없습니다.", "APPLICANT_SUBMISSION_NOT_FOUND");
+      const payload = await body(request);
+      if (payload.submissionId && Number(payload.submissionId) !== Number(current.submission.id)) {
+        throw deps.createHttpError(403, "해당 접수 이력에 접근할 수 없습니다.", "APPLICANT_SUBMISSION_FORBIDDEN");
+      }
+      return applicants.saveApplicantSubmission({ ...payload, accessToken: current.accessToken, submissionId: current.submission.id, password: "" }, { editExisting: true });
+    }),
     ...["/api/public/email-verifications", "/api/public/email-verifications/verify", "/api/public/applications/lookup"].map((path) => publicRoute("POST", path, () => { throw deps.createHttpError(401, "회원가입 후 로그인해 주세요."); })),
     regexRoute("GET", /^\/api\/public\/applications\/(?<submissionId>\d+)\/admit-card\.pdf$/, async ({ request, response, params }) => {
       const current = await context(request);

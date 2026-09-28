@@ -41,9 +41,10 @@ function createSystemSettingsSchemaBootstrap({
           ('autoLogoutMinutes', ?),
           ('applicantNoticeHtml', ''),
           ('admissionHomepageUrl', ''),
+          ('applicantSubmissionEditEnabled', 'false'),
           ('applicantExamNoDigitCount', '10'),
           ('applicantExamNoComponentsJson', '["admissionCode","seriesCode","unitCode","sequence",""]'),
-          ('superAdminSettingsJson', '{"schoolName":"","logoImageUrl":"","backgroundImageUrl":"","recruitmentEnabled":true}')
+          ('superAdminSettingsJson', '{"schoolName":"","logoImageUrl":"","backgroundImageUrl":""}')
       `,
       [defaultInitialPassword, String(defaultAutoLogoutMinutes)],
     );

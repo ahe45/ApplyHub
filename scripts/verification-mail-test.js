@@ -69,10 +69,12 @@ async function run() {
       const setup=await call('/api/auth/password/setup',{password:'EmailTest1234',passwordConfirm:'EmailTest1234'},first.cookie);
       assert.equal(setup.status,200);return setup.cookie;
     };
-    const adminCookie=await login('admin'), viewerCookie=await login('view');
+    await services.authService.createAccount({id:'email-super', name:'메일 슈퍼관리자', role:config.superAdminRole});
+    const adminCookie=await login('email-super'), managerCookie=await login('admin'), viewerCookie=await login('view');
     for(const [resource,method] of [[emailPath,'GET'],[emailPath,'PUT'],[emailPath+'/check','POST']]) {
       assert.equal((await call(resource,payload,'',method)).status,401);
       assert.equal((await call(resource,payload,viewerCookie,method)).status,403);
+      assert.equal((await call(resource,payload,managerCookie,method)).status,403, 'Email settings require super-admin access');
     }
     let result=await call(emailPath,null,adminCookie,'GET');
     assert.equal(result.body.hasPassword,false);
@@ -159,6 +161,9 @@ async function run() {
     await page.setCookie({name:'admitcard.sid',value:adminCookie.split('=')[1],url:base});
     await page.setViewport({width:1440,height:1000});
     await page.goto(base+'/system-settings',{waitUntil:'networkidle2'});
+    assert.equal(await page.$('applyhub-email-settings'), null, 'Email settings have moved out of system settings');
+    assert.equal(await page.$$eval('.system-settings-view .super-admin-form > .super-admin-setting-card', cards=>cards.length), 5);
+    await page.goto(base+'/super-admin',{waitUntil:'networkidle2'});
     await page.waitForSelector('applyhub-email-settings input[name=password]');
     assert.equal(await page.$eval('applyhub-email-settings input[name=password]',el=>el.value),'');
     assert.equal(await page.$eval('[data-email-save]',el=>el.disabled),true);
@@ -178,6 +183,9 @@ async function run() {
       await page.evaluate(theme=>localStorage.setItem('applyhub.theme',theme),theme);
       for(const width of [1440,390]) {
         await page.setViewport({width,height:1000});await page.goto(base+'/system-settings',{waitUntil:'networkidle2'});
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
+        await page.screenshot({path:path.join(artifacts,'system-'+theme+'-'+width+'.png')});
+        await page.goto(base+'/super-admin',{waitUntil:'networkidle2'});
         await page.waitForSelector('applyhub-email-settings input[name=password]');
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
         await page.$eval('applyhub-email-settings',el=>el.scrollIntoView({block:'start'}));
@@ -189,7 +197,7 @@ async function run() {
     assert.equal(await page.evaluate(()=>window.AdmitCardEmailSettings.hasUnsavedChanges()),true);
     page.once('dialog',dialog=>dialog.dismiss());
     await Promise.all([page.waitForNavigation({waitUntil:'networkidle2'}),page.click('[data-view=accountManagement]')]);
-    await page.goto(base+'/system-settings',{waitUntil:'networkidle2'});
+    await page.goto(base+'/super-admin',{waitUntil:'networkidle2'});
     await page.waitForSelector('applyhub-email-settings input[name=password]');
     assert.equal(await page.$eval('applyhub-email-settings input[name=password]',el=>el.value),'');
     assert.equal(await page.evaluate(()=>window.AdmitCardEmailSettings.hasUnsavedChanges()),false);

@@ -296,6 +296,11 @@
   Object.assign(messages, {
     "입학처 홈페이지로 이동": "Go to admissions website",
     "접수 내용 수정": "Edit application",
+    "원서접수 수정": "Edit application",
+    "수정 저장": "Save changes",
+    "접수 내용을 수정했습니다.": "Your application has been updated.",
+    "접수 후 수정이 허용되지 않습니다.": "Editing after submission is not allowed.",
+    "수정할 접수 내역이 없습니다.": "There is no application to edit.",
     "개발용 인증번호: {0} · 실제 이메일은 발송되지 않습니다.": "Development code: {0} · No email will be sent.",
     "{0}은(는) {1}자 이하여야 합니다.": "{0} must not exceed {1} characters.",
     "{0}은(는) {1}자리 이하여야 합니다.": "{0} must not exceed {1} digits.",

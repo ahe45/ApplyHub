@@ -231,6 +231,10 @@ async function run() {
     result = await call(memberPath + "documents", { answers: { "late-document": upload } }, login.cookie);
     assert.equal(result.status, 200, JSON.stringify(result));
     assert((await query("SELECT field_key FROM app_subm WHERE id = ? AND field_key = 'late-document'", [submission.id])).length);
+    if (process.argv.includes('--application-edit')) {
+      await require('./application-edit-test').verifyApplicationEdit({ services, query, base, call, submissionId: submission.id, memberCookie: login.cookie });
+      return;
+    }
     if (process.argv.includes('--data-processing')) {
       await require('./data-processing-test').verifyDataProcessing({services, query, pool, root, base, call, submissionId:submission.id, memberCookie:login.cookie});
       return;
@@ -521,15 +525,18 @@ async function run() {
     await page.waitForSelector(".applicant-member-tile");
     const savedSuperAdminSettings = await services.systemService.getSuperAdminSettings();
     assert(await page.$('[data-applicant-action="member-apply"]'));
-    await services.systemService.updateSuperAdminSettings({ ...savedSuperAdminSettings, recruitmentEnabled: false });
+    await query("UPDATE system_set SET setting_value = ? WHERE setting_key = 'superAdminSettingsJson'", [JSON.stringify({ ...savedSuperAdminSettings, recruitmentEnabled: false })]);
     await page.reload({ waitUntil: 'networkidle2' });
-    assert.equal(await page.$('[data-applicant-action="member-apply"]'), null, 'Hidden application button is absent from the user home');
+    assert(await page.$('[data-applicant-action="member-apply"]'), 'Legacy branding values cannot hide the application button');
     for (const action of ['documents', 'summary', 'ticket']) assert(await page.$(`[data-applicant-action="member-${action}"]`));
-    await checkMobileLayout('home with application button hidden');
-    await services.systemService.updateSuperAdminSettings({ ...savedSuperAdminSettings, recruitmentEnabled: true });
+    await checkMobileLayout('home with legacy branding');
+    await query('UPDATE app_schedule SET applicant_schedule_enabled = 0');
     await page.reload({ waitUntil: 'networkidle2' });
-    assert(await page.$('[data-applicant-action="member-apply"]'), 'Enabling the setting restores the application button');
+    assert.equal(await page.$('[data-applicant-action="member-apply"]'), null, 'Schedule settings determine application button visibility');
+    await query('UPDATE app_schedule SET applicant_schedule_enabled = 1');
     await services.systemService.updateSuperAdminSettings(savedSuperAdminSettings);
+    await page.reload({ waitUntil: 'networkidle2' });
+    assert(await page.$('[data-applicant-action="member-apply"]'));
     await page.setViewport({ width: 390, height: 844 });
     await page.screenshot({ path: path.join(artifacts, "member-mobile.png"), fullPage: true });
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));

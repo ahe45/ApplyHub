@@ -1,5 +1,5 @@
 (function (scope) {
-  scope.createApplicantMembershipController = function ({ apiRequest, escapeHtml: esc, render, navigate, setMessage, openApplication, clearApplication, getApplyAvailability = () => ({ isAvailable: true }), isApplyButtonVisible = () => true }) {
+  scope.createApplicantMembershipController = function ({ apiRequest, escapeHtml: esc, render, navigate, setMessage, openApplication, clearApplication, getApplyAvailability = () => ({ isAvailable: true }) }) {
     const controls = scope.AdmitCardApplicantPublicRenderingHelpers;
     const feedback = scope.AdmitCardPublicFormFeedback;
     let member = null;
@@ -110,7 +110,7 @@
     function home() {
       if (!settings) return `<p class="muted">로그인 정보를 불러오는 중입니다.</p>`;
       if (!member) return `<a class="primary-button" href="/login">공통 로그인으로 이동</a>`;
-      return `<div class="applicant-member-menu">${['apply', 'documents', 'document-status', 'summary', 'ticket'].filter(key => (key !== 'apply' || isApplyButtonVisible()) && applicationContext?.menuVisibility?.[key] !== false).map(key => {
+      return `<div class="applicant-member-menu">${['apply', 'documents', 'document-status', 'summary', 'ticket'].filter(key => applicationContext?.menuVisibility?.[key] !== false).map(key => {
           const item = menuState(key);
           return `<button type="button" class="ghost-button applicant-member-tile${item.complete ? ' is-complete' : ''}" data-applicant-action="member-${key}" ${item.disabled ? 'disabled' : ''}><span class="applicant-member-tile-number" aria-hidden="true">${controls.getApplicantHomeActionIconMarkup(key === 'documents' || key === 'document-status' ? 'scan' : key)}</span><strong>${esc(item.label)}</strong><small>${esc(item.description)}</small><span class="applicant-member-tile-period">${menuPeriod(key)}</span></button>`;
         }).join('')}</div>`;

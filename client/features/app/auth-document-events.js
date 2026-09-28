@@ -454,7 +454,6 @@
       const accountField = target?.closest("[data-account-field]") || null;
       const scheduleTarget = String(target?.dataset.systemSettingsScheduleTarget || "").trim();
       const schedulePart = String(target?.dataset.systemSettingsSchedulePart || "").trim();
-      const superAdminToggle = String(target?.dataset.superAdminToggle || "").trim();
       const superAdminImageField = String(target?.dataset.superAdminImage || "").trim();
       const systemBackupAutomationField = String(target?.dataset.systemBackupAutomationField || "").trim();
       const systemBackupAutomationItemKey = String(target?.dataset.systemBackupAutomationItemKey || "").trim();
@@ -485,12 +484,6 @@
 
       if (accountField?.dataset.accountField === "role") {
         updateAccountEditorField("draftRole", target?.value);
-        return true;
-      }
-
-      if (superAdminToggle) {
-        updateSuperAdminField(superAdminToggle, target?.checked === true);
-        renderView();
         return true;
       }
 
@@ -628,6 +621,13 @@
         if (state.systemSettings.statusMessage) {
           setSystemSettingsStatus("");
         }
+        return true;
+      }
+
+      if (target?.id === "systemSettingsApplicantSubmissionEditEnabled") {
+        state.systemSettings.applicantSubmissionEditEnabled = target.value === "true";
+        syncSystemSettingsDirtyState();
+        if (state.systemSettings.statusMessage) setSystemSettingsStatus("");
         return true;
       }
 

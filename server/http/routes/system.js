@@ -124,11 +124,11 @@ function createSystemRoutes(deps) {
 
   return [
     exactRoute('GET', '/api/system-settings/email', async ({response, authenticatedAccount}) => {
-      requireSystemManager(authenticatedAccount);
+      requireSuperAdmin(authenticatedAccount);
       return deps.sendJson(response, 200, await deps.getEmailSettings(), {'Cache-Control': 'no-store'});
     }),
     exactRoute('PUT', '/api/system-settings/email', async ({request, response, authenticatedAccount}) => {
-      requireSystemManager(authenticatedAccount);
+      requireSuperAdmin(authenticatedAccount);
       const settings = await deps.updateEmailSettings(await deps.readJsonBody(request));
       await recordSystemAuditLogSafely(request, authenticatedAccount, {
         actionType: 'system_email_settings_update', targetScope: 'system-settings', summaryText: '이메일 발송 설정을 저장했습니다.',
@@ -136,7 +136,7 @@ function createSystemRoutes(deps) {
       return deps.sendJson(response, 200, settings);
     }),
     exactRoute('POST', '/api/system-settings/email/check', async ({request, response, authenticatedAccount}) => {
-      requireSystemManager(authenticatedAccount);
+      requireSuperAdmin(authenticatedAccount);
       return deps.sendJson(response, 200, await deps.checkEmailSettings(await deps.readJsonBody(request)));
     }),
     exactRoute('GET', '/api/public/school-branding', async ({ response }) => {
