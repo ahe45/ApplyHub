@@ -7,7 +7,7 @@
       <section class="modal-sheet upload-modal-sheet" role="dialog" aria-modal="true" aria-labelledby="applicantUnitUploadTitle">
         <div class="modal-header">
           <div>
-            <h3 id="applicantUnitUploadTitle">전형 관리 데이터 업로드</h3>
+            <h3 id="applicantUnitUploadTitle">전형 등록 데이터 업로드</h3>
           </div>
           <button class="icon-button" data-close-modal="true" type="button" aria-label="닫기">×</button>
         </div>
@@ -15,8 +15,8 @@
           <div class="modal-body upload-modal-body">
             <div class="upload-grid">
               <article class="upload-card">
-                <h4>전형 관리 데이터 업로드</h4>
-                <p>전형 관리 업로드 전용 XLSX 양식을 내려받아 코드와 명칭 체계를 맞춘 뒤 업로드합니다.</p>
+                <h4>전형 등록 데이터 업로드</h4>
+                <p>전형 등록 업로드 전용 XLSX 양식을 내려받아 코드와 명칭 체계를 맞춘 뒤 업로드합니다.</p>
                 <div class="upload-card-actions">
                   <button class="ghost-button upload-template-button" data-applicant-recruitment-download-template="true" type="button">양식 다운로드</button>
                 </div>
@@ -59,8 +59,8 @@
       >
         <div class="modal-header">
           <div>
-            <h3 id="applicantRecruitmentUnitModalTitle">전형 관리 상세정보</h3>
-            <p class="template-modal-meta">전형·모집단위·전공의 한국어명과 영어명을 각각 입력합니다. 영어명이 없으면 한국어명을 표시합니다.</p>
+            <h3 id="applicantRecruitmentUnitModalTitle">전형 등록 상세정보</h3>
+            <p class="template-modal-meta">언어를 선택해 전형·모집단위·전공 명칭을 입력합니다. 번역이 없으면 한국어명을 표시합니다.</p>
           </div>
           <div class="toolbar-actions">
             <button
@@ -80,9 +80,10 @@
         </div>
 
         <div class="modal-body applicant-recruitment-modal-body">
-          <form class="applicant-recruitment-modal-form" id="applicantRecruitmentUnitForm" data-applicant-recruitment-form="true">
-            <div class="applicant-recruitment-modal-grid">
-              <label class="field" for="applicantRecruitmentTrackName">
+          <form class="applicant-recruitment-modal-form" id="applicantRecruitmentUnitForm" data-applicant-recruitment-form="true" data-language-editor>
+            <section class="recruitment-section" aria-labelledby="recruitmentSharedTitle">
+              <h4 id="recruitmentSharedTitle">공통 정보</h4>
+              <div class="applicant-recruitment-modal-grid"><label class="field" for="applicantRecruitmentTrackName">
                 <span>모집시기</span>
                 <input
                   id="applicantRecruitmentTrackName"
@@ -92,8 +93,7 @@
                   autocomplete="off"
                 />
               </label>
-
-              <label class="field" for="applicantRecruitmentAdmissionCode">
+<label class="field" for="applicantRecruitmentAdmissionCode">
                 <span>전형코드</span>
                 <input
                   id="applicantRecruitmentAdmissionCode"
@@ -103,25 +103,7 @@
                   autocomplete="off"
                 />
               </label>
-
-              <div class="applicant-recruitment-name-pair">
-              <label class="field" for="applicantRecruitmentAdmissionName">
-                <span>전형명(한글)</span>
-                <input
-                  id="applicantRecruitmentAdmissionName"
-                  data-applicant-recruitment-input="admissionName"
-                  type="text" maxlength="100"
-                  placeholder="예: 수시"
-                  autocomplete="off"
-                />
-              </label>
-              <label class="field" for="applicantRecruitmentAdmissionNameEn">
-                <span>전형명(영어)</span>
-                <input id="applicantRecruitmentAdmissionNameEn" data-applicant-recruitment-input="admissionNameEn" type="text" maxlength="200" placeholder="예: Early admission" autocomplete="off" />
-              </label>
-              </div>
-
-              <label class="field" for="applicantRecruitmentSeriesCode">
+<label class="field" for="applicantRecruitmentSeriesCode">
                 <span>계열코드</span>
                 <input
                   id="applicantRecruitmentSeriesCode"
@@ -131,8 +113,7 @@
                   autocomplete="off"
                 />
               </label>
-
-              <label class="field" for="applicantRecruitmentSeriesName">
+<label class="field" for="applicantRecruitmentSeriesName">
                 <span>계열</span>
                 <input
                   id="applicantRecruitmentSeriesName"
@@ -142,8 +123,7 @@
                   autocomplete="off"
                 />
               </label>
-
-              <label class="field" for="applicantRecruitmentUnitCode">
+<label class="field" for="applicantRecruitmentUnitCode">
                 <span>모집단위코드</span>
                 <input
                   id="applicantRecruitmentUnitCode"
@@ -153,9 +133,38 @@
                   autocomplete="off"
                 />
               </label>
-
-              <div class="applicant-recruitment-name-pair">
-              <label class="field" for="applicantRecruitmentUnitName">
+<label class="field" for="applicantRecruitmentMajorCode">
+                <span>전공코드</span>
+                <input
+                  id="applicantRecruitmentMajorCode"
+                  data-applicant-recruitment-input="majorCode"
+                  type="text"
+                  placeholder="예: SE"
+                  autocomplete="off"
+                />
+              </label></div>
+            </section>
+            <section class="recruitment-section" aria-labelledby="recruitmentNamesTitle">
+              <div class="recruitment-language-head"><h4 id="recruitmentNamesTitle">언어별 명칭</h4><applyhub-language-menu editor-key="recruitment-names"></applyhub-language-menu></div>
+              <div class="applicant-recruitment-modal-grid"><div class="applicant-recruitment-name-pair"><label class="field" data-edit-language="ko" for="applicantRecruitmentAdmissionName">
+                <span>전형명(한글)</span>
+                <input
+                  id="applicantRecruitmentAdmissionName"
+                  data-applicant-recruitment-input="admissionName"
+                  type="text" maxlength="100"
+                  placeholder="예: 수시"
+                  autocomplete="off"
+                />
+              </label>
+<label class="field" data-edit-language="en" for="applicantRecruitmentAdmissionNameEn">
+                <span>전형명(영어)</span>
+                <input id="applicantRecruitmentAdmissionNameEn" data-applicant-recruitment-input="admissionNameEn" type="text" maxlength="200" placeholder="예: Early admission" autocomplete="off" />
+              </label>
+<label class="field" data-edit-language="mn" for="applicantRecruitmentAdmissionNameMn">
+                <span>전형명(몽골어)</span>
+                <input id="applicantRecruitmentAdmissionNameMn" data-applicant-recruitment-input="admissionNameMn" type="text" maxlength="200" placeholder="예: Ерөнхий элсэлт" autocomplete="off" />
+              </label><span class="recruitment-reference-name" data-recruitment-reference="admissionName"></span></div>
+<div class="applicant-recruitment-name-pair"><label class="field" data-edit-language="ko" for="applicantRecruitmentUnitName">
                 <span>모집단위명(한글)</span>
                 <input
                   id="applicantRecruitmentUnitName"
@@ -165,25 +174,15 @@
                   autocomplete="off"
                 />
               </label>
-              <label class="field" for="applicantRecruitmentUnitNameEn">
+<label class="field" data-edit-language="en" for="applicantRecruitmentUnitNameEn">
                 <span>모집단위명(영어)</span>
                 <input id="applicantRecruitmentUnitNameEn" data-applicant-recruitment-input="unitNameEn" type="text" maxlength="200" placeholder="예: Computer Science" autocomplete="off" />
               </label>
-              </div>
-
-              <label class="field" for="applicantRecruitmentMajorCode">
-                <span>전공코드</span>
-                <input
-                  id="applicantRecruitmentMajorCode"
-                  data-applicant-recruitment-input="majorCode"
-                  type="text"
-                  placeholder="예: SE"
-                  autocomplete="off"
-                />
-              </label>
-
-              <div class="applicant-recruitment-name-pair">
-              <label class="field" for="applicantRecruitmentMajorName">
+<label class="field" data-edit-language="mn" for="applicantRecruitmentUnitNameMn">
+                <span>모집단위명(몽골어)</span>
+                <input id="applicantRecruitmentUnitNameMn" data-applicant-recruitment-input="unitNameMn" type="text" maxlength="200" placeholder="예: Компьютерын ухаан" autocomplete="off" />
+              </label><span class="recruitment-reference-name" data-recruitment-reference="unitName"></span></div>
+<div class="applicant-recruitment-name-pair"><label class="field" data-edit-language="ko" for="applicantRecruitmentMajorName">
                 <span>전공명(한글)</span>
                 <input
                   id="applicantRecruitmentMajorName"
@@ -193,12 +192,16 @@
                   autocomplete="off"
                 />
               </label>
-              <label class="field" for="applicantRecruitmentMajorNameEn">
+<label class="field" data-edit-language="en" for="applicantRecruitmentMajorNameEn">
                 <span>전공명(영어)</span>
                 <input id="applicantRecruitmentMajorNameEn" data-applicant-recruitment-input="majorNameEn" type="text" maxlength="200" placeholder="예: Software Engineering" autocomplete="off" />
               </label>
-              </div>
-            </div>
+<label class="field" data-edit-language="mn" for="applicantRecruitmentMajorNameMn">
+                <span>전공명(몽골어)</span>
+                <input id="applicantRecruitmentMajorNameMn" data-applicant-recruitment-input="majorNameMn" type="text" maxlength="200" placeholder="예: Программ хангамж" autocomplete="off" />
+              </label><span class="recruitment-reference-name" data-recruitment-reference="majorName"></span></div></div>
+              <p class="recruitment-language-note">선택한 언어의 명칭을 입력합니다. 번역을 비워 두면 한국어명이 표시됩니다.</p>
+            </section>
           </form>
         </div>
       </section>
@@ -216,8 +219,8 @@
       >
         <div class="modal-header">
           <div>
-            <h3 id="applicantScheduleModalTitle">일정 상세정보</h3>
-            <p class="template-modal-meta" id="applicantScheduleModalDescription">모집시기와 전형별 접수, 서류 제출, 서류 제출 확인, 수험표 조회 기간을 설정합니다.</p>
+            <h3 id="applicantScheduleModalTitle">전형 상세설정</h3>
+            <p class="template-modal-meta" id="applicantScheduleModalDescription">전형별 적용 템플릿, 원서 수정, 수험번호 규칙과 운영 기간을 설정합니다.</p>
           </div>
           <div class="toolbar-actions">
             <button class="primary-button" id="applicantScheduleModalSaveButton" form="applicantScheduleForm" type="submit" disabled>
@@ -234,22 +237,46 @@
               <p id="applicantScheduleBulkSummaryTargets"></p>
               <p class="applicant-schedule-bulk-warning">입력한 기간을 선택 항목에 적용합니다. 비워 둔 기간은 해제되며, 혼합된 사용 여부는 스위치를 변경하지 않으면 유지됩니다.</p>
             </div>
+            <div class="applicant-schedule-layout">
+              <div class="applicant-schedule-settings-column">
             <section class="applicant-schedule-templates">
               <h4>적용 템플릿</h4>
-              <div class="applicant-schedule-template-grid">
+              <div class="applicant-schedule-template-grid applicant-schedule-template-row">
                 <label class="field">원서접수 템플릿<select data-applicant-schedule-input="applicationTemplateId" aria-label="원서접수 템플릿"></select></label>
                 <label class="field">서류제출 템플릿<select data-applicant-schedule-input="documentTemplateId" aria-label="서류제출 템플릿"></select></label>
+                <label class="field">수험표 양식<select data-applicant-schedule-input="admitCardTemplateId" aria-label="수험표 양식"></select></label>
               </div>
-              <p class="muted">가입 접수 설정에서 만든 템플릿을 선택하세요. 서류 제출 확인에도 같은 서류제출 템플릿이 적용됩니다.</p>
+              <p class="muted">가입·접수 설정에서 접수·서류 템플릿을, 수험표 양식 설정에서 수험표 양식을 만듭니다. 서류 제출 확인에도 같은 서류제출 템플릿이 적용됩니다.</p>
             </section>
+            <section class="applicant-schedule-templates">
+              <h4>수험번호 생성 규칙</h4>
+              <div class="applicant-schedule-template-grid applicant-schedule-exam-row">
+                <label class="field"><span>전체 자리수</span><input type="number" min="1" max="30" step="1" data-applicant-schedule-input="examNoDigitCount" aria-label="수험번호 전체 자리수" /></label>
+                <label class="field"><span>조합 1</span><select data-applicant-schedule-input="examNoComponent0" aria-label="수험번호 조합 1"></select></label>
+                <label class="field"><span>조합 2</span><select data-applicant-schedule-input="examNoComponent1" aria-label="수험번호 조합 2"></select></label>
+                <label class="field"><span>조합 3</span><select data-applicant-schedule-input="examNoComponent2" aria-label="수험번호 조합 3"></select></label>
+                <label class="field"><span>조합 4</span><select data-applicant-schedule-input="examNoComponent3" aria-label="수험번호 조합 4"></select></label>
+                <label class="field"><span>조합 5</span><select data-applicant-schedule-input="examNoComponent4" aria-label="수험번호 조합 5"></select></label>
+              </div>
+              <p class="muted">전체 자리수와 코드·순번의 조합 순서를 설정합니다. 순번은 한 번만 포함하세요. 변경한 규칙은 새 접수에 적용됩니다.</p>
+            </section>
+              </div>
+              <div class="applicant-schedule-periods-column">
             <section class="applicant-schedule-period" data-schedule-period="applicantSchedule">
               <div class="applicant-schedule-period-header">
                 <h4>접수 기간</h4>
+                <div class="applicant-schedule-period-actions">
+                <label class="applicant-schedule-use-switch" title="접수 기간 내 원서 수정을 허용합니다. 접수번호와 수험번호는 유지됩니다.">
+                  <input type="checkbox" role="switch" data-applicant-schedule-input="applicantSubmissionEditEnabled" aria-label="접수 후 수정 허용" />
+                  <span class="applicant-schedule-switch-track" aria-hidden="true"></span>
+                  <span data-schedule-edit-label>수정 허용</span>
+                </label>
                 <label class="applicant-schedule-use-switch">
                   <input type="checkbox" role="switch" data-applicant-schedule-input="applicantScheduleEnabled" aria-label="접수 사용 여부" checked />
                   <span class="applicant-schedule-switch-track" aria-hidden="true"></span>
                   <span data-schedule-enabled-label>사용</span>
                 </label>
+                </div>
               </div>
               <div class="applicant-schedule-period-dates">
                 <label class="field" for="applicantScheduleStartAt"><span>시작 일시</span><input id="applicantScheduleStartAt" data-applicant-schedule-input="applicantScheduleStartAt" type="datetime-local" /></label>
@@ -298,7 +325,8 @@
                 <label class="field" for="applicantScheduleLookupEndAt"><span>종료 일시</span><input id="applicantScheduleLookupEndAt" data-applicant-schedule-input="admitCardLookupScheduleEndAt" type="datetime-local" /></label>
               </div>
             </section>
-            <p class="template-modal-meta">미사용으로 설정하면 사용자 화면에서 해당 버튼이 숨겨집니다. 입력한 기간은 유지됩니다.</p>
+              </div>
+            </div>
           </form>
         </div>
       </section>
@@ -537,107 +565,6 @@
 
         <div class="modal-body template-preview-modal-body">
           <div class="template-preview-stage" id="templatePreviewStage"></div>
-        </div>
-      </section>
-    </div>
-
-    <div class="modal hidden" id="templateEditorModal" aria-hidden="true">
-      <div class="modal-backdrop" data-close-modal="true"></div>
-      <section
-        class="modal-sheet template-editor-modal-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="templateEditorTitle"
-      >
-        <div class="modal-header">
-          <div>
-            <h3 id="templateEditorTitle">수험표 양식 편집기</h3>
-          </div>
-          <button class="icon-button" data-close-modal="true" type="button" aria-label="닫기">×</button>
-        </div>
-
-        <div class="modal-body template-editor-modal-body">
-          <div class="editor-toolbar-column template-editor-toolbar-column">
-            <div class="editor-toolbar" id="templateEditorToolbarHost" role="toolbar" aria-label="양식 편집 도구"></div>
-            <div class="editor-toolbar-footer template-editor-toolbar-footer">
-              <div class="toolbar-actions">
-                <button class="primary-button" data-save-template-editor="true" type="button">저장</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="template-tag-panel">
-            <p class="template-tag-caption">수험표 데이터 태그</p>
-            <div class="template-tag-strip" id="templateTagStrip"></div>
-          </div>
-
-          <div class="template-editor-page">
-            <div class="template-editor-surface" id="templateEditorSurface" contenteditable="true"></div>
-          </div>
-
-          <aside class="template-page-properties-panel" id="templatePagePropertiesPanel" aria-label="페이지 속성">
-            <p class="template-page-properties-title">페이지 속성</p>
-            <label class="template-page-property-field" for="templateEditorPageSize">
-              <span>용지 크기</span>
-              <select class="template-page-property-control" id="templateEditorPageSize" data-template-page-setting="size">
-                <option value="A3">A3</option>
-                <option value="A4" selected>A4</option>
-                <option value="A5">A5</option>
-                <option value="B5">B5</option>
-                <option value="LETTER">Letter</option>
-                <option value="LEGAL">Legal</option>
-              </select>
-            </label>
-            <fieldset class="template-page-property-field template-page-property-fieldset">
-              <legend>방향</legend>
-              <div class="template-page-orientation-options">
-                <label for="templateEditorPageOrientationPortrait">
-                  <input
-                    class="sr-only"
-                    id="templateEditorPageOrientationPortrait"
-                    name="templateEditorPageOrientation"
-                    data-template-page-setting="orientation"
-                    type="radio"
-                    value="portrait"
-                    checked
-                  />
-                  <span>세로</span>
-                </label>
-                <label for="templateEditorPageOrientationLandscape">
-                  <input
-                    class="sr-only"
-                    id="templateEditorPageOrientationLandscape"
-                    name="templateEditorPageOrientation"
-                    data-template-page-setting="orientation"
-                    type="radio"
-                    value="landscape"
-                  />
-                  <span>가로</span>
-                </label>
-              </div>
-            </fieldset>
-            <div class="template-page-property-field">
-              <span>여백 mm</span>
-              <div class="template-page-margin-grid">
-                <label for="templateEditorPageMarginTop">
-                  <span>위</span>
-                  <input class="template-page-property-control" id="templateEditorPageMarginTop" data-template-page-setting="marginTop" type="number" min="0" max="80" step="1" value="12" />
-                </label>
-                <label for="templateEditorPageMarginRight">
-                  <span>오른쪽</span>
-                  <input class="template-page-property-control" id="templateEditorPageMarginRight" data-template-page-setting="marginRight" type="number" min="0" max="80" step="1" value="12" />
-                </label>
-                <label for="templateEditorPageMarginBottom">
-                  <span>아래</span>
-                  <input class="template-page-property-control" id="templateEditorPageMarginBottom" data-template-page-setting="marginBottom" type="number" min="0" max="80" step="1" value="12" />
-                </label>
-                <label for="templateEditorPageMarginLeft">
-                  <span>왼쪽</span>
-                  <input class="template-page-property-control" id="templateEditorPageMarginLeft" data-template-page-setting="marginLeft" type="number" min="0" max="80" step="1" value="12" />
-                </label>
-              </div>
-            </div>
-          </aside>
         </div>
       </section>
     </div>

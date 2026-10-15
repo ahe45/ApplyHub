@@ -49,6 +49,7 @@ const {
   superAdminRole,
   systemService,
   templateService,
+  translationService,
   translateDatabaseError,
   verifySystemDataDeletionPassword,
 } = applicationServices;
@@ -71,6 +72,7 @@ const apiRoutes = createApiRoutes(createApiRouteDependencies({
   superAdminRole,
   systemService,
   templateService,
+  translationService,
   verifySystemDataDeletionPassword,
 }));
 

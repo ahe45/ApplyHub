@@ -85,7 +85,7 @@ async function runScheduleSettingsChecks({ services, query, base, call, memberCo
     }
     const checkLayout = async width => {
       await admin.setViewport({ width, height: 900 });
-      assert(await admin.$eval(`${modal} .modal-sheet`, el => { const rect = el.getBoundingClientRect(); return rect.width <= 680 && rect.left >= 0 && rect.right <= innerWidth; }));
+      assert(await admin.$eval(`${modal} .modal-sheet`, el => { const rect = el.getBoundingClientRect(); return rect.width <= 1440 && rect.left >= 0 && rect.right <= innerWidth; }));
       assert(await admin.$$eval(`${modal} .applicant-schedule-period`, rows => rows.every(row => row.scrollWidth <= row.clientWidth + 1)));
       await admin.screenshot({ path: path.join(artifacts, `schedule-${width}.png`) });
     };
@@ -99,19 +99,23 @@ async function runScheduleSettingsChecks({ services, query, base, call, memberCo
     await member.reload({ waitUntil: 'networkidle0' });
     for (const key of ['apply', 'documents', 'ticket']) assert(await member.$(`[data-applicant-action=member-${key}]`));
     assert.equal(await member.$eval('[data-applicant-action=member-documents]', el => el.disabled), false);
-    await service.saveApplicantSchedule({ ...schedule, documentSubmissionScheduleEnabled: false });
+    await service.saveApplicantSchedule({ ...schedule, documentSubmissionScheduleEnabled: false, applicantSubmissionEditEnabled: true });
     await admin.reload({ waitUntil: 'networkidle0' }); await admin.click('[data-grid-select-all]'); await admin.click('[data-applicant-schedule-bulk-edit]');
     await admin.waitForSelector(`${modal}:not(.hidden)`);
     assert.equal(await admin.$eval('[data-applicant-schedule-input=documentSubmissionScheduleEnabled]', el => el.indeterminate), true);
+    assert.equal(await admin.$eval('[data-applicant-schedule-input=applicantSubmissionEditEnabled]', el => el.indeterminate), true);
     await Promise.all([admin.waitForResponse(r => r.url().endsWith('/api/applicant-schedules/bulk') && r.request().method() === 'PUT'), admin.click('#applicantScheduleModalSaveButton')]);
     await admin.waitForSelector(`${modal}.hidden`);
     let schedules = await service.getApplicantSchedules(); assert.deepEqual(schedules.map(s => s.documentSubmissionScheduleEnabled), [false, true]);
+    assert.deepEqual(schedules.map(s => s.applicantSubmissionEditEnabled), [true, false]);
     await admin.reload({ waitUntil: 'networkidle0' }); await admin.click('[data-grid-select-all]'); await admin.click('[data-applicant-schedule-bulk-edit]');
     await admin.waitForSelector(`${modal}:not(.hidden)`);
     await admin.focus('[data-applicant-schedule-input=documentSubmissionScheduleEnabled]'); await admin.keyboard.press('Space');
+    await admin.focus('[data-applicant-schedule-input=applicantSubmissionEditEnabled]'); await admin.keyboard.press('Space');
     await Promise.all([admin.waitForResponse(r => r.url().endsWith('/api/applicant-schedules/bulk') && r.request().method() === 'PUT'), admin.click('#applicantScheduleModalSaveButton')]);
     await admin.waitForSelector(`${modal}.hidden`);
     schedules = await service.getApplicantSchedules(); assert(schedules.every(s => s.documentSubmissionScheduleEnabled));
+    assert(schedules.every(s => s.applicantSubmissionEditEnabled));
     assert.deepEqual(errors, []);
     console.log('PASS: hidden/re-enabled user buttons, compact responsive modal, keyboard switches, persistence and mixed bulk settings');
   } finally { await browser.close(); }

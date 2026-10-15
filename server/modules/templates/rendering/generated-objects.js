@@ -1,5 +1,6 @@
 const bwipjs = require("bwip-js");
 const QRCode = require("qrcode");
+const { getObjectValue } = require('../../../../shared/domain/template-data');
 
 const TEMPLATE_GENERATED_OBJECT_ALT_SUFFIX = Object.freeze({
   barcode: "Code128 바코드",
@@ -10,11 +11,6 @@ function createTemplateGeneratedObjectService({
   createHttpError,
   setHtmlTagAttribute,
 }) {
-  function getTemplateGeneratedObjectValue(examinee) {
-    const examineeNo = String(examinee?.examineeNo ?? "").trim();
-    return examineeNo || "-";
-  }
-
   async function buildTemplateGeneratedObjectSvg(objectType, rawValue) {
     const normalizedType = String(objectType || "").trim().toLowerCase();
     const value = String(rawValue ?? "").trim() || "-";
@@ -60,10 +56,11 @@ function createTemplateGeneratedObjectService({
       return String(markup || "");
     }
 
-    const objectValue = getTemplateGeneratedObjectValue(examinee);
     const replacementTags = await Promise.all(
       matches.map(async (match) => {
         const objectType = match[2];
+        const source = /\bdata-template-object-source=(["'])([^"']*)\1/i.exec(match[0])?.[2] || 'examineeNo';
+        const objectValue = getObjectValue(examinee, source);
         const svgMarkup = await buildTemplateGeneratedObjectSvg(objectType, objectValue);
         let nextTagMarkup = setHtmlTagAttribute(match[0], "src", buildTemplateGeneratedObjectDataUri(svgMarkup));
         nextTagMarkup = setHtmlTagAttribute(

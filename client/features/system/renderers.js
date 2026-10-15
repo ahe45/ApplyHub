@@ -11,14 +11,6 @@
     appConfig.resolveSuperAdminLogoImageUrl || ((settings = {}) => String(settings?.logoImageUrl || "").trim() || "/client/assets/logo.png");
   const resolveSuperAdminBackgroundImageUrl =
     appConfig.resolveSuperAdminBackgroundImageUrl || ((settings = {}) => String(settings?.backgroundImageUrl || "").trim() || "/client/assets/bg.png");
-  const applicantExamNoComponentOptions = Object.freeze([
-    Object.freeze({ key: "", label: "선택 안 함" }),
-    Object.freeze({ key: "admissionCode", label: "전형코드" }),
-    Object.freeze({ key: "seriesCode", label: "계열코드" }),
-    Object.freeze({ key: "unitCode", label: "모집단위코드" }),
-    Object.freeze({ key: "nationalityCode", label: "국적코드" }),
-    Object.freeze({ key: "sequence", label: "순번" }),
-  ]);
   const systemScheduleWeekdayLabels = Object.freeze(["일", "월", "화", "수", "목", "금", "토"]);
   const systemScheduleTargetDefinitions = Object.freeze({
     "applicant-start": Object.freeze({
@@ -1636,15 +1628,15 @@
     const defaultFontSize = getLoginNoticeDefaultFontSize();
     const { renderLoginStage } = getAuthRenderers();
     const activeScope = getActiveNoticeScope();
-    const activeLanguage = state.noticeManagement.activeLanguage === "en" ? "en" : "ko";
+    const activeLanguage = globalThis.ApplyHubLanguages.normalize(state.noticeManagement.activeLanguage);
     const noticeTabs = [
       { key: "login", label: "공통 로그인 공지" },
       { key: "applicant", label: "수험생 로그인 후 공지" },
     ];
     const renderCanvas = (language) => {
-      const languageLabel = language === "en" ? "영어" : "한국어";
-      const notice = (language === "en" ? state.noticeManagement.englishScopes : state.noticeManagement.scopes)[activeScope];
-      const editorId = language === "en" ? "loginNoticeEditorEn" : "loginNoticeEditor";
+      const languageLabel = language === "mn" ? "몽골어" : language === "en" ? "영어" : "한국어";
+      const notice = (language === "mn" ? state.noticeManagement.mongolianScopes : language === "en" ? state.noticeManagement.englishScopes : state.noticeManagement.scopes)[activeScope];
+      const editorId = language === "mn" ? "loginNoticeEditorMn" : language === "en" ? "loginNoticeEditorEn" : "loginNoticeEditor";
       const editorAttributes = `data-notice-editor-language="${language}" contenteditable="true" spellcheck="false" lang="${language}" role="textbox" aria-multiline="true" aria-label="${languageLabel} 공지사항 내용"`;
       const renderApplicantNoticePreview = () => `
         <section class="login-shell login-notice-editor-stage applicant-notice-editor-stage">
@@ -1683,9 +1675,9 @@
               useEditorMarkup: true,
             });
 
-      return `<section class="notice-language-canvas ${activeLanguage === language ? 'is-active' : ''}" data-notice-canvas="${language}" aria-labelledby="noticeCanvasHeading-${language}">
+      return `<section class="notice-language-canvas ${activeLanguage === language ? 'is-active' : ''}" data-notice-canvas="${language}" data-edit-language="${language}" aria-labelledby="noticeCanvasHeading-${language}">
         <header class="notice-canvas-header">
-          <h4 id="noticeCanvasHeading-${language}">${language === 'en' ? 'English · 영어' : '한국어'}</h4>
+          <h4 id="noticeCanvasHeading-${language}">${language === 'mn' ? 'Монгол · 몽골어' : language === 'en' ? 'English · 영어' : '한국어'}</h4>
           <button class="primary-button" data-notice-action="save" type="button">${languageLabel} 저장</button>
         </header>
         <div class="notice-canvas-preview">${previewMarkup}</div>
@@ -1693,7 +1685,7 @@
     };
 
     return `
-      <section class="view-stack login-notice-settings-stack">
+      <section class="view-stack login-notice-settings-stack" data-language-editor>
         <article class="form-card">
           <div class="section-header">
             <div class="menu-section-copy">
@@ -1718,16 +1710,17 @@
               )
               .join("")}
           </div>
-          <p class="notice-language-description">편집할 공지를 클릭하면 공통 서식 도구가 적용됩니다. 작성한 내용은 각 캔버스에서 저장해 주세요.</p>
+          <div class="notice-language-selection"><applyhub-language-menu editor-key="notice-editor" value="${activeLanguage}"></applyhub-language-menu><p class="notice-language-description">선택한 언어의 공지를 작성하고 저장하세요. 다른 언어의 작성 내용은 유지됩니다.</p></div>
           <div class="login-notice-editor-shell notice-bilingual-shell">
             <div class="editor-toolbar-column login-notice-editor-toolbar-column">
-              <p class="notice-active-label" data-notice-active-label aria-live="polite">${activeLanguage === 'en' ? '영어' : '한국어'} 서식 편집</p>
+              <p class="notice-active-label" data-notice-active-label aria-live="polite">${activeLanguage === 'mn' ? '몽골어' : activeLanguage === 'en' ? '영어' : '한국어'} 서식 편집</p>
               ${renderLoginNoticeEditorToolbar(defaultFontFamily, defaultFontSize)}
             </div>
 
             <div class="notice-bilingual-canvases">
               ${renderCanvas('ko')}
               ${renderCanvas('en')}
+              ${renderCanvas('mn')}
             </div>
           </div>
         </article>
@@ -1735,71 +1728,33 @@
     `;
   }
 
-  function renderSystemSettings() {
-    const isSaving = state.systemSettings.isSaving;
-    const disabled = isSaving ? 'disabled' : '';
-    const saveDisabled = !state.systemSettings.hasUnsavedChanges || isSaving || state.systemDataDeletion.isDeleting || state.systemDataDeletion.isBackingUp || state.systemDataDeletion.isRestoring;
-    const components = Array.isArray(state.systemSettings.applicantExamNoComponents) ? state.systemSettings.applicantExamNoComponents : ['admissionCode', 'seriesCode', 'unitCode', 'sequence', ''];
-    return `
-      <section class="view-stack system-settings-view">
-        <article class="form-card system-settings-basic-card">
-          <div class="section-header">
-            <div class="menu-section-copy"><h3>시스템 설정</h3><p>원서접수 운영에 필요한 기본 설정을 관리합니다.</p></div>
-            <div class="inline-actions"><button class="primary-button system-settings-save-button" data-system-settings-action="save" type="button" ${saveDisabled ? 'disabled' : ''}>${isSaving ? '저장 중...' : '저장'}</button></div>
-          </div>
-          <div class="super-admin-form">
-            <section class="super-admin-setting-card" aria-labelledby="settingsSchoolHeading">
-              <div class="system-settings-section-head"><span class="system-settings-label" id="settingsSchoolHeading">입학처 홈페이지</span><small class="muted system-settings-help">사용자 페이지에서 연결할 입학처 홈페이지 주소를 설정합니다.</small></div>
+  function renderSystemSettingsFields(section) {
+    const disabled = state.superAdmin?.isSaving || state.systemSettings.isSaving ? 'disabled' : '';
+    const fields = {
+      homepage: `<section class="super-admin-setting-card" aria-label="입학처 홈페이지">
               <label class="field super-admin-text-field" for="systemSettingsAdmissionHomepageUrl"><span>홈페이지 주소</span>
                 <input class="system-settings-input" id="systemSettingsAdmissionHomepageUrl" type="url" maxlength="500" value="${escapeAttribute(state.systemSettings.admissionHomepageUrl || '')}" placeholder="https://admission.example.ac.kr" autocomplete="off" ${disabled} />
               </label>
-            </section>
-            <section class="super-admin-setting-card" aria-labelledby="settingsPasswordHeading">
-              <div class="system-settings-section-head"><span class="system-settings-label" id="settingsPasswordHeading">초기 비밀번호</span><small class="muted system-settings-help">관리자 계정 생성 및 비밀번호 초기화에 사용할 값을 설정합니다.</small></div>
+            </section>`,
+      password: `<section class="super-admin-setting-card" aria-label="초기 비밀번호">
                 <label class="field super-admin-text-field" for="systemSettingsInitialPassword"><span>초기 비밀번호</span>
                   <input class="system-settings-input" id="systemSettingsInitialPassword" type="text" maxlength="100" value="${escapeAttribute(getSystemInitialPassword())}" autocomplete="off" ${disabled} />
                 </label>
-            </section>
-            <section class="super-admin-setting-card" aria-labelledby="settingsLogoutHeading">
-              <div class="system-settings-section-head"><span class="system-settings-label" id="settingsLogoutHeading">자동 로그아웃</span><small class="muted system-settings-help">사용하지 않을 때 자동으로 로그아웃할 시간을 설정합니다. 0분이면 자동 로그아웃하지 않습니다.</small></div>
+            </section>`,
+      logout: `<section class="super-admin-setting-card" aria-label="자동 로그아웃">
                 <label class="field super-admin-text-field" for="systemSettingsAutoLogoutMinutes"><span>자동 로그아웃 (분)</span>
                   <input class="system-settings-input" id="systemSettingsAutoLogoutMinutes" type="number" min="0" max="${MAX_SYSTEM_AUTO_LOGOUT_MINUTES}" step="1" value="${escapeAttribute(String(state.systemSettings.autoLogoutMinutes))}" ${disabled} />
                 </label>
-            </section>
-            <section class="super-admin-setting-card" aria-labelledby="settingsApplicationHeading">
-              <div class="system-settings-section-head"><span class="system-settings-label" id="settingsApplicationHeading">원서접수 수정</span><small class="muted system-settings-help">허용하면 접수 기간 내에 접수결과에서 기존 원서를 수정할 수 있습니다. 접수번호와 수험번호는 유지됩니다.</small></div>
-              <label class="field super-admin-text-field" for="systemSettingsApplicantSubmissionEditEnabled"><span>접수 후 수정 허용</span>
-                <select class="system-settings-input" id="systemSettingsApplicantSubmissionEditEnabled" ${disabled}>
-                  <option value="false" ${state.systemSettings.applicantSubmissionEditEnabled ? '' : 'selected'}>허용 안 함</option>
-                  <option value="true" ${state.systemSettings.applicantSubmissionEditEnabled ? 'selected' : ''}>허용</option>
-                </select>
-              </label>
-            </section>
-            <section class="super-admin-setting-card" aria-labelledby="settingsExamHeading">
-              <div class="system-settings-section-head"><span class="system-settings-label" id="settingsExamHeading">수험번호 생성</span><small class="muted system-settings-help">전체 자리수와 코드·순번의 조합 순서를 설정합니다.</small></div>
-              <div class="settings-exam-fields">
-                <label class="field" for="systemSettingsApplicantExamNoDigitCount"><span>전체 자리수</span>
-                  <input class="system-settings-input" id="systemSettingsApplicantExamNoDigitCount" type="number" min="1" max="30" step="1" value="${escapeAttribute(String(state.systemSettings.applicantExamNoDigitCount || 10))}" ${disabled} />
-                </label>
-                ${Array.from({length: 5}, (_, index) => `
-                  <label class="field" for="systemSettingsApplicantExamNoComponent${index + 1}"><span>조합 ${index + 1}</span>
-                    <select class="system-settings-input" id="systemSettingsApplicantExamNoComponent${index + 1}" data-system-settings-exam-component-index="${index}" ${disabled}>
-                      ${applicantExamNoComponentOptions.map(option => `<option value="${escapeAttribute(option.key)}" ${String(components[index] || '') === option.key ? 'selected' : ''}>${escapeHtml(option.label)}</option>`).join('')}
-                    </select>
-                  </label>`).join('')}
-              </div>
-            </section>
-          </div>
-          <p class="system-settings-status${state.systemSettings.statusType === 'warning' ? ' warning' : ''}${state.systemSettings.statusMessage ? '' : ' hidden'}" id="systemSettingsStatus">${escapeHtml(state.systemSettings.statusMessage)}</p>
-        </article>
-      </section>`;
+            </section>`
+    };
+    return fields[section] || '';
   }
 
   function renderSuperAdminManagement() {
-    const isSaving = state.superAdmin?.isSaving === true;
+    const isSaving = state.superAdmin?.isSaving === true || state.systemSettings.isSaving === true;
     const uploadingField = String(state.superAdmin?.uploadingField || "").trim();
     const isUploadingImage = Boolean(uploadingField);
-    const hasUnsavedChanges = state.superAdmin?.hasUnsavedChanges === true;
+    const hasUnsavedChanges = state.superAdmin?.hasUnsavedChanges === true || state.systemSettings.hasUnsavedChanges === true;
     const statusClass = state.superAdmin?.statusType === "warning" ? " warning" : "";
     const isDeletingSystemData = state.systemDataDeletion.isDeleting;
     const isBackingUpSystemData = Boolean(state.systemDataDeletion.isBackingUp);
@@ -1819,7 +1774,7 @@
           <div class="section-header">
             <div class="menu-section-copy">
               <h3>슈퍼관리자</h3>
-              <p>학교명, 로그인 화면 이미지와 이메일 발송 설정을 관리합니다.</p>
+              <p>기본 운영 설정, 학교명, 로그인 화면 이미지와 이메일 발송 설정을 관리합니다.</p>
             </div>
             <div class="inline-actions">
               <button
@@ -1834,11 +1789,14 @@
           </div>
 
           <div class="super-admin-form">
+            <section class="super-admin-setting-card super-admin-basic-settings" aria-labelledby="superAdminBasicHeading">
+              <div class="system-settings-section-head"><span class="system-settings-label" id="superAdminBasicHeading">기본 설정</span></div>
+            <div class="super-admin-setting-row">
+              ${renderSystemSettingsFields('password')}
+              ${renderSystemSettingsFields('logout')}
+            </div>
+            <div class="super-admin-setting-row">
             <section class="super-admin-setting-card">
-              <div class="system-settings-section-head">
-                <span class="system-settings-label">학교명 설정</span>
-                <small class="muted system-settings-help">사용자 페이지 헤더에 표시되는 학교명을 설정합니다.</small>
-              </div>
               <label class="field super-admin-text-field" for="superAdminSchoolName">
                 <span>학교 이름</span>
                 <input
@@ -1852,15 +1810,17 @@
                 />
               </label>
             </section>
+              ${renderSystemSettingsFields('homepage')}
+            </div>
+            <div class="super-admin-setting-row super-admin-image-row">
 
-            <section class="super-admin-setting-card">
-              <div class="system-settings-section-head">
-                <span class="system-settings-label">로고 이미지 설정</span>
-                <small class="muted system-settings-help">기본 로고는 현재 로그인 화면에서 사용 중인 이미지를 그대로 사용합니다.</small>
-              </div>
+            <section class="super-admin-setting-card" aria-labelledby="superAdminLogoLabel">
               <div class="super-admin-image-layout">
+                <div class="field super-admin-image-field">
+                  <span id="superAdminLogoLabel">로고 이미지</span>
                 <div class="super-admin-logo-preview">
                   <img src="${escapeAttribute(logoImageUrl)}" alt="로고 미리보기" />
+                </div>
                 </div>
                 <div class="super-admin-image-actions">
                   <label class="outline-button super-admin-upload-button" for="superAdminLogoImageInput">
@@ -1886,14 +1846,13 @@
               </div>
             </section>
 
-            <section class="super-admin-setting-card">
-              <div class="system-settings-section-head">
-                <span class="system-settings-label">배경 이미지 설정</span>
-                <small class="muted system-settings-help">업로드한 이미지를 로그인 화면 배경으로 사용합니다.</small>
-              </div>
+            <section class="super-admin-setting-card" aria-labelledby="superAdminBackgroundLabel">
               <div class="super-admin-image-layout">
+                <div class="field super-admin-image-field">
+                  <span id="superAdminBackgroundLabel">배경 이미지</span>
                 <div class="super-admin-background-preview${backgroundImageUrl ? "" : " is-empty"}"${backgroundPreviewStyle}>
                   ${backgroundImageUrl ? "" : "<span>배경 이미지 미설정</span>"}
+                </div>
                 </div>
                 <div class="super-admin-image-actions">
                   <label class="outline-button super-admin-upload-button" for="superAdminBackgroundImageInput">
@@ -1919,7 +1878,10 @@
               </div>
             </section>
 
+            </div>
+            </section>
             <applyhub-email-settings></applyhub-email-settings>
+            <applyhub-translation-settings></applyhub-translation-settings>
           </div>
 
           <p class="system-settings-status${statusClass}${state.superAdmin?.statusMessage ? "" : " hidden"}" id="superAdminStatus">
@@ -1938,6 +1900,5 @@
     renderSuperAdminManagement,
     renderSystemBackupRestore,
     renderSystemDataDeletion,
-    renderSystemSettings,
   };
 });

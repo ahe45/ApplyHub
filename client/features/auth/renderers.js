@@ -47,6 +47,7 @@
   function renderLoginStage({
     noticeHtml,
     noticeHtmlEn = "",
+    noticeHtmlMn = "",
     heading,
     description,
     submitLabel,
@@ -155,7 +156,7 @@
           <applyhub-theme-toggle ${interactive ? '' : 'disabled'}></applyhub-theme-toggle>
         </header>
         ${interactive ? '<div class="public-language-row"><applyhub-language-toggle></applyhub-language-toggle></div>' : ''}
-        ${publicRenderingHelpersModule.renderCompactNotice({ html: noticeContentMarkup, htmlEn: noticeHtmlEn.trim() ? getLoginNoticeMarkup(noticeHtmlEn) : '', userContent: Boolean(String(noticeHtml || '').trim()), cardClassName: noticeCardClassName, contentClassName: noticeContentClassName, contentId: noticeContentId, contentAttributes: noticeContentAttributes, editing: useEditorMarkup })}
+        ${publicRenderingHelpersModule.renderCompactNotice({ html: noticeContentMarkup, htmlEn: noticeHtmlEn.trim() ? getLoginNoticeMarkup(noticeHtmlEn) : '', htmlMn:noticeHtmlMn.trim() ? getLoginNoticeMarkup(noticeHtmlMn) : '', userContent: Boolean(String(noticeHtml || '').trim()), cardClassName: noticeCardClassName, contentClassName: noticeContentClassName, contentId: noticeContentId, contentAttributes: noticeContentAttributes, editing: useEditorMarkup })}
 
         <article class="${panelClassNames}">
           <div class="login-stage-panel-inner">${formBody}</div>
@@ -179,6 +180,7 @@
     return `${renderAuthBackgroundMedia(superAdminSettings)}${renderLoginStage({
       noticeHtml: state.noticeManagement.scopes.login.savedHtml,
       noticeHtmlEn: state.noticeManagement.englishScopes.login.savedHtml,
+      noticeHtmlMn:state.noticeManagement.mongolianScopes.login.savedHtml,
       heading,
       description,
       submitLabel: state.auth.isSubmittingLogin ? "로그인 중..." : "로그인",

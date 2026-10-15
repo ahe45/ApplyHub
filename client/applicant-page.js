@@ -145,6 +145,7 @@
       },
       noticeHtml: "",
       noticeHtmlEn: "",
+      noticeHtmlMn: "",
     },
     message: {
       type: "",
@@ -882,7 +883,7 @@
   function getApplicantFormEditAvailabilityState() {
     if (state.mode === "documents") return getMemberDocumentEditAvailabilityState();
     if (!APPLICANT_IS_PREVIEW_MODE && membership?.member && state.currentSubmission?.id) {
-      if (state.formConfig.systemSettings?.applicantSubmissionEditEnabled !== true) {
+      if (findApplicantScheduleRecord(getApplicantSchedules(), { ...getApplicantRecruitmentSelectionFromSubmission(state.currentSubmission), ...state.currentSubmission?.fieldOverrides })?.applicantSubmissionEditEnabled !== true || findApplicantScheduleRecord(getApplicantSchedules(), getApplicantEditableScheduleTarget())?.applicantSubmissionEditEnabled !== true) {
         return { isEditable: false, disabledMessage: '접수 후 수정이 허용되지 않습니다.' };
       }
       const originalAvailability = getApplicantApplyAvailabilityState({ target: state.currentSubmission });
@@ -1026,6 +1027,16 @@
       APPLICANT_RECRUITMENT_SELECTION_FIELDS.slice(0, definitionIndex).every(parent =>
         !selection[parent.key] || String(unit[parent.unitKey] || "").trim() === selection[parent.key]));
     return candidates.map(unit => String(unit[`${definition.unitKey}En`] || "").trim()).find(Boolean) || value;
+  }
+  function getRecruitmentMongolianName(fieldKey, value, selection = state.recruitment) {
+    if (!["admission", "unit", "major"].includes(fieldKey)) return value;
+    const definitionIndex = getApplicantRecruitmentSelectionIndex(fieldKey);
+    const definition = APPLICANT_RECRUITMENT_SELECTION_FIELDS[definitionIndex];
+    const candidates = (state.formConfig.recruitmentUnits || []).filter(unit =>
+      String(unit[definition.unitKey] || "").trim() === value &&
+      APPLICANT_RECRUITMENT_SELECTION_FIELDS.slice(0, definitionIndex).every(parent =>
+        !selection[parent.key] || String(unit[parent.unitKey] || "").trim() === selection[parent.key]));
+    return candidates.map(unit => String(unit[`${definition.unitKey}Mn`] || "").trim()).find(Boolean) || value;
   }
 
   function hasApplicantRecruitmentSelectionPrerequisites(fieldKey = "", selection = state.recruitment) {
@@ -1489,7 +1500,7 @@
         >
           <div class="applicant-public-pdf-viewer-head">
             <div class="applicant-public-pdf-viewer-copy">
-              <h2 id="applicantPdfPreviewTitle">${state.pdfPreview.fieldKey ? applicantPublicRenderingHelpersModule.renderAuthoredText(state.pdfPreview.title, state.pdfPreview.titleEn) : escapeHtml(state.pdfPreview.title || "PDF 미리보기")}</h2>
+              <h2 id="applicantPdfPreviewTitle">${state.pdfPreview.fieldKey ? applicantPublicRenderingHelpersModule.renderAuthoredText(state.pdfPreview.title, state.pdfPreview.titleEn, state.pdfPreview.titleMn) : escapeHtml(state.pdfPreview.title || "PDF 미리보기")}</h2>
               <p translate="no">${escapeHtml(state.pdfPreview.fileName || "")}</p>
             </div>
             <div class="applicant-public-actions applicant-public-pdf-viewer-actions">
@@ -2090,6 +2101,7 @@
       fieldKey: normalizedFieldKey,
       title: String(field?.questionText || "").trim() || "PDF 미리보기",
       titleEn: field?.questionTextEn || "",
+      titleMn: field?.questionTextMn || "",
       fileName: String(previewFile.name || fieldValue?.fileName || "").trim() || "document.pdf",
       file: previewFile,
       objectUrl,
@@ -2289,7 +2301,7 @@
 
       <section class="applicant-public-home-stage">
         <section class="applicant-public-home">
-          ${applicantPublicRenderingHelpersModule.renderCompactNotice({ html: getApplicantNoticeMarkup(state.formConfig.noticeHtml, "접수 전 공지사항을 확인하세요."), htmlEn: state.formConfig.noticeHtmlEn.trim() ? getApplicantNoticeMarkup(state.formConfig.noticeHtmlEn) : '', userContent: Boolean(String(state.formConfig.noticeHtml || "").trim()), cardClassName: 'applicant-public-hero', contentClassName: 'applicant-public-notice-surface' })}
+          ${applicantPublicRenderingHelpersModule.renderCompactNotice({ html: getApplicantNoticeMarkup(state.formConfig.noticeHtml, "접수 전 공지사항을 확인하세요."), htmlEn: state.formConfig.noticeHtmlEn.trim() ? getApplicantNoticeMarkup(state.formConfig.noticeHtmlEn) : '', htmlMn:state.formConfig.noticeHtmlMn.trim() ? getApplicantNoticeMarkup(state.formConfig.noticeHtmlMn) : '', userContent: Boolean(String(state.formConfig.noticeHtml || "").trim()), cardClassName: 'applicant-public-hero', contentClassName: 'applicant-public-notice-surface' })}
 
           <article class="applicant-public-panel applicant-public-action-grid login-panel-card login-stage-panel">
             ${renderMessage()}
@@ -2517,10 +2529,10 @@
 
     return `
       <div class="applicant-public-field">
-        <label>${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn)} ${requiredBadge}</label>
+        <label>${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn, field.questionTextMn)} ${requiredBadge}</label>
         ${fieldDescriptionMarkup}
         ${field.inputType === 'daterange'
-          ? applicantPublicRenderingHelpersModule.renderDateRangeControls({ fieldKey: field.fieldKey, inputType: field.inputType, dateParts: field.dateParts, rangeParts: Object.fromEntries(['start', 'end'].map(edge => [edge, getApplicantDatePartState(field.fieldKey, edge)])), label: field.questionText, labelEn: field.questionTextEn, disabled: isReadOnly })
+          ? applicantPublicRenderingHelpersModule.renderDateRangeControls({ fieldKey: field.fieldKey, inputType: field.inputType, dateParts: field.dateParts, rangeParts: Object.fromEntries(['start', 'end'].map(edge => [edge, getApplicantDatePartState(field.fieldKey, edge)])), label: field.questionText, labelEn: field.questionTextEn, labelMn:field.questionTextMn, disabled: isReadOnly })
           : applicantPublicRenderingHelpersModule.renderDateSelectControls({ fieldKey: field.fieldKey, inputType: field.inputType, dateParts: field.dateParts, parts: dateParts, label: field.questionText, labelEn: field.questionTextEn, disabled: isReadOnly })}
         <input type="hidden" data-applicant-field-key="${escapeAttribute(field.fieldKey)}" value="${escapeAttribute(fieldValue || "")}" />
       </div>
@@ -2532,15 +2544,15 @@
     const isReadOnly = options.isReadOnly === true || field.systemFieldKey === "name";
     const requiredBadge = globalThis.AdmitCardPublicFormFeedback.badge(field.required);
     const fieldDescription = String(field.questionDescription || "").trim();
-    const fieldDescriptionMarkup = fieldDescription || field.questionDescriptionEn
-      ? `<span class="applicant-public-file-note applicant-public-field-note">${applicantPublicRenderingHelpersModule.renderAuthoredText(fieldDescription, field.questionDescriptionEn)}</span>`
+    const fieldDescriptionMarkup = fieldDescription || field.questionDescriptionEn || field.questionDescriptionMn
+      ? `<span class="applicant-public-file-note applicant-public-field-note">${applicantPublicRenderingHelpersModule.renderAuthoredText(fieldDescription, field.questionDescriptionEn, field.questionDescriptionMn)}</span>`
       : "";
     const fieldTypeAttribute = `data-applicant-field-type="${escapeAttribute(field.inputType || "text")}"`;
 
     if (field.inputType === "textarea") {
       return `
         <div class="applicant-public-field">
-          <label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn)} ${requiredBadge}</label>
+          <label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn, field.questionTextMn)} ${requiredBadge}</label>
           ${fieldDescriptionMarkup}
           <textarea
             id="field-${escapeAttribute(field.fieldKey)}"
@@ -2553,7 +2565,7 @@
     }
 
     if (field.inputType === "multiselect") {
-      return `<div class="applicant-public-field"><span>${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn)} ${requiredBadge}</span>${fieldDescriptionMarkup}${applicantPublicRenderingHelpersModule.renderMultiSelect(field, fieldValue, { disabled: isReadOnly })}</div>`;
+      return `<div class="applicant-public-field"><span>${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn, field.questionTextMn)} ${requiredBadge}</span>${fieldDescriptionMarkup}${applicantPublicRenderingHelpersModule.renderMultiSelect(field, fieldValue, { disabled: isReadOnly })}</div>`;
     }
 
     if (field.inputType === "select") {
@@ -2583,7 +2595,7 @@
 
       return `
         <div class="applicant-public-field">
-          <label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn)} ${requiredBadge}</label>
+          <label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn, field.questionTextMn)} ${requiredBadge}</label>
           ${fieldDescriptionMarkup}
           <select
             id="field-${escapeAttribute(field.fieldKey)}"
@@ -2596,7 +2608,7 @@
             ${normalizedOptions
               .map(
                 (option) => `
-                  <option translate="no" data-i18n-ko="${escapeAttribute(option)}" data-i18n-en="${escapeAttribute(field.optionsEn?.[option] || option)}" value="${escapeAttribute(option)}" ${selectedOptionValue === option ? "selected" : ""}>${escapeHtml(option)}</option>
+                  <option translate="no" data-i18n-ko="${escapeAttribute(option)}" data-i18n-en="${escapeAttribute(field.optionsEn?.[option] || option)}" data-i18n-mn="${escapeAttribute(field.optionsMn?.[option] || option)}" value="${escapeAttribute(option)}" ${selectedOptionValue === option ? "selected" : ""}>${escapeHtml(option)}</option>
                 `,
               )
               .join("")}
@@ -2631,7 +2643,7 @@
 
       return `
         <div class="applicant-public-field applicant-public-file-field">
-          <label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn)} ${requiredBadge}</label>
+          <label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn, field.questionTextMn)} ${requiredBadge}</label>
           ${fieldDescriptionMarkup}
           <div class="applicant-public-file-shell">
             ${!isPhotoField && field.allowedExtensions?.length ? `<small class="muted">허용 확장자: ${escapeHtml(field.allowedExtensions.join(', '))}</small>` : ''}
@@ -2687,7 +2699,7 @@
 
       return `
         <div class="applicant-public-field applicant-public-nationality-field">
-          <label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn)} ${requiredBadge}</label>
+          <label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn, field.questionTextMn)} ${requiredBadge}</label>
           ${fieldDescriptionMarkup}
           <div class="applicant-public-nationality-combobox">
             <input
@@ -2717,6 +2729,10 @@
       return renderApplicantDateField(field, fieldValue, requiredBadge, fieldDescriptionMarkup, isReadOnly);
     }
 
+    if (field.inputType === 'phone' && field.showCountryCode) {
+      return `<div class="applicant-public-field"><label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn, field.questionTextMn)} ${requiredBadge}</label>${fieldDescriptionMarkup}${applicantPublicRenderingHelpersModule.renderPhoneControls({ value: fieldValue, fieldKey: field.fieldKey, prefix: 'applicant', id: `field-${field.fieldKey}`, required: field.required, readOnly: isReadOnly })}</div>`;
+    }
+
     const inputType =
       field.inputType === "time"
           ? "time"
@@ -2728,7 +2744,7 @@
 
     return `
       <div class="applicant-public-field">
-        <label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn)} ${requiredBadge}</label>
+        <label for="field-${escapeAttribute(field.fieldKey)}">${applicantPublicRenderingHelpersModule.renderAuthoredText(field.questionText, field.questionTextEn, field.questionTextMn)} ${requiredBadge}</label>
         ${fieldDescriptionMarkup}
         <input
           id="field-${escapeAttribute(field.fieldKey)}"
@@ -2786,7 +2802,7 @@
             (item) => `
               <div class="applicant-public-selection-summary-item">
                 <strong>${escapeHtml(item.label)}</strong>
-                <span translate="no" class="applicant-public-selection-summary-value" data-i18n-ko="${escapeAttribute(item.value)}" data-i18n-en="${escapeAttribute(getRecruitmentEnglishName(item.key, item.value))}" title="${escapeAttribute(item.value)}" data-i18n-title-en="${escapeAttribute(getRecruitmentEnglishName(item.key, item.value))}">${escapeHtml(item.value)}</span>
+                <span translate="no" class="applicant-public-selection-summary-value" data-i18n-ko="${escapeAttribute(item.value)}" data-i18n-en="${escapeAttribute(getRecruitmentEnglishName(item.key, item.value))}" data-i18n-mn="${escapeAttribute(getRecruitmentMongolianName(item.key, item.value))}" title="${escapeAttribute(item.value)}" data-i18n-title-en="${escapeAttribute(getRecruitmentEnglishName(item.key, item.value))}" data-i18n-title-mn="${escapeAttribute(getRecruitmentMongolianName(item.key, item.value))}">${escapeHtml(item.value)}</span>
               </div>
             `,
           )
@@ -2826,7 +2842,7 @@
             ${options
               .map(
                 (option) => `
-                  <option translate="no" value="${escapeAttribute(option)}" data-i18n-ko="${escapeAttribute(option)}" data-i18n-en="${escapeAttribute(getRecruitmentEnglishName(definition.key, option))}" ${selectedValue === option ? "selected" : ""}>${escapeHtml(option)}</option>
+                  <option translate="no" value="${escapeAttribute(option)}" data-i18n-ko="${escapeAttribute(option)}" data-i18n-en="${escapeAttribute(getRecruitmentEnglishName(definition.key, option))}" data-i18n-mn="${escapeAttribute(getRecruitmentMongolianName(definition.key, option))}" ${selectedValue === option ? "selected" : ""}>${escapeHtml(option)}</option>
                 `,
               )
               .join("")}
@@ -3060,8 +3076,8 @@
 
             return `
               <div class="applicant-public-summary-item">
-                <strong>${applicantPublicRenderingHelpersModule.renderAuthoredText(answerItem?.questionText || "-", answerItem?.questionTextEn)}</strong>
-                <span ${answerItem?.inputType === "photo" || answerItem?.inputType === "file" ? (answerItem?.value?.fileName ? 'translate="no"' : '') : 'translate="no"'}>${["admission", "unit", "major"].includes(answerItem.systemFieldKey) ? applicantPublicRenderingHelpersModule.renderAuthoredText(value, getRecruitmentEnglishName(answerItem.systemFieldKey, value, recruitmentSelection)) : applicantFormConfig.isChoiceInputType(answerItem.inputType) ? applicantPublicRenderingHelpersModule.renderChoiceAnswer(getApplicantFormFieldByKey(answerItem.fieldKey) || {}, answerItem.value) : escapeHtml(value)}</span>
+                <strong>${applicantPublicRenderingHelpersModule.renderAuthoredText(answerItem?.questionText || "-", answerItem?.questionTextEn, answerItem?.questionTextMn)}</strong>
+                <span ${answerItem?.inputType === "photo" || answerItem?.inputType === "file" ? (answerItem?.value?.fileName ? 'translate="no"' : '') : 'translate="no"'}>${["admission", "unit", "major"].includes(answerItem.systemFieldKey) ? applicantPublicRenderingHelpersModule.renderAuthoredText(value, getRecruitmentEnglishName(answerItem.systemFieldKey, value, recruitmentSelection), getRecruitmentMongolianName(answerItem.systemFieldKey, value, recruitmentSelection)) : applicantFormConfig.isChoiceInputType(answerItem.inputType) ? applicantPublicRenderingHelpersModule.renderChoiceAnswer(getApplicantFormFieldByKey(answerItem.fieldKey) || {}, answerItem.value) : escapeHtml(value)}</span>
               </div>
             `;
           })
@@ -3220,7 +3236,7 @@
     return `<section class="applicant-public-step"><article class="applicant-public-slab"><h2>서류 제출 확인</h2>
       <p class="muted">서류별 제출 상태를 확인해 주세요.</p>${renderMessage()}
       <div class="applicant-document-status-list">${documents.map(item => `<div class="applicant-document-status-row">
-        <div><strong>${applicantPublicRenderingHelpersModule.renderAuthoredText(item.questionText, item.questionTextEn)}</strong>
+        <div><strong>${applicantPublicRenderingHelpersModule.renderAuthoredText(item.questionText, item.questionTextEn, item.questionTextMn)}</strong>
           ${item.fileName ? `<p translate="no">${escapeHtml(item.fileName)}</p>` : ''}</div>
         <span class="applicant-document-status-badge is-${escapeAttribute(item.status)}">${escapeHtml(item.statusLabel)}</span>
       </div>`).join('') || '<p>확인할 서류 항목이 없습니다.</p>'}</div>
@@ -3326,6 +3342,7 @@
         },
         noticeHtml: String(payload?.noticeHtml || ""),
         noticeHtmlEn: String(payload?.noticeHtmlEn || ""),
+        noticeHtmlMn: String(payload?.noticeHtmlMn || ""),
       };
       syncApplicantRecruitmentSelection({ preserveExisting: true });
       state.draftAnswers = {
@@ -3579,7 +3596,10 @@
         navigateToApplicantMode('home');
         return;
       }
-      if (error.code === 'APPLICANT_SUBMISSION_EDIT_DISABLED') state.formConfig.systemSettings.applicantSubmissionEditEnabled = false;
+      if (error.code === 'APPLICANT_SUBMISSION_EDIT_DISABLED') {
+        const schedule = findApplicantScheduleRecord(getApplicantSchedules(), { ...getApplicantRecruitmentSelectionFromSubmission(state.currentSubmission), ...state.currentSubmission?.fieldOverrides });
+        if (schedule) schedule.applicantSubmissionEditEnabled = false;
+      }
       if (error.fieldKey) fieldError = error;
       else setMessage("error", error?.message || "접수 저장에 실패했습니다.");
     } finally {
@@ -3983,6 +4003,8 @@
       return;
     }
 
+    const phoneGroup = target.closest('[data-phone-control]');
+    if (phoneGroup) { state.draftAnswers[phoneGroup.dataset.phoneFieldKey] = applicantPublicRenderingHelpersModule.readPhoneControl(phoneGroup); persistApplicantPublicState(); return; }
     const multiGroup = target.closest('[data-choice-prefix="applicant"]');
     if (multiGroup) { state.draftAnswers[multiGroup.dataset.choiceGroup] = applicantPublicRenderingHelpersModule.readMultiSelect(multiGroup); persistApplicantPublicState(); return; }
 
@@ -4033,6 +4055,9 @@
     if (!element) {
       return;
     }
+
+    const phoneGroup = element.closest('[data-phone-control]');
+    if (phoneGroup) { state.draftAnswers[phoneGroup.dataset.phoneFieldKey] = applicantPublicRenderingHelpersModule.readPhoneControl(phoneGroup); persistApplicantPublicState(); return; }
 
     if (String(element.dataset.applicantModel || "").startsWith("recruitment.")) {
       const mirroredInputEvent = new Event("input", { bubbles: true });

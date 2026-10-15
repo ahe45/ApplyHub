@@ -434,29 +434,10 @@ function createSystemSettingsService({
       );
     }
 
-    const applicantExamNoDigitCount = parseApplicantExamNoDigitCount(payload.applicantExamNoDigitCount);
-    const applicantExamNoComponents = parseApplicantExamNoComponents(payload.applicantExamNoComponents);
-    const selectedComponents = applicantExamNoComponents.filter(Boolean);
-
-    if (selectedComponents.length === 0) {
-      throw createHttpError(400, "수험번호 자동 생성 구성 요소를 하나 이상 선택하세요.", "APPLICANT_EXAM_NO_COMPONENTS_REQUIRED");
-    }
-
-    if (selectedComponents.filter((value) => value === "sequence").length !== 1) {
-      throw createHttpError(400, "수험번호 자동 생성 구성에는 순번을 한 번만 포함해야 합니다.", "APPLICANT_EXAM_NO_SEQUENCE_COMPONENT_REQUIRED");
-    }
-
-    if (new Set(selectedComponents).size !== selectedComponents.length) {
-      throw createHttpError(400, "수험번호 자동 생성 구성 요소는 중복 없이 선택하세요.", "APPLICANT_EXAM_NO_COMPONENTS_DUPLICATED");
-    }
-
     return {
       initialPassword,
       autoLogoutMinutes,
       admissionHomepageUrl,
-      applicantSubmissionEditEnabled: payload.applicantSubmissionEditEnabled === true,
-      applicantExamNoDigitCount,
-      applicantExamNoComponents,
     };
   }
 
@@ -514,10 +495,7 @@ function createSystemSettingsService({
         VALUES
           ('initialPassword', ?),
           ('autoLogoutMinutes', ?),
-          ('admissionHomepageUrl', ?),
-          ('applicantSubmissionEditEnabled', ?),
-          ('applicantExamNoDigitCount', ?),
-          ('applicantExamNoComponentsJson', ?)
+          ('admissionHomepageUrl', ?)
         ON DUPLICATE KEY UPDATE
           setting_value = VALUES(setting_value)
       `,
@@ -525,9 +503,6 @@ function createSystemSettingsService({
         nextSettings.initialPassword,
         String(nextSettings.autoLogoutMinutes),
         nextSettings.admissionHomepageUrl,
-        String(nextSettings.applicantSubmissionEditEnabled),
-        String(nextSettings.applicantExamNoDigitCount),
-        JSON.stringify(nextSettings.applicantExamNoComponents),
       ],
     );
 

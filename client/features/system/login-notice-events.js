@@ -57,11 +57,25 @@
         element.classList.toggle('is-active', element === canvas);
       });
       const activeLabel = document.querySelector('[data-notice-active-label]');
-      if (activeLabel) activeLabel.textContent = `${language === 'en' ? '영어' : '한국어'} 서식 편집`;
+      if (activeLabel) activeLabel.textContent = `${language === 'mn' ? '몽골어' : language === 'en' ? '영어' : '한국어'} 서식 편집`;
       setLoginNoticeTableInsertPanelVisibility(false);
       setLoginNoticeCellSplitPanelVisibility(false);
       updateLoginNoticeFormattingControls();
     }
+
+    document.addEventListener('applyhub:language-select', event => {
+      if (!isLoginNoticeViewActive() || event.detail.editorKey !== 'notice-editor') return;
+      const canvas = document.querySelector('[data-notice-canvas="' + event.detail.language + '"]');
+      activateNoticeCanvas(canvas);
+    });
+    document.addEventListener('applyhub:notice-translation', event => {
+      if (!isLoginNoticeViewActive()) return;
+      const previous=state.noticeManagement.activeLanguage;
+      syncLoginNoticeEditorDraft();
+      setNoticeManagementScope(state.noticeManagement.activeScope,event.detail.language);
+      syncLoginNoticeEditorDraft();
+      setNoticeManagementScope(state.noticeManagement.activeScope,previous);
+    });
 
     function handleFocusIn(event) {
       if (isLoginNoticeViewActive()) activateNoticeCanvas(event.target);

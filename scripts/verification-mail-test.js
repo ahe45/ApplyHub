@@ -161,8 +161,8 @@ async function run() {
     await page.setCookie({name:'admitcard.sid',value:adminCookie.split('=')[1],url:base});
     await page.setViewport({width:1440,height:1000});
     await page.goto(base+'/system-settings',{waitUntil:'networkidle2'});
-    assert.equal(await page.$('applyhub-email-settings'), null, 'Email settings have moved out of system settings');
-    assert.equal(await page.$$eval('.system-settings-view .super-admin-form > .super-admin-setting-card', cards=>cards.length), 5);
+    assert.equal(new URL(page.url()).pathname, '/super-admin', 'The retired system settings route redirects to super admin');
+    assert(await page.$('applyhub-email-settings'), 'Super admin includes email settings');
     await page.goto(base+'/super-admin',{waitUntil:'networkidle2'});
     await page.waitForSelector('applyhub-email-settings input[name=password]');
     assert.equal(await page.$eval('applyhub-email-settings input[name=password]',el=>el.value),'');
@@ -170,13 +170,13 @@ async function run() {
     await page.click('applyhub-email-settings input[name=fromName]',{clickCount:3});
     await page.type('applyhub-email-settings input[name=fromName]','입학처 테스트');
     await page.click('[data-email-check]');
-    await page.waitForFunction(()=>document.querySelector('applyhub-email-settings [role=status]')?.textContent.includes('성공'));
+    await page.waitForFunction(()=>document.querySelector('applyhub-email-settings [data-settings-status]')?.textContent.includes('연결 확인됨'));
     await page.click('[data-email-save]');
-    await page.waitForFunction(()=>document.querySelector('applyhub-email-settings [role=status]')?.textContent.includes('저장했습니다'));
+    await page.waitForFunction(()=>document.querySelector('applyhub-email-settings [data-settings-status]')?.textContent.includes('저장됨'));
     assert.equal((await fresh.getEmailSettings()).fromName,'입학처 테스트');
     assert.equal(await page.$eval('applyhub-email-settings input[name=password]',el=>el.value),'');
     smtpFailure='EAUTH'; await page.click('[data-email-check]');
-    await page.waitForFunction(()=>document.querySelector('applyhub-email-settings [role=status]')?.textContent.includes('인증을 거절'));
+    await page.waitForFunction(()=>document.querySelector('.toast-error')?.textContent.includes('인증을 거절'));
     smtpFailure='';
     const artifacts=path.resolve(__dirname,'../.tmp-email-check');fs.mkdirSync(artifacts,{recursive:true});
     for(const theme of ['light','dark']) {
@@ -205,6 +205,7 @@ async function run() {
     const signupPage=await visitor.newPage();signupPage.on('pageerror',error=>errors.push(error.message));
     await services.membershipService.saveSettings({birth:'hidden',phone:'hidden',terms:[],extraFields:[]});
     await signupPage.goto(base+'/applicant/signup',{waitUntil:'networkidle0'});
+    await signupPage.click('.language-menu-trigger');
     await signupPage.click('[data-language="en"]');
     await signupPage.click('[data-applicant-form="member-terms"] button[type="submit"]');
     await signupPage.waitForSelector('[data-applicant-form="member-register"] [name="email"]');

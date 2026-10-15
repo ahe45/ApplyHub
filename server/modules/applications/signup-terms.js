@@ -8,13 +8,15 @@ function normalizeSignupTerms(settings = {}) {
   const terms = source.map(term => {
     const id = String(term?.id || ''), title = String(term?.title || '').trim(), text = String(term?.text || '').trim();
     const titleEn = String(term?.titleEn || '').trim(), textEn = String(term?.textEn || '').trim();
+    const titleMn = String(term?.titleMn || '').trim(), textMn = String(term?.textMn || '').trim();
+    if (titleMn.length > 100 || textMn.length > 30000) throw new Error('몽골어 약관 제목은 100자, 내용은 30,000자 이내로 입력하세요.');
     const enabled = term?.enabled !== false;
     if (!/^[a-zA-Z0-9_-]{1,60}$/.test(id)) throw new Error('약관 식별자가 올바르지 않습니다.');
     if (!title || title.length > 100) throw new Error('약관 제목을 100자 이내로 입력하세요.');
     if (text.length > 30000 || (enabled && !text)) throw new Error('사용할 약관 내용을 30,000자 이내로 입력하세요.');
     if (titleEn.length > 100) throw new Error('영어 약관 제목을 100자 이내로 입력하세요.');
     if (textEn.length > 30000) throw new Error('영어 약관 내용을 30,000자 이내로 입력하세요.');
-    return { id, title, text, titleEn, textEn, required: term?.required !== false, enabled };
+    return { id, title, text, titleEn, textEn, titleMn, textMn, required: term?.required !== false, enabled };
   });
   if (new Set(terms.map(t => t.id)).size !== terms.length) throw new Error('약관 식별자가 중복됩니다.');
   return terms;
@@ -35,8 +37,8 @@ function buildSignupConsent(settings, payload, now = new Date()) {
   const agreedIds = new Set(consents.filter(c => c.agreed === true).map(c => c.id));
   const missing = terms.find(t => t.required && !agreedIds.has(t.id));
   if (missing) throw new Error(`${missing.title} 약관에 동의해 주세요. (필수)`);
-  return { version: signupTermsVersion(settings), language: payload.language === 'en' ? 'en' : 'ko', submittedAt: now.toISOString(), terms: terms.map(term => ({
-    id: term.id, title: term.title, text: term.text, titleEn: term.titleEn || '', textEn: term.textEn || '', required: term.required,
+  return { version: signupTermsVersion(settings), language: require('../../../shared/domain/languages').normalize(payload.language), submittedAt: now.toISOString(), terms: terms.map(term => ({
+    id: term.id, title: term.title, text: term.text, titleEn: term.titleEn || '', textEn: term.textEn || '', titleMn:term.titleMn || '', textMn:term.textMn || '', required: term.required,
     agreed: agreedIds.has(term.id), agreedAt: agreedIds.has(term.id) ? now.toISOString() : null,
   })) };
 }

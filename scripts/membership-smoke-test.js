@@ -27,7 +27,10 @@ async function run() {
     await admin.query(`CREATE DATABASE \`${database}\` CHARACTER SET utf8mb4`);
     pool = mysql.createPool({ ...getDbConfig(), database, ...(process.argv.includes('--single-connection') ? {connectionLimit:1} : {}) });
     const query = async (sql, params = []) => (await pool.query(sql, params))[0];
-    const services = createApplicationServices({ fs, path, query, getPool: () => pool, rootDir: root, env: { ...process.env, DB_NAME: database } });
+    const translationTest = process.argv.includes('--translation');
+    const services = createApplicationServices({ fs, path, query, getPool: () => pool, rootDir: root,
+      env: { ...process.env, DB_NAME: database, ...(translationTest ? { GOOGLE_TRANSLATE_API_KEY: 'test-only' } : {}) },
+      ...(translationTest ? { translationFetch: require('./translation-service-test').mockTranslationFetch } : {}) });
     await services.initializeApplicationData();
     // Simulate an existing database before separate document questions were introduced.
     const legacyFields = await query('SELECT id, field_key, question_text, input_type FROM app_form ORDER BY id');
@@ -68,8 +71,28 @@ async function run() {
       const text = await response.text();
       return { status: response.status, body: (() => { try { return JSON.parse(text); } catch { return text; } })(), cookie: response.headers.get("set-cookie")?.split(";")[0] || "" };
     };
+    if (translationTest) {
+      await require('./translation-checks').runTranslationChecks({ services, query, base, call });
+      return;
+    }
+    if (process.argv.includes('--phone-settings')) {
+      await require('./phone-settings-checks').runPhoneSettingsChecks({ services, members, query, base, call, getDeliveredCode: () => deliveredCode });
+      return;
+    }
+    if (process.argv.includes('--admin-ui')) {
+      await require('./admin-ui-checks').runAdminUiChecks({ services, query, base, call });
+      return;
+    }
     if (process.argv.includes('--admin-menus')) {
       await require('./admin-menu-checks').runAdminMenuChecks({ services, query, base, call });
+      return;
+    }
+    if (process.argv.includes('--settings-language')) {
+      await require('./settings-language-checks').verifySettingsLanguage({ services, query, base, call });
+      return;
+    }
+    if (process.argv.includes('--examlist-editor')) {
+      await require('./examlist-editor-checks').verifyExamListEditor({ services, query, base, call });
       return;
     }
     if (process.argv.includes('--login-header')) {
@@ -145,6 +168,7 @@ async function run() {
 
     await query("INSERT INTO app_unit (track_name, admission_code, admission_name, series_code, series_name, unit_code, unit_name) VALUES ('수시','1','일반','2','인문','3','문학')");
     await query("INSERT INTO app_schedule (track_name, admission_code, admission_name, applicant_schedule_start_at, applicant_schedule_end_at, admit_card_lookup_schedule_start_at, admit_card_lookup_schedule_end_at) VALUES ('수시','1','일반',DATE_SUB(NOW(), INTERVAL 1 DAY),DATE_ADD(NOW(), INTERVAL 1 DAY),DATE_SUB(NOW(), INTERVAL 1 DAY),DATE_ADD(NOW(), INTERVAL 1 DAY))");
+    await query("UPDATE app_schedule SET admit_card_template_id = (SELECT id FROM templates WHERE status='used' LIMIT 1)");
     await query("UPDATE app_form SET required = 0 WHERE system_field_key <> 'name'");
     if (process.argv.includes('--nationality-code')) {
       await require('./member-nationality-checks').runMemberNationalityChecks({ services, members, query, call, memberCookie: login.cookie, signup });
@@ -184,6 +208,22 @@ async function run() {
     assert(completedContext.menuWindows.ticket.startAt <= completedContext.serverTime && completedContext.menuWindows.ticket.endAt >= completedContext.serverTime);
     assert.deepEqual(completedContext.menuWindows.documents, { startAt: null, endAt: null });
     assert.equal(submission.answerMap.birth, signup.profile.birth, 'Member birthdate overrides client-supplied dates in submitted answers');
+    if (process.argv.includes('--mongolian')) {
+      await require('./mongolian-language-checks').verifyMongolian({ services, query, base, call, memberCookie:login.cookie, submission, signup });
+      return;
+    }
+    if (process.argv.includes('--admission-settings')) {
+      await require('./admission-settings-checks').verifyAdmissionSettings({ services, query, base, call, submission, signup, memberCookie: login.cookie, application });
+      return;
+    }
+    if (process.argv.includes('--template-admissions')) {
+      await require('./template-admission-checks').verifyTemplateAdmissions({ services, query, base, call, submission, signup });
+      return;
+    }
+    if (process.argv.includes('--ticket-tags')) {
+      await require('./ticket-tag-link-checks').verifyTicketTagLinks({ services, members, query, submission, signup });
+      return;
+    }
     const ruleFileName = submission.answerMap['rule-document'].fileName;
     assert.match(ruleFileName, /_증빙_sample_[a-f0-9]{16}\.TXT$/);
     assert.equal(fs.readFileSync(path.join(root, 'uploads/file', ruleFileName), 'utf8'), 'rule content');
@@ -649,7 +689,7 @@ async function run() {
     await page.type('[data-applicant-field-input=questionText]', '서류 전용 질문');
     await page.type('[data-applicant-field-input=allowedExtensions]', 'pdf, png');
     await Promise.all([page.waitForResponse(r => r.url().endsWith('/api/applicant-form-fields') && r.request().method() === 'POST'), page.click('[data-applicant-field-form] button[type=submit]')]);
-    await page.waitForFunction(() => document.querySelector('[data-applicant-field-input=questionText]')?.disabled);
+    await page.waitForSelector('[data-applicant-field-select].is-editing');
     const documentQuestion = (await services.applicantService.getApplicantFormFields({ formScope: 'documents' })).find(field => field.questionText === '서류 전용 질문');
     assert(documentQuestion);
     assert.equal(documentQuestion.inputType, 'file', 'New document questions are always file uploads');
@@ -658,7 +698,8 @@ async function run() {
     assert.equal(await page.$('[data-applicant-field-input=inputType]'), null, 'Editing a document question keeps its upload type fixed');
     await page.$eval('[data-applicant-field-input=questionText]', el => { el.value = '서류 전용 질문 수정'; el.dispatchEvent(new Event('input', { bubbles: true })); });
     await Promise.all([page.waitForResponse(r => r.url().endsWith(`/api/applicant-form-fields/${documentQuestion.id}`) && r.request().method() === 'PUT'), page.click('[data-applicant-field-form] button[type=submit]')]);
-    await page.waitForFunction(() => document.querySelector('[data-applicant-field-input=questionText]')?.disabled);
+    await page.waitForFunction(() => document.querySelector('.toast-message')?.textContent.includes('수정했습니다'));
+    assert(await page.$(`[data-applicant-field-select="${documentQuestion.id}"].is-editing`));
     await Promise.all([page.waitForResponse(r => r.url().includes(`/api/applicant-form-fields/${documentQuestion.id}/move`)), page.click(`[data-applicant-field-move="${documentQuestion.id}"][data-applicant-field-direction=up]`)]);
     await page.waitForFunction(id => {
       const cards = [...document.querySelectorAll('[data-applicant-field-select]')];

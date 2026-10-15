@@ -89,14 +89,6 @@
     const badgeClass = card.status === "used" ? "green" : "gray";
     const badgeLabel = card.status === "used" ? "사용중" : "사용 안 함";
     const isActiveTemplate = card.status === "used";
-    const applyButtonMarkup = `<button class="secondary-button template-card-action-button" ${
-      isActiveTemplate ? "disabled" : `data-template-apply="${escapeAttribute(card.id)}"`
-    } type="button">
-      <svg class="button-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M5 12.5 9.2 16.7 19 7.5"></path>
-      </svg>
-      <span>사용 적용</span>
-    </button>`;
     const deleteButtonMarkup = `<button class="icon-button template-card-delete-button danger-button" ${
       isActiveTemplate
         ? 'disabled title="사용 중 양식은 삭제할 수 없습니다."'
@@ -153,8 +145,8 @@
           </div>
         </div>
         <div class="template-preview">${renderTemplateCardThumbnail(card)}</div>
+        <p class="helper-text">전형 상세설정에서 이 양식을 적용할 수 있습니다.</p>
         <div class="template-card-actions">
-          ${applyButtonMarkup}
           ${previewButtonMarkup}
           ${editButtonMarkup}
         </div>

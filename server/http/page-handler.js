@@ -175,6 +175,10 @@ function createPageRequestHandlers({
 
   async function handlePageRequest(request, response, pathname) {
     const normalizedPath = normalizeRoutePath(pathname);
+    if (normalizedPath === '/system-settings') {
+      sendRedirect(response, '/super-admin');
+      return true;
+    }
     if (normalizedPath === '/account-recovery') {
       await serveHtmlFile(response, '/account-recovery.html', { headers: { 'Cache-Control': 'no-store' }, injectSuperAdminSettings: true });
       return true;

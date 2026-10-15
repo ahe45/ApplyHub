@@ -60,6 +60,15 @@
         statusMessage: "영어 공지사항을 편집 중입니다.",
       };
     }
+    function createMongolianNoticeState(html = "") {
+      return {
+        ...createLoginNoticeState(),
+        savedHtml: html,
+        draftHtml: html,
+        historyEntries: [{ html, selection: null }],
+        statusMessage: "몽골어 공지사항을 편집 중입니다.",
+      };
+    }
 
     const noticeManagementState = {
       activeScope: "login",
@@ -68,6 +77,7 @@
         login: createLoginNoticeState(),
         applicant: createApplicantNoticeState(),
       },
+      mongolianScopes: { login:createMongolianNoticeState(), applicant:createMongolianNoticeState() },
       englishScopes: {
         login: createEnglishNoticeState(),
         applicant: createEnglishNoticeState(),
@@ -136,10 +146,10 @@
 
     function applyLoginNoticePayload(html = "", options = {}) {
       const scope = getNoticeScopeState(options.scope);
-      const language = options.language === "en" ? "en" : "ko";
-      const nextNoticeState = language === "en" ? createEnglishNoticeState(html) : scope === "applicant" ? createApplicantNoticeState(html) : createLoginNoticeState(html);
+      const language = globalThis.ApplyHubLanguages.normalize(options.language);
+      const nextNoticeState = language === "mn" ? createMongolianNoticeState(html) : language === "en" ? createEnglishNoticeState(html) : scope === "applicant" ? createApplicantNoticeState(html) : createLoginNoticeState(html);
 
-      const scopes = language === "en" ? state.noticeManagement.englishScopes : state.noticeManagement.scopes;
+      const scopes = language === "mn" ? state.noticeManagement.mongolianScopes : language === "en" ? state.noticeManagement.englishScopes : state.noticeManagement.scopes;
       scopes[scope] = nextNoticeState;
 
       if (state.noticeManagement.activeScope === scope && state.noticeManagement.activeLanguage === language) {
@@ -150,8 +160,8 @@
     function setNoticeManagementScope(scope = "", language = state.noticeManagement.activeLanguage) {
       const nextScope = getNoticeScopeState(scope);
       state.noticeManagement.activeScope = nextScope;
-      state.noticeManagement.activeLanguage = language === "en" ? "en" : "ko";
-      state.loginNotice = (language === "en" ? state.noticeManagement.englishScopes : state.noticeManagement.scopes)[nextScope];
+      state.noticeManagement.activeLanguage = globalThis.ApplyHubLanguages.normalize(language);
+      state.loginNotice = (language === "mn" ? state.noticeManagement.mongolianScopes : language === "en" ? state.noticeManagement.englishScopes : state.noticeManagement.scopes)[nextScope];
     }
 
     return Object.freeze({

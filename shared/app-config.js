@@ -16,8 +16,8 @@
   const pageTitles = Object.freeze({
     login: "로그인",
     dashboard: "대시보드",
-    applicantRecruitmentManagement: "전형 관리",
-    applicantScheduleManagement: "일정 관리",
+    applicantRecruitmentManagement: "전형 등록",
+    applicantScheduleManagement: "전형 관리",
     applicantQuestionTemplateManagement: "가입·접수 설정",
     applicantHistory: "접수 이력",
     applicantDocumentManagement: "서류 제출 관리",
@@ -28,7 +28,6 @@
     templateManagement: "수험표 양식 설정",
     accountManagement: "계정 관리",
     loginNoticeSettings: "공지사항 설정",
-    systemSettings: "시스템 설정",
     systemDataDeletion: "데이터 삭제",
     systemBackupRestore: "백업 및 복구",
     [superAdminView]: "슈퍼관리자",
@@ -51,7 +50,6 @@
       views: Object.freeze([
         "loginNoticeSettings",
         "accountManagement",
-        "systemSettings",
       ]),
     }),
     Object.freeze({
@@ -109,7 +107,6 @@
     Object.freeze({ view: "templateManagement", path: "/templates", title: pageTitles.templateManagement }),
     Object.freeze({ view: "accountManagement", path: "/accounts", title: pageTitles.accountManagement }),
     Object.freeze({ view: "loginNoticeSettings", path: "/login-notice", title: pageTitles.loginNoticeSettings }),
-    Object.freeze({ view: "systemSettings", path: "/system-settings", title: pageTitles.systemSettings }),
     Object.freeze({ view: "systemDataDeletion", path: "/system-data-deletion", title: pageTitles.systemDataDeletion }),
     Object.freeze({ view: "systemBackupRestore", path: "/system-backup-restore", title: pageTitles.systemBackupRestore }),
     Object.freeze({ view: superAdminView, path: "/super-admin", title: pageTitles[superAdminView] }),
@@ -131,7 +128,6 @@
       "templateManagement",
       "accountManagement",
       "loginNoticeSettings",
-      "systemSettings",
     ]),
     운영자: Object.freeze([
       "applicantRecruitmentManagement",
@@ -163,6 +159,7 @@
     }, {}),
   );
   const legacyViewPathAliases = Object.freeze({
+    "/system-settings": superAdminView,
     "/applicant-form-settings": "applicantRecruitmentManagement",
   });
   const viewByPathMap = Object.freeze(
@@ -241,7 +238,7 @@
     return normalizeRoleMenuVisibilitySettings(nextRoleMenuViews);
   };
   const getViewRoutePath = (view) => viewRouteMap[String(view || "").trim()]?.path || viewRouteMap[defaultView].path;
-  const getViewFromPathname = (pathname) => viewByPathMap[normalizeRoutePath(pathname)] || "";
+  const getViewFromPathname = (pathname) => /^\/templates\/[^/]+\/edit$/.test(normalizeRoutePath(pathname)) ? 'templateManagement' : viewByPathMap[normalizeRoutePath(pathname)] || "";
   const isLoginRoutePath = (pathname) => normalizeRoutePath(pathname) === loginRoutePath;
   const getVisibleMenuViewsForRole = (role = "", options = {}) => {
     const normalizedRole = getNormalizedRole(role);

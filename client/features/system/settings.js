@@ -303,6 +303,7 @@
     function setSystemSettingsStatus(message = "", type = "") {
       state.systemSettings.statusMessage = String(message || "");
       state.systemSettings.statusType = type;
+      if (state.currentView === "superAdminManagement") setSuperAdminStatus(message, type);
 
       const statusElement = getSystemSettingsStatusElement();
 
@@ -1123,9 +1124,6 @@
         { key: "initialPassword", label: "초기 비밀번호" },
         { key: "autoLogoutMinutes", label: "자동 로그아웃 시간" },
         { key: "admissionHomepageUrl", label: "입학처 홈페이지 링크" },
-        { key: "applicantSubmissionEditEnabled", label: "접수 후 수정 허용" },
-        { key: "applicantExamNoDigitCount", label: "수험번호 자리수" },
-        { key: "applicantExamNoComponents", label: "수험번호 자동 생성 조합" },
       ];
 
       return summaryDefinitions
@@ -1161,11 +1159,12 @@
           state.systemDataDeletion.isRestoring;
       }
 
+      if (state.currentView === "superAdminManagement") syncSuperAdminDirtyState();
       return hasUnsavedChanges;
     }
 
     function syncSuperAdminDirtyState() {
-      const hasUnsavedChanges = !areSuperAdminSnapshotsEqual(state.superAdmin.savedSnapshot, buildSuperAdminSnapshot());
+      const hasUnsavedChanges = !areSuperAdminSnapshotsEqual(state.superAdmin.savedSnapshot, buildSuperAdminSnapshot()) || !areSystemSettingsSnapshotsEqual(state.systemSettings.savedSnapshot, buildSystemSettingsSnapshot());
       const saveButtonElement = getSuperAdminSaveButtonElement();
       const isUploadingImage = Boolean(String(state.superAdmin.uploadingField || "").trim());
 
@@ -1174,7 +1173,7 @@
       if (saveButtonElement) {
         saveButtonElement.disabled =
           !hasUnsavedChanges ||
-          state.superAdmin.isSaving ||
+          state.superAdmin.isSaving || state.systemSettings.isSaving ||
           isUploadingImage ||
           state.systemDataDeletion.isDeleting ||
           state.systemDataDeletion.isBackingUp ||
@@ -1210,6 +1209,7 @@
 
     async function confirmSystemSettingsNavigation() {
       if (window.AdmitCardEmailSettings && !(await window.AdmitCardEmailSettings.confirmNavigation())) return false;
+      if (window.AdmitCardTranslationSettings && !(await window.AdmitCardTranslationSettings.confirmNavigation())) return false;
       const currentView = String(state.currentView || "").trim();
       const automationState = getSystemBackupAutomationState();
 
@@ -1218,7 +1218,7 @@
           return true;
         }
 
-        const changeSummaries = getSuperAdminChangeSummaries();
+        const changeSummaries = [...getSuperAdminChangeSummaries(), ...getSystemSettingsChangeSummaries()];
         const messageLines = [
           "다음 슈퍼관리자 설정 변경사항이 있습니다.",
           ...changeSummaries.map((summary) => `- ${summary.label}: ${summary.beforeValue} -> ${summary.afterValue}`),
@@ -1291,7 +1291,7 @@
     }
 
     function hasUnsavedSystemSettingsChanges() {
-      return Boolean(window.AdmitCardEmailSettings?.hasUnsavedChanges()) || syncSystemSettingsDirtyState() || syncSuperAdminDirtyState() || syncSystemBackupAutomationDirtyState();
+      return Boolean(window.AdmitCardTranslationSettings?.hasUnsavedChanges()) || Boolean(window.AdmitCardEmailSettings?.hasUnsavedChanges()) || syncSystemSettingsDirtyState() || syncSuperAdminDirtyState() || syncSystemBackupAutomationDirtyState();
     }
 
     function getApplicantScheduleTimestamp(value) {
@@ -1399,11 +1399,6 @@
       const autoLogoutMinutes = Math.round(Number(state.systemSettings.autoLogoutMinutes));
       const admissionHomepageUrl = String(state.systemSettings.admissionHomepageUrl ?? "").trim();
 
-      const applicantExamNoDigitCount = Math.round(Number(state.systemSettings.applicantExamNoDigitCount));
-      const applicantExamNoComponents = Array.isArray(state.systemSettings.applicantExamNoComponents)
-        ? state.systemSettings.applicantExamNoComponents.map((value) => String(value || "").trim())
-        : [];
-
       if (!initialPassword) {
         throw new Error("초기 비밀번호를 입력하세요.");
       }
@@ -1428,31 +1423,10 @@
         throw new Error("입학처 홈페이지 링크는 https:// 주소 또는 /경로 형식으로 입력하세요.");
       }
 
-      if (!Number.isFinite(applicantExamNoDigitCount) || applicantExamNoDigitCount < 1 || applicantExamNoDigitCount > 30) {
-        throw new Error("수험번호 자리수는 1자 이상 30자 이하로 입력하세요.");
-      }
-
-      const selectedExamNoComponents = applicantExamNoComponents.filter(Boolean);
-
-      if (selectedExamNoComponents.length === 0) {
-        throw new Error("수험번호 자동 생성 구성 요소를 하나 이상 선택하세요.");
-      }
-
-      if (selectedExamNoComponents.filter((value) => value === "sequence").length !== 1) {
-        throw new Error("수험번호 자동 생성 구성에는 순번을 한 번만 포함해야 합니다.");
-      }
-
-      if (new Set(selectedExamNoComponents).size !== selectedExamNoComponents.length) {
-        throw new Error("수험번호 자동 생성 구성 요소는 중복 없이 선택하세요.");
-      }
-
       return {
         initialPassword,
         autoLogoutMinutes,
         admissionHomepageUrl,
-        applicantSubmissionEditEnabled: state.systemSettings.applicantSubmissionEditEnabled === true,
-        applicantExamNoDigitCount,
-        applicantExamNoComponents,
       };
     }
 
@@ -1600,7 +1574,8 @@
     }
 
     async function saveSuperAdminSettings() {
-      let nextSettings;
+      if (state.superAdmin.isSaving || state.systemSettings.isSaving) return false;
+      let nextSettings, basicSettings;
 
       if (isSystemDataOperationActive()) {
         setSuperAdminStatus("백업, 복원 또는 데이터 삭제 작업이 끝난 뒤 저장하세요.", "warning");
@@ -1616,6 +1591,7 @@
 
       try {
         nextSettings = getValidatedSuperAdminPayload();
+        basicSettings = getValidatedSystemSettingsPayload();
       } catch (error) {
         setSuperAdminStatus(error.message, "warning");
         syncSuperAdminDirtyState();
@@ -1623,11 +1599,14 @@
       }
 
       state.superAdmin.isSaving = true;
+      state.systemSettings.isSaving = true;
       setSuperAdminStatus("");
       syncSuperAdminDirtyState();
       renderView();
 
       try {
+        const savedBasicSettings = await apiRequest('/api/system-settings', { method:'PUT', body:JSON.stringify(basicSettings) });
+        applySystemSettingsPayload(savedBasicSettings, { preserveStatus:true });
         const savedSettings = await apiRequest("/api/super-admin/settings", {
           method: "PUT",
           body: JSON.stringify(nextSettings),
@@ -1649,6 +1628,7 @@
         return false;
       } finally {
         state.superAdmin.isSaving = false;
+        state.systemSettings.isSaving = false;
         syncSuperAdminDirtyState();
         renderView();
       }

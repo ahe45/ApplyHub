@@ -1,11 +1,24 @@
 .public-language-row { display: flex; justify-content: flex-end; width: 100%; min-width: 0; }
 applyhub-language-toggle { display: inline-flex; flex-shrink: 0; }
-.public-language-toggle { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--glass-line, #d7dce2); border-radius: 999px; background: var(--glass-surface, #fff); }
-.public-language-toggle button { appearance: none; cursor: pointer; border: 0; border-radius: 999px; padding: 8px 14px; min-height: 40px; font: inherit; font-size: 13px; font-weight: 600; color: var(--glass-muted, #526070); background: transparent; white-space: nowrap; }
-.public-language-toggle button[aria-pressed="true"] { color: var(--glass-primary-contrast, #fff); background: var(--glass-primary, #2563eb); }
-.public-language-toggle button:focus-visible { outline: 2px solid var(--glass-primary, #2563eb); outline-offset: 3px; }
-.public-language-toggle button:disabled { cursor: default; opacity: .65; }
-.common-login-stage .public-language-toggle button { min-height: 40px; font-size: 13px; }
+applyhub-language-menu { display: inline-flex; width: fit-content; max-width: 100%; }
+.language-menu { position: relative; font-size: 13px; }
+.language-menu-trigger { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 8px 12px; border: 1px solid var(--glass-line, #d7dce2); border-radius: 12px; background: var(--glass-surface, #fff); color: var(--glass-ink, #152033); font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.language-menu-trigger svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.7; flex-shrink: 0; }
+.language-menu-trigger .language-menu-chevron { width: 14px; height: 14px; }
+.language-menu-current { color: var(--glass-muted, #526070); font-size: 12px; font-weight: 400; }
+.language-menu-options { position: absolute; z-index: 1200; right: 0; top: calc(100% + 6px); min-width: 180px; max-width: calc(100vw - 32px); max-height: 50vh; overflow: auto; padding: 5px; border: 1px solid var(--glass-line, #d7dce2); border-radius: 12px; background: var(--glass-surface, #fff); box-shadow: 0 10px 30px #15203326; }
+.language-menu.opens-up .language-menu-options { top: auto; bottom: calc(100% + 6px); }
+.language-menu-options button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 42px; padding: 10px; border: 0; border-radius: 8px; font: inherit; color: var(--glass-ink, #152033); background: transparent; text-align: left; cursor: pointer; }
+.language-menu-options button:hover, .language-menu-options button:focus-visible, .language-menu-options button[aria-checked="true"] { background: var(--glass-tint, #edf3ff); color: var(--glass-tint-ink, #2563eb); }
+.language-menu-options button span { visibility: hidden; }
+.language-menu-options button[aria-checked="true"] span { visibility: visible; }
+.language-menu-trigger:focus-visible, .language-menu-options button:focus-visible { outline: 2px solid var(--glass-primary, #2563eb); outline-offset: 2px; }
+.language-menu-trigger:disabled { cursor: default; opacity: .65; }
+.language-menu-options[hidden], [data-edit-language][hidden] { display: none !important; }
+[data-language-editor] .applicant-option-language-fields { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+[data-language-editor] .applicant-recruitment-name-pair, [data-language-editor] .signup-term-language-grid { grid-template-columns: minmax(0, 1fr); }
+.notice-language-selection { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
+.notice-language-selection .notice-language-description { margin: 0; }
 .common-login-stage > .public-language-row { margin-bottom: 18px; }
 public-school-header > .public-language-row { margin-top: 10px; }
 html[data-public-language="en"] .applicant-member-tile :is(strong, small) { overflow-wrap: break-word; }

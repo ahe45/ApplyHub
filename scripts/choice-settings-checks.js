@@ -75,7 +75,8 @@ async function runChoiceSettingsChecks({ services, members, query, base, call, m
       return Math.abs(a.top - b.top) < 2 && b.left > a.left;
     }));
     await admin.click('[data-signup-field-form] button[type=submit]');
-    await admin.waitForFunction(() => document.querySelector('[data-signup-status]')?.textContent.includes('저장했습니다'));
+    await admin.waitForFunction(() => document.querySelector('.toast-message')?.textContent.includes('저장했습니다'));
+    assert(await admin.$('[data-signup-field-select=choices].is-editing'));
     assert.equal((await members.getSettings()).questions.find(q => q.key === 'choices').optionsEn.주말수업, 'Weekend program');
     await admin.reload({ waitUntil: 'networkidle0' }); await admin.click('[data-signup-field-select=choices]');
     await admin.screenshot({ path: path.join(artifacts, 'bilingual-choice-editor.png'), fullPage: true });

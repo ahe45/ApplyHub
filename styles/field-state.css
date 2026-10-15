@@ -1,0 +1,5 @@
+/* Empty controls retain the tinted surface; populated controls use the neutral surface. */
+:root body :is(input,textarea,select)[data-field-empty="true"] { background-color: var(--glass-bg, #f4f8ff) !important; }
+:root body :is(input,textarea,select)[data-field-empty="false"] { background-color: var(--glass-surface, #fff) !important; }
+@keyframes field-value-autofill { from { opacity: .999; } to { opacity: 1; } }
+:root body input:-webkit-autofill { animation-name: field-value-autofill; animation-duration: .01s; -webkit-box-shadow: 0 0 0 1000px var(--glass-surface, #fff) inset; -webkit-text-fill-color: var(--glass-ink, #172b4d); }

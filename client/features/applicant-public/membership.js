@@ -72,7 +72,7 @@
     }
     const periodDateFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
     function menuPeriod(key) {
-      const label = (ko, en) => controls.renderAuthoredText(ko, en);
+      const label = (ko, en) => controls.renderAuthoredText(ko, en, scope.ApplyHubPublicI18n?.translate(ko, 'mn'));
       if (!applicationContext || contextError) return label('일정 확인 중', 'Checking dates');
       if (key === 'summary') return label('접수 후 상시 조회', 'Any time after submission');
       const period = applicationContext.menuWindows?.[key];
@@ -143,35 +143,38 @@
       const systemLabel = ({ password: '비밀번호', name: '이름', email: '이메일' })[q.key] === q.label;
       const name = core ? q.key : `profile.${q.key}`;
       const value = signup[name] || '';
-      const label = `${systemLabel && !q.labelEn ? esc(q.label) : controls.renderAuthoredText(q.label, q.labelEn)}${feedback.badge(q.required)}`;
+      const label = `${systemLabel && !q.labelEn && !q.labelMn ? esc(q.label) : controls.renderAuthoredText(q.label, q.labelEn, q.labelMn)}${feedback.badge(q.required)}`;
       const hint = q.key === 'email' ? '인증한 이메일을 로그인 ID로 사용합니다.' : q.key === 'password' ? '4~20자' : '';
-      const noteParts = [(q.description || q.descriptionEn) ? controls.renderAuthoredText(q.description, q.descriptionEn) : '', hint ? `<span>${esc(hint)}</span>` : ''].filter(Boolean);
+      const noteParts = [(q.description || q.descriptionEn || q.descriptionMn) ? controls.renderAuthoredText(q.description, q.descriptionEn, q.descriptionMn) : '', hint ? `<span>${esc(hint)}</span>` : ''].filter(Boolean);
       const note = noteParts.length ? `<small class="muted">${noteParts.join('<span aria-hidden="true"> · </span>')}</small>` : '';
       const labelEn = q.labelEn || (systemLabel ? scope.ApplyHubPublicI18n?.translate(q.label, 'en') || q.label : q.label);
+      const labelMn = q.labelMn || (systemLabel ? scope.ApplyHubPublicI18n?.translate(q.label, 'mn') || q.label : q.label);
       let control;
       if (['file', 'photo'].includes(q.inputType)) {
         const extensions = q.inputType === 'photo' ? ['jpg', 'jpeg', 'png'] : q.allowedExtensions?.length ? q.allowedExtensions : ['pdf', 'jpg', 'jpeg', 'png'];
-        control = `<input class="public-localized-file-input" id="member-file-${esc(q.key)}" type="file" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" data-member-file="${esc(q.key)}" data-member-file-type="${q.inputType}" accept="${esc(extensions.map(e => '.' + e).join(','))}" ${q.required ? 'required' : ''} /><label class="ghost-button public-file-choose" for="member-file-${esc(q.key)}">파일 선택</label><small>허용 확장자: ${esc(extensions.join(', '))} · 파일당 5MB, 전체 8MB 이하</small><span data-member-upload-preview="${esc(q.key)}"></span>`;
+        control = `<input class="public-localized-file-input" id="member-file-${esc(q.key)}" type="file" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" data-i18n-aria-label-mn="${esc(labelMn)}" data-member-file="${esc(q.key)}" data-member-file-type="${q.inputType}" accept="${esc(extensions.map(e => '.' + e).join(','))}" ${q.required ? 'required' : ''} /><label class="ghost-button public-file-choose" for="member-file-${esc(q.key)}">파일 선택</label><small>허용 확장자: ${esc(extensions.join(', '))} · 파일당 5MB, 전체 8MB 이하</small><span data-member-upload-preview="${esc(q.key)}"></span>`;
+      } else if (q.inputType === 'phone' && q.showCountryCode) {
+        control = controls.renderPhoneControls({ value, fieldKey: q.key, prefix: 'member', name, required: q.required });
       } else if (q.inputType === 'textarea') {
-        control = `<textarea name="${esc(name)}" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" rows="4" maxlength="10000" ${q.required ? 'required' : ''}>${esc(value)}</textarea>`;
+        control = `<textarea name="${esc(name)}" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" data-i18n-aria-label-mn="${esc(labelMn)}" rows="4" maxlength="10000" ${q.required ? 'required' : ''}>${esc(value)}</textarea>`;
       } else if (q.inputType === 'daterange') {
         const range = scope.AdmitCardApplicantFormConfig.parseDateRange(value);
         const rangeParts = Object.fromEntries(['start', 'end'].map(edge => [edge, scope.AdmitCardApplicantFormConfig.parseDateValue(range[edge], q)]));
-        control = controls.renderDateRangeControls({ fieldKey: q.key, inputType: q.inputType, dateParts: q.dateParts, rangeParts, prefix: 'member', label: q.label, labelEn: q.labelEn, required: q.required }) + `<input type="hidden" name="${esc(name)}" data-member-date-value="${esc(q.key)}" value="${esc(value)}" />`;
+        control = controls.renderDateRangeControls({ fieldKey: q.key, inputType: q.inputType, dateParts: q.dateParts, rangeParts, prefix: 'member', label: q.label, labelEn: q.labelEn, labelMn:q.labelMn, required: q.required }) + `<input type="hidden" name="${esc(name)}" data-member-date-value="${esc(q.key)}" value="${esc(value)}" />`;
       } else if (['date', 'birthdate'].includes(q.inputType)) {
         const parts = scope.AdmitCardApplicantFormConfig.parseDateValue(value, q);
-        control = `<div ${q.inputType === 'birthdate' ? 'class="applicant-member-birthdate"' : ''}>${controls.renderDateSelectControls({ fieldKey: q.key, inputType: q.inputType, dateParts: q.dateParts, parts, prefix: 'member', label: q.label, labelEn: q.labelEn, required: q.required })}</div><input type="hidden" name="${esc(name)}" data-member-date-value="${esc(q.key)}" value="${esc(value)}" />`;
+        control = `<div ${q.inputType === 'birthdate' ? 'class="applicant-member-birthdate"' : ''}>${controls.renderDateSelectControls({ fieldKey: q.key, inputType: q.inputType, dateParts: q.dateParts, parts, prefix: 'member', label: q.label, labelEn: q.labelEn, labelMn:q.labelMn, required: q.required })}</div><input type="hidden" name="${esc(name)}" data-member-date-value="${esc(q.key)}" value="${esc(value)}" />`;
       } else if (q.inputType === 'nationality') {
         const selected = scope.AdmitCardApplicantFormConfig.findApplicantNationalityOption(value);
-        control = `<div class="applicant-public-nationality-combobox"><input type="search" data-member-nationality-search="${esc(q.key)}" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" value="${esc(controls.formatNationalitySelection(selected))}" placeholder="국가를 검색하세요" autocomplete="off" spellcheck="false" ${q.required ? 'required' : ''} /><input type="hidden" name="${esc(name)}" value="${esc(selected?.code || '')}" /><div class="applicant-public-nationality-picker" data-member-nationality-picker="${esc(q.key)}"></div></div><small class="applicant-public-file-note">국가명을 검색한 뒤 목록에서 선택하세요.</small>`;
+        control = `<div class="applicant-public-nationality-combobox"><input type="search" data-member-nationality-search="${esc(q.key)}" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" data-i18n-aria-label-mn="${esc(labelMn)}" value="${esc(controls.formatNationalitySelection(selected))}" placeholder="국가를 검색하세요" autocomplete="off" spellcheck="false" ${q.required ? 'required' : ''} /><input type="hidden" name="${esc(name)}" value="${esc(selected?.code || '')}" /><div class="applicant-public-nationality-picker" data-member-nationality-picker="${esc(q.key)}"></div></div><small class="applicant-public-file-note">국가명을 검색한 뒤 목록에서 선택하세요.</small>`;
       } else if (q.inputType === 'multiselect') {
         control = controls.renderMultiSelect(q, value, { prefix: 'member' });
       } else if (q.inputType === 'select') {
         const options = q.options.map(v => [v, v]);
-        control = `<select name="${esc(name)}" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" data-member-select="${esc(q.key)}" ${q.required ? 'required' : ''}><option value="">선택하세요</option>${options.map(([key, text]) => `<option translate="no" data-i18n-ko="${esc(text)}" data-i18n-en="${esc(q.optionsEn?.[key] || text)}" value="${esc(key)}" ${key === value ? 'selected' : ''}>${esc(text)}</option>`).join('')}</select>${q.customOptionLabel ? `<input type="text" name="custom.${esc(q.key)}" data-member-custom="${esc(q.key)}" aria-label="${esc(q.label)} 직접 입력" data-i18n-aria-label-en="${esc(labelEn)} custom entry" placeholder="직접 입력하세요" maxlength="200" hidden />` : ''}`;
+        control = `<select name="${esc(name)}" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" data-i18n-aria-label-mn="${esc(labelMn)}" data-member-select="${esc(q.key)}" ${q.required ? 'required' : ''}><option value="">선택하세요</option>${options.map(([key, text]) => `<option translate="no" data-i18n-ko="${esc(text)}" data-i18n-en="${esc(q.optionsEn?.[key] || text)}" data-i18n-mn="${esc(q.optionsMn?.[key] || text)}" value="${esc(key)}" ${key === value ? 'selected' : ''}>${esc(text)}</option>`).join('')}</select>${q.customOptionLabel ? `<input type="text" name="custom.${esc(q.key)}" data-member-custom="${esc(q.key)}" aria-label="${esc(q.label)} 직접 입력" data-i18n-aria-label-en="${esc(labelEn)} custom entry" data-i18n-aria-label-mn="${esc(labelMn)} custom entry" placeholder="직접 입력하세요" maxlength="200" hidden />` : ''}`;
       } else {
         const type = q.inputType === 'phone' ? 'text' : q.inputType;
-        control = `<input name="${esc(name)}" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" type="${esc(type)}" value="${esc(value)}" ${q.required ? 'required' : ''} ${q.inputType === 'phone' ? 'data-member-phone inputmode="numeric" pattern="[0-9]*" maxlength="20" autocomplete="tel-national"' : q.key === 'password' ? 'minlength="4" maxlength="20"' : q.key === 'email' ? 'maxlength="255" autocapitalize="none" spellcheck="false"' : 'maxlength="500"'} ${core ? `autocomplete="${({ password: 'new-password', name: 'name', email: 'email' })[q.key]}"` : ''} />`;
+        control = `<input name="${esc(name)}" data-i18n-preserve="${systemLabel ? '' : 'aria-label'}" aria-label="${esc(q.label)}" data-i18n-aria-label-en="${esc(labelEn)}" data-i18n-aria-label-mn="${esc(labelMn)}" type="${esc(type)}" value="${esc(value)}" ${q.required ? 'required' : ''} ${q.inputType === 'phone' ? 'data-member-phone inputmode="numeric" pattern="[0-9]*" maxlength="20" autocomplete="tel-national"' : q.key === 'password' ? 'minlength="4" maxlength="20"' : q.key === 'email' ? 'maxlength="255" autocapitalize="none" spellcheck="false"' : 'maxlength="500"'} ${core ? `autocomplete="${({ password: 'new-password', name: 'name', email: 'email' })[q.key]}"` : ''} />`;
       }
       if (q.key === 'email' && settings.emailVerification) control = `<div class="applicant-member-input-action">${control}<button class="primary-button" type="button" data-applicant-action="member-send-code" ${busy || preview || resendSeconds() > 0 || !isValidSignupEmail(value) ? 'disabled' : ''}>${sendButtonText()}</button></div>`;
       let html = `<div class="applicant-public-field"><span>${label}</span>${note}${control}</div>`;
@@ -180,6 +183,8 @@
       return html;
     }
     document.addEventListener('change', event => {
+      const phoneGroup = event.target.closest('[data-phone-control]');
+      if (phoneGroup) { controls.readPhoneControl(phoneGroup); return; }
       const multiGroup = event.target.closest('[data-choice-prefix=member]');
       if (multiGroup) { controls.readMultiSelect(multiGroup); return; }
       if (event.target.matches('[data-applicant-form="member-register"] [name="email"], #memberEmailCode')) syncEmailSendButton();
@@ -260,6 +265,8 @@
     window.addEventListener('applyhub:languagechange', syncCountryDisplay);
     document.addEventListener('focusin', event => { if (event.target.matches('[data-member-nationality-search]')) showMemberNationality(event.target); });
     document.addEventListener('input', event => {
+      const phoneGroup = event.target.closest('[data-phone-control]');
+      if (phoneGroup) controls.readPhoneControl(phoneGroup);
       if (event.target.matches('#memberEmailCode')) {
         event.target.value = event.target.value.replace(/\D/g, '').slice(0, 6);
         syncEmailSendButton();
@@ -323,9 +330,9 @@
         <div data-member-step="terms" ${signupStep !== 'terms' ? 'hidden' : ''}>
           <form class="applicant-public-form" data-applicant-form="member-terms">
           ${(settings.terms || []).length ? settings.terms.map(term => `<div class="applicant-member-terms">
-            <div class="applicant-member-terms-heading"><h3>${controls.renderAuthoredText(term.title, term.titleEn)}${feedback.badge(term.required)}</h3></div>
-            <div translate="no" class="applicant-member-terms-text" tabindex="0" role="region" aria-label="${esc(term.title)} 내용" data-i18n-aria-label-en="${esc(term.titleEn || term.title)} contents">${controls.renderAuthoredText(term.text, term.textEn)}</div>
-            <div class="applicant-member-terms-consent"><button class="ghost-button applicant-member-terms-view" type="button" data-member-term-view="${esc(term.id)}" aria-haspopup="dialog" aria-controls="member-term-dialog" aria-label="${esc(term.title)} 전문보기" data-i18n-aria-label-en="Read ${esc(term.titleEn || term.title)} in full" title="전문보기"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M8 9h8M8 12h8M8 15h5"></path></svg></button><div class="applicant-member-consent-options" role="radiogroup" aria-label="${esc(term.title)} 동의 여부" data-i18n-aria-label-en="Consent to ${esc(term.titleEn || term.title)}">
+            <div class="applicant-member-terms-heading"><h3>${controls.renderAuthoredText(term.title, term.titleEn, term.titleMn)}${feedback.badge(term.required)}</h3></div>
+            <div translate="no" class="applicant-member-terms-text" tabindex="0" role="region" aria-label="${esc(term.title)} 내용" data-i18n-aria-label-en="${esc(term.titleEn || term.title)} contents" data-i18n-aria-label-mn="${esc(term.titleMn || term.title)} contents">${controls.renderAuthoredText(term.text, term.textEn, term.textMn)}</div>
+            <div class="applicant-member-terms-consent"><button class="ghost-button applicant-member-terms-view" type="button" data-member-term-view="${esc(term.id)}" aria-haspopup="dialog" aria-controls="member-term-dialog" aria-label="${esc(term.title)} 전문보기" data-i18n-aria-label-en="Read ${esc(term.titleEn || term.title)} in full" data-i18n-aria-label-mn="Read ${esc(term.titleMn || term.title)} in full" title="전문보기"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M8 9h8M8 12h8M8 15h5"></path></svg></button><div class="applicant-member-consent-options" role="radiogroup" aria-label="${esc(term.title)} 동의 여부" data-i18n-aria-label-en="Consent to ${esc(term.titleEn || term.title)}" data-i18n-aria-label-mn="Consent to ${esc(term.titleMn || term.title)}">
               <label class="applicant-member-consent-option"><input type="radio" name="term-consent-${esc(term.id)}" value="agree" data-member-term="${esc(term.id)}" ${termConsents.some(c => c.id === term.id && c.agreed) ? 'checked' : ''} /><span>동의</span></label>
               <label class="applicant-member-consent-option"><input type="radio" name="term-consent-${esc(term.id)}" value="disagree" ${termConsents.some(c => c.id === term.id && c.agreed === false) ? 'checked' : ''} /><span>미동의</span></label>
             </div></div>
@@ -350,9 +357,9 @@
       if (view) {
         const term = settings?.terms.find(item => item.id === view.dataset.memberTermView);
         if (!term) return;
-        dialog.querySelector('#member-term-dialog-title').innerHTML = controls.renderAuthoredText(term.title, term.titleEn);
+        dialog.querySelector('#member-term-dialog-title').innerHTML = controls.renderAuthoredText(term.title, term.titleEn, term.titleMn);
         const content = dialog.querySelector('[data-member-term-content]');
-        content.innerHTML = controls.renderAuthoredText(term.text, term.textEn);
+        content.innerHTML = controls.renderAuthoredText(term.text, term.textEn, term.textMn);
         scope.ApplyHubPublicI18n?.apply();
         dialog.showModal();
         content.scrollTop = 0;
@@ -374,7 +381,7 @@
       syncEmailSendButton();
       document.querySelector(`[data-member-step="${step}"] input, [data-member-step="${step}"] button`)?.focus();
     }
-    function formData(form) { const data = Object.fromEntries(new FormData(form)); for (const group of form.querySelectorAll('[data-choice-prefix=member]')) data['profile.' + group.dataset.choiceGroup] = controls.readMultiSelect(group); return data; }
+    function formData(form) { for (const group of form.querySelectorAll('[data-phone-control]')) controls.readPhoneControl(group); const data = Object.fromEntries(new FormData(form)); for (const group of form.querySelectorAll('[data-choice-prefix=member]')) data['profile.' + group.dataset.choiceGroup] = controls.readMultiSelect(group); return data; }
     function showCodePreview(code = '') {
       developmentCode = /^\d{6}$/.test(String(code)) ? String(code) : '';
       const mount = document.querySelector('[data-member-code-preview]');

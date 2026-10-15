@@ -444,7 +444,7 @@
       return `
         <article class="form-card applicant-recruitment-settings-panel">
           <div class="section-header">
-            ${renderMenuSectionCopy("전형 관리", "공통 그리드를 불러오는 중입니다.")}
+            ${renderMenuSectionCopy("전형 등록", "공통 그리드를 불러오는 중입니다.")}
           </div>
         </article>
       `;
@@ -452,7 +452,7 @@
 
     return `
       ${sharedGridRenderer.renderExamineeResultTable({
-        title: "전형 관리",
+        title: "전형 등록",
         description: "수험생이 접수 화면에서 선택할 수 있는 모집시기, 전형, 계열, 모집단위, 전공을 관리합니다.",
         gridKey: "applicantRecruitmentGrid",
         showPrintColumn: false,
@@ -489,7 +489,7 @@
       return `
         <article class="form-card applicant-recruitment-settings-panel">
           <div class="section-header">
-            ${renderMenuSectionCopy("일정 관리", "공통 그리드를 불러오는 중입니다.")}
+            ${renderMenuSectionCopy("전형 관리", "공통 그리드를 불러오는 중입니다.")}
           </div>
         </article>
       `;
@@ -527,7 +527,7 @@
 
     return `
       ${sharedGridRenderer.renderExamineeResultTable({
-        title: "일정 관리",
+        title: "전형 관리",
         description: "왼쪽 체크박스로 여러 전형을 선택해 일정을 일괄 설정하거나, 행을 클릭해 개별 일정을 편집할 수 있습니다.",
         gridKey: "applicantScheduleGrid",
         showPrintColumn: false,
@@ -535,7 +535,7 @@
         checkboxFirst: true,
         showRowNumber: true,
         headerActionsMarkup: `${scheduleBulkActionMarkup}${sharedGridRenderer.renderGridHeaderActions({ gridKey: "applicantScheduleGrid" })}`,
-        emptyMessage: "전형 관리에 등록된 일정 대상이 없습니다.",
+        emptyMessage: "전형 등록에 등록된 일정 대상이 없습니다.",
       })}
     `;
   }
@@ -586,8 +586,9 @@
               </div>
             </div>
 
-            <form class="applicant-field-editor-form" data-applicant-field-form="true">
-              <label class="field">
+            <form class="applicant-field-editor-form" data-applicant-field-form="true" data-language-editor>
+              <applyhub-language-menu editor-key="question-${config.fileUploadScope || 'application'}"></applyhub-language-menu>
+              <label class="field" data-edit-language="ko">
                 <span>제목 (한국어)</span>
                 <input
                   data-applicant-field-input="questionText"
@@ -598,14 +599,20 @@
                 />
               </label>
 
-              <label class="field">
+              <label class="field" data-edit-language="en">
                 <span>제목 (영어)</span>
                 <input data-applicant-field-input="questionTextEn" type="text" lang="en"
                   value="${escapeAttribute(editorState.questionTextEn || '')}" maxlength="${config.fileUploadScope === 'signup' ? 100 : 255}"
-                  placeholder="예: Graduation certificate" ${isEditorActive ? '' : 'disabled'} />
+                  placeholder="${isDocumentScope ? '예: Graduation certificate' : '예: Field of study'}" ${isEditorActive ? '' : 'disabled'} />
+              </label>
+              <label class="field" data-edit-language="mn">
+                <span>제목 (몽골어)</span>
+                <input data-applicant-field-input="questionTextMn" type="text" lang="mn"
+                  value="${escapeAttribute(editorState.questionTextMn || '')}" maxlength="${config.fileUploadScope === 'signup' ? 100 : 255}"
+                  placeholder="${isDocumentScope ? '예: Төгсөлтийн гэрчилгээ' : '예: Суралцах чиглэл'}" ${isEditorActive ? '' : 'disabled'} />
               </label>
 
-              <label class="field">
+              <label class="field" data-edit-language="ko">
                 <span>설명 (한국어)</span>
                 <input
                   data-applicant-field-input="questionDescription"
@@ -616,13 +623,19 @@
                 />
               </label>
 
-              <label class="field">
+              <label class="field" data-edit-language="en">
                 <span>설명 (영어)</span>
                 <input data-applicant-field-input="questionDescriptionEn" type="text" lang="en"
                   value="${escapeAttribute(editorState.questionDescriptionEn || '')}" maxlength="${config.fileUploadScope === 'signup' ? 1000 : 500}"
-                  placeholder="예: Upload your graduation certificate as a PDF." ${isEditorActive ? '' : 'disabled'} />
+                  placeholder="${isDocumentScope ? '예: Upload your graduation certificate as a PDF.' : '예: Choose your field of study.'}" ${isEditorActive ? '' : 'disabled'} />
               </label>
-              <p class="muted applicant-answer-type-help">영어 모드에서는 영어 제목과 설명을 표시합니다. 비워 둔 항목은 한국어로 표시됩니다.</p>
+              <label class="field" data-edit-language="mn">
+                <span>설명 (몽골어)</span>
+                <input data-applicant-field-input="questionDescriptionMn" type="text" lang="mn"
+                  value="${escapeAttribute(editorState.questionDescriptionMn || '')}" maxlength="${config.fileUploadScope === 'signup' ? 1000 : 500}"
+                  placeholder="${isDocumentScope ? '예: Төгсөлтийн гэрчилгээг PDF файлаар оруулна уу.' : '예: Суралцах чиглэлээ сонгоно уу.'}" ${isEditorActive ? '' : 'disabled'} />
+              </label>
+              <p class="muted applicant-answer-type-help">선택한 언어의 제목과 설명을 작성합니다. 비워 둔 항목은 한국어로 표시됩니다.</p>
 
               ${isDocumentScope ? '' : config.lockedCore || isLegacyBirth || isLegacySignupUpload ? `<div class="field"><span>입력 항목</span><input type="text" value="${isLegacySignupUpload ? getApplicantAnswerTypeLabel(editorState.inputType) + ' · 기존 항목' : isLegacyBirth ? '생년월일 · 회원정보 연동' : '회원가입 고정 항목'}" readonly /></div>` : `<label class="field select-field">
                 <span>답변 데이터 종류</span>
@@ -639,6 +652,7 @@
                 </select>
               </label>`}
 
+              ${editorState.inputType === 'phone' ? `<label class="checkbox-field applicant-required-field"><input type="checkbox" data-applicant-field-input="showCountryCode" ${editorState.showCountryCode === true ? 'checked' : ''} ${isEditorActive ? '' : 'disabled'} /><span>국가코드 선택 항목 표시</span></label>` : ''}
               ${['date', 'daterange'].includes(editorState.inputType) ? `<fieldset class="field applicant-date-format-settings">
                 <legend>날짜 형식</legend>
                 <div class="inline-actions">${['year', 'month', 'day'].map(part => {
@@ -655,8 +669,8 @@
                   ? `
                     <div class="field applicant-option-editor">
                       <span>선택지 목록</span>
-                      <div class="applicant-option-editor-row">
-                        <div class="applicant-option-language-fields"><label class="field"><span>선택지 (한국어)</span><input
+                      <div class="applicant-option-editor-row" data-edit-language="ko">
+                        <div class="applicant-option-language-fields"><label class="field" data-edit-language="ko"><span>선택지 (한국어)</span><input
                           data-applicant-field-input="optionDraft"
                           data-applicant-field-option-draft="true"
                           type="text"
@@ -664,7 +678,7 @@
                           placeholder="예: 오전반" maxlength="200"
                           ${isEditorActive ? "" : "disabled"}
                         />
-                        </label><label class="field"><span>선택지 (영어)</span><input data-applicant-field-input="optionDraftEn" data-applicant-field-option-draft="true" type="text" lang="en" maxlength="200" value="${escapeAttribute(editorState.optionDraftEn || '')}" placeholder="예: Morning class" ${isEditorActive ? '' : 'disabled'} /></label></div>
+                        </label><label class="field" data-edit-language="en"><span>선택지 (영어)</span><input data-applicant-field-input="optionDraftEn" data-applicant-field-option-draft="true" type="text" lang="en" maxlength="200" value="${escapeAttribute(editorState.optionDraftEn || '')}" placeholder="예: Morning class" ${isEditorActive ? '' : 'disabled'} /></label></div>
                         <label class="checkbox-field applicant-option-custom-toggle">
                           <input
                             data-applicant-field-input="allowCustomOption"
@@ -676,7 +690,7 @@
                         </label>
                         <button class="ghost-button applicant-option-add-button" data-applicant-field-option-add="true" type="button" ${isEditorActive ? "" : "disabled"}>항목 추가</button>
                       </div>
-                      <span class="muted applicant-option-editor-help">한국어와 영어를 함께 입력해 추가하세요. 영어를 비우면 한국어로 표시됩니다.</span>
+                      <span class="muted applicant-option-editor-help">새 선택지는 한국어에서 추가한 뒤 언어를 선택해 번역을 입력하세요. 번역이 없으면 한국어로 표시됩니다.</span>
                       ${
                         editorOptions.length > 0
                           ? `
@@ -687,8 +701,10 @@
                                     <div class="applicant-option-editor-item">
                                       <div class="applicant-option-editor-item-main">
                                         <div class="applicant-option-language-fields">
-                                        <label class="field"><span>선택지 (한국어)</span><input data-applicant-field-input="optionKorean:${index}" type="text" lang="ko" maxlength="200" required value="${escapeAttribute(editorState.optionKoreanEdits?.[index] ?? option)}" placeholder="예: 오전반" ${isEditorActive ? '' : 'disabled'} /></label>
-                                        <div class="field"><span id="choice-option-english-label-${index}">선택지 (영어)</span><div class="applicant-option-input-actions"><input aria-labelledby="choice-option-english-label-${index}" data-applicant-field-input="optionEnglish:${index}" type="text" lang="en" maxlength="200" value="${escapeAttribute(editorState.optionsEn?.[option] || '')}" placeholder="예: Morning class" ${isEditorActive ? '' : 'disabled'} />
+                                        <label class="field" data-edit-language="ko"><span>선택지 (한국어)</span><input data-applicant-field-input="optionKorean:${index}" type="text" lang="ko" maxlength="200" required value="${escapeAttribute(editorState.optionKoreanEdits?.[index] ?? option)}" placeholder="예: 오전반" ${isEditorActive ? '' : 'disabled'} /></label>
+                                        <div class="field" data-edit-language="en"><span id="choice-option-english-label-${index}">선택지 (영어)</span><div class="applicant-option-input-actions"><input aria-labelledby="choice-option-english-label-${index}" data-applicant-field-input="optionEnglish:${index}" type="text" lang="en" maxlength="200" value="${escapeAttribute(editorState.optionsEn?.[option] || '')}" placeholder="예: Morning class" ${isEditorActive ? '' : 'disabled'} />
+                                        </div></div><div class="field" data-edit-language="mn"><span id="choice-option-mongolian-label-${index}">선택지 (몽골어)</span><div class="applicant-option-input-actions"><input aria-labelledby="choice-option-mongolian-label-${index}" data-applicant-field-input="optionMongolian:${index}" type="text" lang="mn" maxlength="200" value="${escapeAttribute(editorState.optionsMn?.[option] || '')}" placeholder="예: Morning class" ${isEditorActive ? '' : 'disabled'} />
+                                        </div></div>
                                       <button
                                         class="icon-button danger-button applicant-option-remove-button"
                                         data-applicant-field-option-remove="${index}"
@@ -705,7 +721,7 @@
                                           <path d="M14 11v5.5"></path>
                                         </svg>
                                       </button>
-                                        </div></div></div>
+                                        </div>
                                         ${
                                           customOptionLabel && customOptionLabel === option
                                             ? `<em class="applicant-option-editor-badge">직접 입력</em>`
@@ -760,6 +776,7 @@
   }
 
   function renderTemplateManagement() {
+    if (/^\/templates\/[^/]+\/edit$/.test(location.pathname)) return globalThis.ApplyHubExamListEditor.renderPage();
     return `
       <section class="view-stack template-management-view">
         ${renderTemplateListPanel()}
@@ -819,7 +836,7 @@
       return `<section class="view-stack form-template-gallery">
         <article class="form-card form-template-toolbar">
           <div class="section-header">
-            ${renderMenuSectionCopy(`${scopeLabel} 템플릿`, '미리보기 카드를 선택해 질문을 수정하고, 일정 상세정보에서 전형별로 적용하세요.')}
+            ${renderMenuSectionCopy(`${scopeLabel} 템플릿`, '미리보기 카드를 선택해 질문을 수정하고, 전형 상세설정에서 전형별로 적용하세요.')}
             ${actionButton('create', null, 'primary-button')}
           </div>${renderMetadataEditor()}
         </article>

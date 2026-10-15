@@ -68,6 +68,22 @@ function createApplicantVerificationEmailSender({
   const previewEnabled = allowPreview && ["development", "test"].includes(String(env.NODE_ENV || "").toLowerCase());
   let transporterVerificationPromise = null;
 
+  function logSmtpFailure(stage, error, privateValues = []) {
+    const redact = value => {
+      let text = String(value || "");
+      const secrets = [env.SMTP_PASS, env.SMTP_USER, smtpFrom, ...privateValues]
+        .filter(value => typeof value === "string" && value.length).sort((a, b) => b.length - a.length);
+      for (const secret of secrets) text = text.split(secret).join("[redacted]");
+      return text.replace(/[^\s<>@]+@[^\s<>@]+/g, "[email]").replace(/[\x00-\x1f\x7f]+/g, " ").slice(0, 1000);
+    };
+    console.error(`Verification SMTP ${stage} failed:`, JSON.stringify({
+      code: redact(error.code || "UNKNOWN"),
+      responseCode: Number(error.responseCode) || null,
+      command: redact(error.command),
+      response: redact(error.response),
+    }));
+  }
+
   async function verifyTransporterAvailability() {
     if (!transporter) {
       throw createHttpError(
@@ -87,7 +103,7 @@ function createApplicantVerificationEmailSender({
     try {
       await transporterVerificationPromise;
     } catch (error) {
-      console.error("Verification SMTP check failed:", error.code || "UNKNOWN", error.responseCode || "");
+      logSmtpFailure("check", error);
       throw createHttpError(
         503,
         "인증 메일 발송 서비스를 이용할 수 없습니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.",
@@ -108,41 +124,42 @@ function createApplicantVerificationEmailSender({
 
     const schoolLabel = String(schoolName || "").replace(/[\r\n]+/g, " ").trim();
     const isEnglish = language === "en";
-    const serviceLabel = `${schoolLabel ? schoolLabel + " " : ""}${isEnglish ? "Application Portal" : "원서접수"}`;
-    const verificationMailSubject = `[ApplyHub] ${serviceLabel} ${isEnglish ? "Email verification code" : "이메일 인증 코드"}`;
+    const isMongolian = language === "mn";
+    const serviceLabel = `${schoolLabel ? schoolLabel + " " : ""}${isMongolian ? "Элсэлтийн бүртгэл" : isEnglish ? "Application Portal" : "원서접수"}`;
+    const verificationMailSubject = `[ApplyHub] ${serviceLabel} ${isMongolian ? "И-мэйл баталгаажуулах код" : isEnglish ? "Email verification code" : "이메일 인증 코드"}`;
     const isPasswordRecovery = purposeLabel === "비밀번호 재설정";
-    const heading = isEnglish ? (isPasswordRecovery ? "Reset your password" : "Verify your email") : (isPasswordRecovery ? "비밀번호 재설정" : "이메일 인증");
-    const introduction = isEnglish
+    const heading = isMongolian ? (isPasswordRecovery ? "Нууц үг сэргээх" : "И-мэйл баталгаажуулах") : isEnglish ? (isPasswordRecovery ? "Reset your password" : "Verify your email") : (isPasswordRecovery ? "비밀번호 재설정" : "이메일 인증");
+    const introduction = isMongolian ? `${serviceLabel} системд ${isPasswordRecovery ? 'нууц үгээ сэргээхэд' : 'и-мэйлээ баталгаажуулахад'} энэ кодыг ашиглана уу.` : isEnglish
       ? (isPasswordRecovery ? `Use this code to reset your password for ${serviceLabel}.` : `Use this code to verify your email address for ${serviceLabel}.`)
       : isPasswordRecovery
       ? `${serviceLabel} 시스템의 비밀번호 재설정을 위한 인증번호입니다.`
       : `${serviceLabel} 시스템에서 이메일 주소를 확인하기 위한 인증번호입니다.`;
-    const instruction = isEnglish
+    const instruction = isMongolian ? `${isPasswordRecovery ? 'Нууц үг сэргээх' : 'И-мэйл баталгаажуулах'} хуудсанд доорх кодыг оруулна уу.` : isEnglish
       ? (isPasswordRecovery ? "Enter the code below on the password reset page." : "Enter the code below on the email verification page.")
       : isPasswordRecovery
       ? "비밀번호 재설정 화면에 아래 인증번호를 입력해 주세요."
       : "진행 중인 인증 화면에 아래 인증번호를 입력해 주세요.";
-    const greeting = isEnglish ? "Hello," : "안녕하세요.";
-    const codeLabel = isEnglish ? "Verification code" : "인증번호";
-    const expiryLabel = isEnglish ? "Expires at" : "유효시간";
+    const greeting = isMongolian ? "Сайн байна уу," : isEnglish ? "Hello," : "안녕하세요.";
+    const codeLabel = isMongolian ? "Баталгаажуулах код" : isEnglish ? "Verification code" : "인증번호";
+    const expiryLabel = isMongolian ? "Хүчинтэй хугацаа" : isEnglish ? "Expires at" : "유효시간";
     let expirationLabel = "";
     if (expiresAt instanceof Date && !Number.isNaN(expiresAt.getTime())) {
       const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
         hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
       }).formatToParts(expiresAt).map(part => [part.type, part.value]));
-      expirationLabel = `${parts.year}.${parts.month}.${parts.day} ${parts.hour}:${parts.minute}:${parts.second}${isEnglish ? " (Korea Standard Time, UTC+09:00)" : "까지 (한국시간)"}`;
+      expirationLabel = `${parts.year}.${parts.month}.${parts.day} ${parts.hour}:${parts.minute}:${parts.second}${isMongolian ? ' (Солонгосын цаг, UTC+09:00)' : isEnglish ? " (Korea Standard Time, UTC+09:00)" : "까지 (한국시간)"}`;
     }
-    const expiryNotice = isEnglish ? "If this code expires, request a new code on the verification page." : "유효시간이 지나면 인증 화면에서 새 인증번호를 요청해 주세요.";
-    const securityNotice = isEnglish ? "If you did not request this email, you can safely delete it. Do not share this code with anyone." : "본인이 요청하지 않은 메일이라면 별도의 조치 없이 삭제해 주세요. 인증번호는 다른 사람에게 알려주지 마세요.";
+    const expiryNotice = isMongolian ? 'Кодын хугацаа дуусвал баталгаажуулах хуудсаас шинэ код авна уу.' : isEnglish ? "If this code expires, request a new code on the verification page." : "유효시간이 지나면 인증 화면에서 새 인증번호를 요청해 주세요.";
+    const securityNotice = isMongolian ? 'Та энэ и-мэйлийг хүсээгүй бол устгаж болно. Кодоо бусдад бүү дамжуулаарай.' : isEnglish ? "If you did not request this email, you can safely delete it. Do not share this code with anyone." : "본인이 요청하지 않은 메일이라면 별도의 조치 없이 삭제해 주세요. 인증번호는 다른 사람에게 알려주지 마세요.";
     const textLines = [
       serviceLabel, heading, "", greeting, introduction, instruction, "",
-      `${isEnglish ? codeLabel : "인증 코드"}: ${codeValue}`,
+      `${isEnglish || isMongolian ? codeLabel : "인증 코드"}: ${codeValue}`,
       ...(expirationLabel ? [`${expiryLabel}: ${expirationLabel}`] : []),
       expiryNotice, "", securityNotice, "", `ApplyHub · ${serviceLabel}`,
     ];
     const htmlBody = `
-      <div lang="${isEnglish ? 'en' : 'ko'}" style="margin:0;padding:24px 12px;background:#f4f7fb;font-family:'Malgun Gothic','Apple SD Gothic Neo',Arial,sans-serif;color:#192e49;line-height:1.7;">
+      <div lang="${isMongolian ? 'mn' : isEnglish ? 'en' : 'ko'}" style="margin:0;padding:24px 12px;background:#f4f7fb;font-family:'Malgun Gothic','Apple SD Gothic Neo',Arial,sans-serif;color:#192e49;line-height:1.7;">
         <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #dfe7f1;border-radius:16px;">
           <tr><td style="padding:28px 24px 24px;">
             <p style="margin:0 0 6px;color:#526984;font-size:13px;">${escapeHtml(serviceLabel)}</p>
@@ -198,7 +215,7 @@ function createApplicantVerificationEmailSender({
     } catch (error) {
       // Authentication can succeed while the provider rejects the From header at DATA.
       const senderNotAllowed = /no permitted from-header address/i.test(String(error.response || ''));
-      console.error("Verification SMTP send failed:", error.code || "UNKNOWN", error.responseCode || "", senderNotAllowed ? "SENDER_NOT_ALLOWED" : "");
+      logSmtpFailure("send", error, [String(codeValue || ""), email]);
       if (senderNotAllowed) {
         throw createHttpError(503, "발신 이메일의 발송 권한이 없어 인증 메일을 보내지 못했습니다. 관리자에게 문의해 주세요.", "APPLICANT_VERIFICATION_EMAIL_SENDER_NOT_ALLOWED");
       }

@@ -1,0 +1,148 @@
+#templateEditorPage {
+/* Paint the empty caret independently of Chromium's zero-height line painting. */
+.template-editor-surface [data-template-object-caret-host] > .template-object-caret {
+  display: inline-block;
+  height: 1em;
+  width: 1px;
+  vertical-align: top;
+  position: relative;
+  caret-color: transparent;
+}
+
+.template-editor-surface:focus [data-template-object-caret-host][data-template-object-caret-active] > .template-object-caret::after {
+  content: "";
+  background: currentColor;
+  height: 1em;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  width: 1px;
+}
+
+.template-editor-surface [data-template-object-caret-host][data-template-object-caret-active] {
+  height: calc(1em + 1pt) !important;
+  margin-bottom: calc(-1em - 1pt) !important;
+}
+
+.template-editor-surface [data-template-object-caret-host] {
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  line-height: calc(1em + 1pt) !important;
+}
+
+.template-editor-runtime {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.template-editor-runtime-shell {
+  --template-editor-canvas-panel-gutter-width: 24px;
+  --template-editor-canvas-panel-width: calc(
+    var(--template-editor-canvas-width, 794px) + var(--template-editor-canvas-panel-gutter-width)
+  );
+  display: grid;
+  grid-template-columns: var(--editor-toolbar-column-width, 320px) minmax(180px, 252px) var(--template-editor-canvas-panel-width);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 6px;
+  min-height: 720px;
+}
+
+.template-editor-runtime .template-editor-page {
+  --template-editor-canvas-zoom: 1;
+  grid-column: 3;
+  grid-row: 1 / 3;
+  min-width: var(--template-editor-canvas-panel-width, var(--template-editor-canvas-width, 794px));
+  min-height: 720px;
+  overflow-x: auto;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.template-editor-runtime .editor-paper-scale-box {
+  height: var(--template-editor-canvas-scaled-height, calc(var(--template-editor-canvas-height, 1123px) * var(--template-editor-canvas-zoom, 1)));
+  margin: 0 auto;
+  min-height: var(--template-editor-canvas-scaled-height, calc(var(--template-editor-canvas-height, 1123px) * var(--template-editor-canvas-zoom, 1)));
+  min-width: var(--template-editor-canvas-scaled-width, calc(var(--template-editor-canvas-width, 794px) * var(--template-editor-canvas-zoom, 1)));
+  position: relative;
+  width: var(--template-editor-canvas-scaled-width, calc(var(--template-editor-canvas-width, 794px) * var(--template-editor-canvas-zoom, 1)));
+}
+
+.template-editor-runtime .template-editor-surface {
+  transform: scale(var(--template-editor-canvas-zoom, 1));
+  transform-origin: top left;
+}
+
+.template-editor-runtime .template-tag-panel {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.template-editor-runtime .template-page-properties-panel {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: start;
+  max-height: 100%;
+}
+
+.template-editor-runtime-status {
+  min-height: 22px;
+  color: var(--text-dim, #5e6a80);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.template-editor-runtime-status.warning {
+  color: var(--warning, #f59e0b);
+}
+
+.template-editor-runtime .upload-file-input {
+  display: none;
+}
+
+@media (max-width: 1120px) {
+  .template-editor-runtime-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+  }
+
+  .template-editor-runtime-shell > .editor-toolbar-column,
+  .template-editor-runtime-shell > .template-tag-panel,
+  .template-editor-runtime-shell > .template-page-properties-panel,
+  .template-editor-runtime-shell > .template-editor-page {
+    grid-column: 1;
+  }
+
+  .template-editor-runtime-shell > .editor-toolbar-column {
+    grid-row: 1;
+  }
+
+  .template-editor-runtime-shell > .template-tag-panel {
+    grid-row: 2;
+  }
+
+  .template-editor-runtime-shell > .template-page-properties-panel {
+    grid-row: 3;
+  }
+
+  .template-editor-runtime-shell > .template-editor-page {
+    grid-row: 4;
+  }
+}
+
+@media (max-width: 820px) {
+  .template-editor-runtime-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .template-editor-runtime .template-editor-page {
+    min-width: 0;
+    min-height: 620px;
+  }
+}
+
+}

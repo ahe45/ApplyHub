@@ -33,7 +33,7 @@ thead th {
 
 tbody td {
   padding: 10px 3px;
-  font-size: 0.85rem;
+  font-size: var(--grid-body-font-size);
   border-bottom: 1px solid var(--grid-row-line);
   text-align: center;
   white-space: nowrap;

@@ -86,7 +86,10 @@
         return buildExamineePhotoMarkup(examinee);
       }
 
-      const replacementText = getTemplateTagReplacement(definition, examinee);
+      const formattedRecord = tokenElement.dataset.templateTagFormat && ['birth', 'currentDate'].includes(definition?.examineeKey)
+        ? { ...examinee, [definition.examineeKey]: globalThis.ApplyHubTemplateData.formatDate(examinee[definition.examineeKey], tokenElement.dataset.templateTagFormat) }
+        : examinee;
+      const replacementText = getTemplateTagReplacement(definition, formattedRecord);
 
       if (!replacementText) {
         return "";
@@ -101,6 +104,8 @@
       clone.removeAttribute("data-template-token");
       clone.removeAttribute("contenteditable");
       clone.removeAttribute("spellcheck");
+      clone.querySelectorAll('svg').forEach(icon => icon.remove());
+      Array.from(clone.attributes).filter(attribute => attribute.name.startsWith('data-template-tag-')).forEach(attribute => clone.removeAttribute(attribute.name));
 
       if (!String(clone.className || "").trim()) {
         clone.removeAttribute("class");
@@ -111,6 +116,8 @@
           editorTagText,
           `<span class="template-data-fit" data-template-data-fit="true">${replacementText}</span>`,
         );
+      } else if (definition?.label && clone.innerHTML.includes(definition.label)) {
+        clone.innerHTML = clone.innerHTML.replaceAll(definition.label, `<span class="template-data-fit" data-template-data-fit="true">${replacementText}</span>`);
       } else {
         clone.innerHTML = `<span class="template-data-fit" data-template-data-fit="true">${replacementText}</span>`;
       }
@@ -373,8 +380,12 @@
         <html lang="ko">
           <head>
             <meta charset="UTF-8" />
+            <base href="${escapeAttribute(window.location.origin + '/')}" />
             <title>수험표 출력</title>
-            <style>${getTemplateDocumentStyles(getTemplatePreviewPageSettings(state.templatePreview.renderedHtml))}</style>
+            <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=Noto+Sans+KR:wght@400;500;700&amp;display=swap" rel="stylesheet" />
+            <style>${getTemplateDocumentStyles(getTemplatePreviewPageSettings(state.templatePreview.renderedHtml))}${globalThis.ApplyHubTemplateDocument.getStyles()}</style>
+            <script src="/client/examlist-editor/runtime/client/features/template-editor/object-flow-reflow.js"><\/script>
+            <script src="/shared/domain/template-document.js"><\/script>
           </head>
           <body>
             <article class="template-render-sheet" ${getTemplatePreviewRenderAttributes(state.templatePreview.renderedHtml)}>
@@ -383,11 +394,12 @@
           </body>
         </html>
       `);
+      printWindow.addEventListener('load', async () => {
+        await printWindow.ApplyHubTemplateDocument.prepare(printWindow.document);
+        printWindow.print();
+      }, { once: true });
       printWindow.document.close();
       printWindow.focus();
-      window.setTimeout(() => {
-        printWindow.print();
-      }, 250);
 
       if (state.templatePreview.examineeNo && state.templatePreview.examineeNo !== "-") {
         await recordExamineePrint(state.templatePreview.examineeNo);

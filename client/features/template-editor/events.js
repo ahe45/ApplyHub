@@ -544,18 +544,22 @@
       updateTemplateEditorImageSelectionOverlay();
     }
 
+    const runtimeOwnsEditor = () => Boolean(document.getElementById('templateEditorPage'));
+    const runtimeOwnsEvent = event => runtimeOwnsEditor() && event?.target?.closest?.('#templateEditorRuntimeHost');
+    const delegate = handler => event => runtimeOwnsEvent(event) ? true : handler(event);
+    const delegateSurface = handler => event => runtimeOwnsEditor() ? undefined : handler(event);
     return Object.freeze({
-      handleChange,
-      handleClick,
-      handleDragStart,
-      handleInput,
-      handleKeydown,
-      handlePaste,
-      handlePointerDown,
-      handleSelectionChange,
-      handleSurfacePointerLeave,
-      handleSurfacePointerMove,
-      handleSurfaceScroll,
+      handleChange: delegate(handleChange),
+      handleClick: delegate(handleClick),
+      handleDragStart: delegate(handleDragStart),
+      handleInput: delegate(handleInput),
+      handleKeydown: delegate(handleKeydown),
+      handlePaste: delegate(handlePaste),
+      handlePointerDown: delegate(handlePointerDown),
+      handleSelectionChange: delegateSurface(handleSelectionChange),
+      handleSurfacePointerLeave: delegateSurface(handleSurfacePointerLeave),
+      handleSurfacePointerMove: delegateSurface(handleSurfacePointerMove),
+      handleSurfaceScroll: delegateSurface(handleSurfaceScroll),
     });
   }
 

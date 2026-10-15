@@ -6,6 +6,8 @@ const { createAdmitCardRoutes } = require("./routes/admit-cards");
 const { createPrintHistoryRoutes } = require("./routes/print-history");
 const { createSystemRoutes } = require("./routes/system");
 const { createTemplateRoutes } = require("./routes/templates");
+const { createTranslationRoutes } = require('./routes/translation');
+const { createSecretValueRoutes } = require('./routes/secret-values');
 
 function createApiRoutes(deps) {
   return Object.freeze([
@@ -17,6 +19,8 @@ function createApiRoutes(deps) {
     ...createSystemRoutes(deps),
     ...createTemplateRoutes(deps),
     ...createAccountRoutes(deps),
+    ...createTranslationRoutes(deps),
+    ...createSecretValueRoutes(deps),
   ]);
 }
 

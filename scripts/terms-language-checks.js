@@ -33,9 +33,11 @@ async function runTermsLanguageChecks({ services, members, query, base, call }) 
     await admin.click('[data-term-select]');
     const titleEn = 'Consent to personal data use';
     const textEn = 'Please read these terms.\nYour data is used for admissions. <b>Plain text</b>';
+    await admin.click('[editor-key=signup-terms] .language-menu-trigger');
+    await admin.click('[editor-key=signup-terms] [data-language=en]');
     await admin.type('[data-term-input=titleEn]', titleEn);
     await admin.type('[data-term-input=textEn]', textEn);
-    assert(await admin.$eval('.signup-term-language-grid', el => { const [ko, en] = el.children; return ko.getBoundingClientRect().top === en.getBoundingClientRect().top && ko.getBoundingClientRect().right < en.getBoundingClientRect().left; }));
+    assert(await admin.$eval('.signup-term-language-grid', el => { const [ko,en] = el.children; return ko.hidden && !en.hidden; }));
     await admin.screenshot({ path: path.join(artifacts, 'terms-editor.png'), fullPage: true });
     const [saved] = await Promise.all([
       admin.waitForResponse(response => response.url().endsWith('/api/applicant-signup-settings') && response.request().method() === 'PUT'),
@@ -66,7 +68,8 @@ async function runTermsLanguageChecks({ services, members, query, base, call }) 
     await page.waitForSelector('.applicant-member-terms-text');
     assert.equal(await page.$eval('.applicant-member-terms-text', el => el.textContent), term.text);
     await page.click('[data-member-term]');
-    await page.click('[data-language=en]');
+    await page.click('applyhub-language-toggle .language-menu-trigger');
+    await page.click('applyhub-language-toggle [data-language=en]');
     await page.waitForFunction(text => document.querySelector('.applicant-member-terms-text')?.textContent === text, {}, textEn);
     assert.equal(await page.$eval('.applicant-member-terms-heading [data-i18n-ko]', el => el.textContent), titleEn);
     assert.equal(await page.$('.applicant-member-terms-text b'), null, 'Authored terms remain plain text');
@@ -76,10 +79,12 @@ async function runTermsLanguageChecks({ services, members, query, base, call }) 
     assert.equal(await page.$eval('[data-member-term-content]', el => el.textContent), textEn);
     await page.screenshot({ path: path.join(artifacts, 'terms-english.png') });
     await page.click('[data-member-term-close]');
-    await page.click('[data-language=ko]');
+    await page.click('applyhub-language-toggle .language-menu-trigger');
+    await page.click('applyhub-language-toggle [data-language=ko]');
     await page.waitForFunction(text => document.querySelector('.applicant-member-terms-text')?.textContent === text, {}, term.text);
     assert(await page.$eval('[data-member-term]', el => el.checked));
-    await page.click('[data-language=en]');
+    await page.click('applyhub-language-toggle .language-menu-trigger');
+    await page.click('applyhub-language-toggle [data-language=en]');
     settings = await members.saveSettings({ ...settings, terms: settings.terms.map(item => ({ ...item, titleEn: '', textEn: '' })) });
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForSelector('.applicant-member-terms-text');

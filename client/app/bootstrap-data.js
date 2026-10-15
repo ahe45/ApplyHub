@@ -171,7 +171,9 @@
       applyLoginNoticePayload(payload.loginNoticeHtml, { scope: "login" });
       applyLoginNoticePayload(payload.applicantNoticeHtml, { scope: "applicant" });
       applyLoginNoticePayload(payload.loginNoticeHtmlEn || "", { scope: "login", language: "en" });
+      applyLoginNoticePayload(payload.loginNoticeHtmlMn || "", { scope: "login", language: "mn" });
       applyLoginNoticePayload(payload.applicantNoticeHtmlEn || "", { scope: "applicant", language: "en" });
+      applyLoginNoticePayload(payload.applicantNoticeHtmlMn || "", { scope: "applicant", language: "mn" });
       const nextExamineeRows = Array.isArray(payload.examinees) ? payload.examinees.map(normalizeExamineeRecord) : [];
       const nextPrintHistoryRows = Array.isArray(payload.printHistory) ? payload.printHistory.map(normalizeExamineeRecord) : [];
       const nextAccountRows = Array.isArray(payload.accounts) ? payload.accounts.map(normalizeAccountRecord) : [];

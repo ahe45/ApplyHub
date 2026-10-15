@@ -1,11 +1,17 @@
 <!DOCTYPE html>
 <html lang="ko">
   <head>
+    <base href="/" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script src="/client/app/public-messages.js"></script>
+    <script src="/client/app/public-messages-mn.js"></script>
+    <script src="/shared/domain/languages.js"></script>
+    <script src="/client/app/auto-translate.js"></script>
+    <script src="/client/app/language-menu.js"></script>
     <script src="/client/app/public-i18n.js"></script>
     <script src="/client/app/theme.js"></script>
+    <script src="/client/app/field-state.js"></script>
     <link rel="stylesheet" href="/styles/features/public-language.css" />
     <title>원서접수시스템</title>
     <link rel="icon" href="data:," />
@@ -36,6 +42,8 @@
     <link rel="stylesheet" href="./styles/quiet-glass-emphasis.css" />
     <link rel="stylesheet" href="./styles/features/applicant-archive.css" />
     <link rel="stylesheet" href="./styles/features/dashboard.css" />
+    <link rel="stylesheet" href="./styles/features/admin-ui.css" />
+    <link rel="stylesheet" href="/styles/field-state.css" />
   </head>
   <body>
     <div class="app-shell auth-locked" id="appShell">
@@ -75,7 +83,7 @@
                     <circle cx="16" cy="16.5" r="1.75"></circle>
                   </svg>
                 </span>
-                <span>전형 관리</span>
+                <span>전형 등록</span>
               </button>
               <button class="nav-item" data-view="applicantScheduleManagement" type="button">
                 <span class="nav-icon-wrap" aria-hidden="true">
@@ -89,7 +97,7 @@
                     <path d="M8 16.5h8"></path>
                   </svg>
                 </span>
-                <span>일정 관리</span>
+                <span>전형 관리</span>
               </button>
               <button class="nav-item" data-view="applicantQuestionTemplateManagement" type="button">
                 <span class="nav-icon-wrap" aria-hidden="true">
@@ -198,15 +206,6 @@
                   </svg>
                 </span>
                 <span>계정 관리</span>
-              </button>
-              <button class="nav-item" data-view="systemSettings" type="button">
-                <span class="nav-icon-wrap" aria-hidden="true">
-                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="3"></circle>
-                    <path d="M19 12a7 7 0 0 0-.08-1l2.05-1.6-2-3.46-2.48 1a7.03 7.03 0 0 0-1.73-1L14.5 3h-5l-.26 2.94a7.03 7.03 0 0 0-1.73 1l-2.48-1-2 3.46L5.08 11A7 7 0 0 0 5 12c0 .34.03.67.08 1l-2.05 1.6 2 3.46 2.48-1a7.03 7.03 0 0 0 1.73 1L9.5 21h5l.26-2.94a7.03 7.03 0 0 0 1.73-1l2.48 1 2-3.46L18.92 13c.05-.33.08-.66.08-1Z"></path>
-                  </svg>
-                </span>
-                <span>시스템 설정</span>
               </button>
             </div>
           </details>

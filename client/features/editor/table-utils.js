@@ -60,7 +60,7 @@
     cell.style.verticalAlign = nextVerticalAlign;
 
     if (nextBackgroundColor) {
-      cell.style.backgroundColor = normalizeTemplateEditorColorValue(
+      cell.style.backgroundColor = String(nextBackgroundColor).trim().toLowerCase() === 'transparent' ? 'transparent' : normalizeTemplateEditorColorValue(
         nextBackgroundColor,
         cell.tagName === "TH" ? TEMPLATE_EDITOR_DEFAULT_TABLE_HEADER_BACKGROUND : "#ffffff",
       );

@@ -271,6 +271,7 @@
     "페이지를 준비하지 못했습니다.": "Could not load the page.",
     "처리 중 오류가 발생했습니다.": "An error occurred.",
     "요청 처리 중 오류가 발생했습니다.": "An error occurred while processing your request.",
+    "서버 연결이 일시적으로 원활하지 않습니다. 잠시 후 다시 시도해 주세요.": "The server is temporarily unavailable. Please try again shortly.",
     "요청 처리 중 네트워크 오류가 발생했습니다.": "A network error occurred. Check your connection and try again.",
     "요청이 중단되었습니다.": "The request was canceled.",
     "요청을 처리하지 못했습니다.": "Could not process your request.",

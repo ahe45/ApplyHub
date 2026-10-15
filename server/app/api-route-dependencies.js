@@ -16,9 +16,12 @@ function createApiRouteDependencies({
   superAdminRole,
   systemService,
   templateService,
+  translationService,
   verifySystemDataDeletionPassword,
 }) {
   return {
+    translationService,
+    getStoredEmailPassword: systemService.getStoredEmailPassword,
     membershipService,
     applicantService,
     activateTemplate: templateService.activateTemplate,
@@ -46,6 +49,8 @@ function createApiRouteDependencies({
     createBatchAdmitCardJob: admitCardService.createBatchAdmitCardJob,
     createHttpError,
     createTemplate: templateService.createTemplate,
+    getTemplateEditorContext: templateService.getEditorContext,
+    previewTemplate: templateService.previewTemplate,
     databaseName,
     deleteAccount: authService.deleteAccount,
 

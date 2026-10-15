@@ -1,4 +1,4 @@
-const { isChoiceInputType, normalizeChoiceTranslations, validateMultiSelectAnswer, normalizeDateParts, isValidDateValue, validateDateRangeAnswer } = require('../../../shared/domain/applicant-form');
+const { isChoiceInputType, normalizeChoiceTranslations, validateMultiSelectAnswer, normalizeDateParts, isValidDateValue, validateDateRangeAnswer, normalizePhoneValue } = require('../../../shared/domain/applicant-form');
 const { answerTypeOptions, nationalityOptions } = require('../../../shared/domain/applicant-form');
 const { normalizeFileUploadSettings, isAllowedUploadExtension, formatUploadFileBaseName } = require('../../../shared/domain/applicant-form');
 const coreQuestions = [
@@ -27,11 +27,15 @@ function normalizeQuestions(value, legacy) {
     const customOptionLabel = String(q.customOptionLabel || '').trim();
     if (customOptionLabel && !options.includes(customOptionLabel)) throw new Error('직접 입력 항목을 선택지에 추가하세요.');
     return { key, label, labelEn: String(q.labelEn || q.questionTextEn || '').trim().slice(0, 100),
+      labelMn: String(q.labelMn || q.questionTextMn || '').trim().slice(0,100),
       description: String(q.description || q.questionDescription || '').slice(0, 1000),
-      descriptionEn: String(q.descriptionEn || q.questionDescriptionEn || '').trim().slice(0, 1000), inputType,
+      descriptionEn: String(q.descriptionEn || q.questionDescriptionEn || '').trim().slice(0, 1000),
+      descriptionMn: String(q.descriptionMn || q.questionDescriptionMn || '').trim().slice(0,1000), inputType,
+      ...(inputType === 'phone' ? { showCountryCode: q.showCountryCode === true } : {}),
       ...(['date', 'daterange'].includes(inputType) ? { dateParts: normalizeDateParts(q.dateParts) } : {}),
       ...(inputType === 'file' ? normalizeFileUploadSettings(q, 'signup') : {}),
       optionsEn: isChoiceInputType(inputType) ? normalizeChoiceTranslations(options, q.optionsEn) : {},
+      optionsMn: isChoiceInputType(inputType) ? normalizeChoiceTranslations(options, q.optionsMn) : {},
       required: core ? true : q.required === true, options: isChoiceInputType(inputType) ? options : [], customOptionLabel: isChoiceInputType(inputType) ? customOptionLabel : '' };
   });
   if (new Set(questions.map(q => q.key)).size !== questions.length) throw new Error('질문 식별자가 중복됩니다.');
@@ -65,12 +69,12 @@ function validateAnswers(questions, payload, context = {}) {
       continue;
     }
     if (q.inputType === 'multiselect') { profile[q.key] = validateMultiSelectAnswer(q, raw, q.label); continue; }
+    if (q.inputType === 'phone') { profile[q.key] = normalizePhoneValue(raw, q); continue; }
     const rawText = String(raw ?? '').trim();
-    const value = q.inputType === 'phone' ? rawText.replace(/\D+/g, '') : rawText;
+    const value = rawText;
     if (q.required && !value) throw new Error(`${q.label} 항목을 입력하세요.`);
     if (value.length > (q.inputType === 'textarea' ? 10000 : 500)) throw new Error(`${q.label} 답변이 너무 깁니다.`);
     if (value && ['date', 'birthdate'].includes(q.inputType) && (!isValidDateValue(value, q) || (q.inputType === 'birthdate' && Date.parse(value) > Date.now()))) throw new Error('올바른 날짜를 입력하세요.');
-    if (q.inputType === 'phone' && rawText && (!value || !/^\d{1,20}$/.test(value))) throw new Error('연락처는 20자리 이하의 숫자로 입력하세요.');
     if (value && q.inputType === 'time' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) throw new Error('올바른 시간을 입력하세요.');
     if (value && q.inputType === 'nationality' && !nationalityOptions.some(n => n.code === value)) throw new Error('국적 목록에서 선택하세요.');
     if (value && q.inputType === 'select' && !q.options.includes(value) && !(q.customOptionLabel && value.startsWith(q.customOptionLabel + ': ') && value.slice(q.customOptionLabel.length + 2).trim())) throw new Error(`${q.label} 선택지를 확인하세요.`);

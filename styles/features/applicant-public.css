@@ -4,3 +4,17 @@
 @import url("./applicant-membership.css");
 @import url("./applicant-public-mobile.css");
 @import url("./applicant-public-feedback.css");
+.applicant-phone-control {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 8px;
+  min-width: 0;
+}
+.applicant-phone-control > select,
+.applicant-phone-control > input {
+  width: 100%;
+  min-width: 0;
+}
+@media (max-width: 480px) {
+  .applicant-phone-control { grid-template-columns: minmax(0, 1fr); }
+}

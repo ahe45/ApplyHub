@@ -27,6 +27,9 @@
   animation: toast-slide-in 180ms ease-out both;
 }
 
+.toast-message.toast-error { background: var(--glass-error-bg); color: var(--glass-error); border-color: var(--glass-error); }
+.toast-message.toast-warning { background: var(--glass-warning-bg); color: var(--glass-warning); border-color: var(--glass-warning); }
+
 @keyframes toast-slide-in {
   from {
     opacity: 0;

@@ -1,8 +1,8 @@
 /* Public UI translations only. Form values, API payloads and stored data remain unchanged. */
 (() => {
-  const catalog = globalThis.ApplyHubPublicMessages || {};
+  const catalogs = { en: globalThis.ApplyHubPublicMessages || {}, mn: globalThis.ApplyHubPublicMessagesMn || {} };
   const storageKey = 'applyhub.public-language';
-  const normalize = value => value === 'en' ? 'en' : 'ko';
+  const normalize = globalThis.ApplyHubLanguages.normalize;
   let language = 'ko';
   try { language = normalize(localStorage.getItem(storageKey)); } catch { /* In-memory preference when storage is unavailable. */ }
   const controls = new Set();
@@ -11,22 +11,22 @@
   const authoredHtml = new WeakMap();
   const attributeNames = ['placeholder', 'title', 'aria-label', 'aria-description', 'alt'];
   const excluded = 'script, style, textarea, [contenteditable="true"], [translate="no"], [data-i18n-user-content]';
-  const patterns = Object.entries(catalog).filter(([key]) => /\{\d+\}/.test(key)).sort(([a], [b]) => b.replace(/\{\d+\}/g, '').length - a.replace(/\{\d+\}/g, '').length).map(([key, value]) => {
+  const patternsByLanguage = Object.fromEntries(Object.entries(catalogs).map(([locale,catalog]) => [locale, Object.entries(catalog).filter(([key]) => /\{\d+\}/.test(key)).sort(([a], [b]) => b.replace(/\{\d+\}/g, '').length - a.replace(/\{\d+\}/g, '').length).map(([key, value]) => {
     const slots = [];
     const parts = key.split(/(\{\d+\})/).map(part => {
       if (/^\{\d+\}$/.test(part)) { slots.push(part); return '([\\s\\S]*?)'; }
       return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     });
     return { regex: new RegExp(`^${parts.join('')}$`), slots, value };
-  });
+  })]));
 
   function translate(text, locale = language) {
     const source = String(text ?? '');
-    if (locale !== 'en' || !/[가-힣]/.test(source)) return source;
+    if (!catalogs[locale] || !/[가-힣]/.test(source)) return source;
     const trimmed = source.trim();
-    let translated = catalog[trimmed];
+    let translated = catalogs[locale][trimmed];
     if (translated === undefined) {
-      for (const pattern of patterns) {
+      for (const pattern of patternsByLanguage[locale]) {
         const match = pattern.regex.exec(trimmed);
         if (match) {
           // Captures are data: never run them through the dictionary.
@@ -45,7 +45,7 @@
   function updateValue(target, current, records, write, explicitEnglish) {
     let record = records.get(target);
     if (!record || current !== record.output) record = { source: current, output: current };
-    record.output = explicitEnglish !== undefined ? (language === 'en' ? explicitEnglish : record.source) : translate(record.source);
+    record.output = explicitEnglish !== undefined ? (language !== 'ko' ? explicitEnglish : record.source) : translate(record.source);
     records.set(target, record);
     if (current !== record.output) write(record.output);
   }
@@ -60,7 +60,7 @@
       if (!active || !root) return;
       // Only administrator-authored notice HTML opts into rich-text language switching.
       for (const element of root.querySelectorAll('[data-i18n-html-ko]')) {
-        const html = language === 'en' ? element.dataset.i18nHtmlEn || element.dataset.i18nHtmlKo : element.dataset.i18nHtmlKo;
+        const html = element.getAttribute('data-i18n-html-' + language) || element.dataset.i18nHtmlKo;
         if (authoredHtml.get(element) !== html) {
           element.innerHTML = html;
           authoredHtml.set(element, html);
@@ -68,14 +68,15 @@
       }
       // Authored bilingual labels bypass the system dictionary in both languages.
       for (const element of root.querySelectorAll('[data-i18n-ko]')) {
-        const text = language === 'en' ? element.dataset.i18nEn || element.dataset.i18nKo : element.dataset.i18nKo;
+        const text = element.getAttribute('data-i18n-' + language) || element.dataset.i18nKo;
         if (element.textContent !== text) element.textContent = text;
       }
       for (const name of ['aria-label', 'title']) {
-        for (const element of root.querySelectorAll(`[data-i18n-${name}-en]`)) {
+        const selectors = Object.keys(catalogs).map(locale => `[data-i18n-${name}-${locale}]`).join(',');
+        for (const element of root.querySelectorAll(selectors)) {
           let records = attributes.get(element);
           if (!records) { records = new Map(); attributes.set(element, records); }
-          updateValue(name, element.getAttribute(name), records, value => element.setAttribute(name, value), element.getAttribute(`data-i18n-${name}-en`));
+          updateValue(name, element.getAttribute(name), records, value => element.setAttribute(name, value), element.getAttribute(`data-i18n-${name}-${language}`) ?? undefined);
         }
       }
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
@@ -86,11 +87,11 @@
         const current = node;
         const element = current.parentElement;
         if (element.tagName === 'OPTION' && !element.hasAttribute('value')) element.setAttribute('value', element.value);
-        const explicitEnglish = element.getAttribute('data-i18n-en');
+        const explicitEnglish = element.getAttribute('data-i18n-' + language);
         if (explicitEnglish !== null) {
           let record = originals.get(current);
           if (!record || current.data !== record.output) record = { source: current.data };
-          record.output = language === 'en' ? explicitEnglish : record.source;
+          record.output = language !== 'ko' ? explicitEnglish : record.source;
           originals.set(current, record);
           if (current.data !== record.output) current.data = record.output;
         } else updateValue(current, current.data, originals, value => { current.data = value; });
@@ -101,7 +102,7 @@
         let records = attributes.get(element);
         if (!records) { records = new Map(); attributes.set(element, records); }
         for (const name of attributeNames) {
-          if (!element.hasAttribute(name) || preserved.includes(name) || element.hasAttribute(`data-i18n-${name}-en`)) continue;
+          if (!element.hasAttribute(name) || preserved.includes(name) || element.hasAttribute(`data-i18n-${name}-${language}`)) continue;
           updateValue(name, element.getAttribute(name), records, value => element.setAttribute(name, value));
         }
       }
@@ -112,7 +113,7 @@
       const title = document.querySelector('title');
       if (title?.firstChild) updateValue(title.firstChild, title.textContent, originals, value => { title.firstChild.data = value; });
     } finally {
-      observer.observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: [...attributeNames, 'class', 'translate', 'data-i18n-preserve', 'data-i18n-ko', 'data-i18n-en', 'data-i18n-aria-label-en'] });
+      observer.observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: [...attributeNames, 'class', 'translate', 'data-i18n-preserve', 'data-i18n-ko', 'data-i18n-en', 'data-i18n-mn', 'data-i18n-aria-label-en', 'data-i18n-aria-label-mn'] });
     }
   }
   const observer = new MutationObserver(apply);
@@ -127,21 +128,17 @@
   class LanguageToggle extends HTMLElement {
     connectedCallback() {
       this.setAttribute('translate', 'no');
-      this.innerHTML = '<div class="public-language-toggle" role="group"><button type="button" lang="ko" data-language="ko">한국어</button><button type="button" lang="en" data-language="en">English</button></div>';
-      this.addEventListener('click', event => {
-        const button = event.target.closest('[data-language]');
-        if (button && !this.hasAttribute('disabled')) setLanguage(button.dataset.language);
-      });
+      this.innerHTML = '<applyhub-language-menu value="' + language + '"></applyhub-language-menu>';
+      this.onSelect ||= event => { if (!this.hasAttribute('disabled')) setLanguage(event.detail.language); };
+      this.addEventListener('applyhub:language-select', this.onSelect);
       controls.add(this);
       this.update();
     }
-    disconnectedCallback() { controls.delete(this); }
+    disconnectedCallback() { controls.delete(this); this.removeEventListener('applyhub:language-select', this.onSelect); }
     update() {
-      this.querySelector('[role="group"]')?.setAttribute('aria-label', language === 'en' ? 'Display language' : '표시 언어');
-      this.querySelectorAll('button').forEach(button => {
-        button.setAttribute('aria-pressed', String(button.dataset.language === language));
-        button.disabled = this.hasAttribute('disabled');
-      });
+      const menu = this.querySelector('applyhub-language-menu');
+      menu?.toggleAttribute('disabled', this.hasAttribute('disabled'));
+      menu?.update(language);
     }
   }
   customElements.define('applyhub-language-toggle', LanguageToggle);

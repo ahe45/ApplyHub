@@ -1,0 +1,130 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const puppeteer = require('puppeteer-core');
+const { PDFDocument } = require('pdf-lib');
+
+async function verifyAdmissionSettings({ services, query, base, call, submission, signup, memberCookie, application }) {
+  const applicants = services.applicantService;
+  const templates = services.templateService;
+  let first = (await applicants.getApplicantSchedules())[0];
+  const ticketA = await templates.createTemplate({ name: '전형 A 양식', version: 'v1', contentHtml: '<div class="template-doc"><p>A 전형 @{이름} @{생년월일} @{회원가입:address}</p></div>' });
+  const ticketB = await templates.createTemplate({ name: '전형 B 양식', version: 'v1', contentHtml: '<div class="template-doc"><p>B 전형 @{이름}</p></div>' });
+  assert.equal((await templates.getEditorContext(ticketA.id)).previewSource.kind, 'empty', 'Unassigned templates can be edited');
+  await templates.updateTemplate(ticketA.id, { contentHtml: ticketA.contentHtml + '<p>편집 가능</p>' });
+  // Recreate the old association to verify the one-time data migration.
+  await query("UPDATE templates SET status = 'unused'");
+  await query("UPDATE templates SET status = 'used', recruitment_schedule_id = ? WHERE id = ?", [first.id, ticketA.id]);
+  await query("UPDATE system_set SET setting_value = 'true' WHERE setting_key = 'applicantSubmissionEditEnabled'");
+  await query("DELETE FROM system_set WHERE setting_key = 'admissionTemplateSettingsMigrated'");
+  await services.initializeApplicationData();
+  first = (await applicants.getApplicantSchedules())[0];
+  assert.equal(first.admitCardTemplateId, ticketA.id);
+  assert.equal(first.applicantSubmissionEditEnabled, true);
+  await query("INSERT INTO app_unit (track_name,admission_code,admission_name,series_code,series_name,unit_code,unit_name) VALUES ('정시','9','특별','2','인문','3','문학')");
+  const secondTarget = { trackName: '정시', admissionCode: '9', admissionName: '특별' };
+  await applicants.saveApplicantSchedule({ ...secondTarget, applicantScheduleStartAt: first.applicantScheduleStartAt, applicantScheduleEndAt: first.applicantScheduleEndAt, admitCardLookupScheduleStartAt: first.admitCardLookupScheduleStartAt, admitCardLookupScheduleEndAt: first.admitCardLookupScheduleEndAt,
+    admitCardTemplateId: ticketB.id, applicantSubmissionEditEnabled: false, examNoSettings: { digitCount: 7, components: ['admissionCode','sequence','','',''] } });
+  await assert.rejects(() => applicants.saveApplicantSchedule({ ...secondTarget, admitCardTemplateId: 'missing' }), error => error.errorCode === 'ADMIT_CARD_TEMPLATE_INVALID');
+  await assert.rejects(() => applicants.saveApplicantSchedule({ ...secondTarget, examNoSettings: { digitCount: 3, components: ['sequence','sequence'] } }), error => error.errorCode === 'APPLICANT_EXAM_NO_COMPONENT_SEQUENCE_REQUIRED');
+  await assert.rejects(() => applicants.saveApplicantSchedule({ ...secondTarget, examNoSettings: { digitCount: 0, components: ['sequence'] } }), /자리/);
+  await assert.rejects(() => applicants.saveApplicantSchedule({ ...secondTarget, examNoSettings: { digitCount: 5, components: [] } }), /조합/);
+  await assert.rejects(() => templates.deleteTemplate(ticketA.id), /사용 중/);
+  const context = await templates.getEditorContext(ticketA.id);
+  assert.equal(context.previewSource.submissionId, submission.id);
+  assert.equal(context.previewRecord.signupAnswers.address, signup.profile.address);
+  assert((await templates.previewTemplate(ticketA.id)).renderedHtml.includes(signup.profile.address));
+
+  await query('UPDATE accounts SET password_temporary = 0');
+  const system = await services.systemService.getSystemSettings();
+  const login = await call('/api/auth/login', { id: 'admin', password: system.initialPassword });
+  assert.equal(login.status, 200);
+  const browser = await puppeteer.launch({ headless: true, executablePath: process.env.EDGE_PATH || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe' });
+  const errors = [];
+  const artifacts = path.resolve('.tmp-admission-settings'); fs.mkdirSync(artifacts, { recursive: true });
+  try {
+    const cookieAt = login.cookie.indexOf('=');
+    await browser.setCookie({ name: login.cookie.slice(0,cookieAt), value: login.cookie.slice(cookieAt+1), url: base });
+    const page = await browser.newPage(); page.on('pageerror', error => errors.push(error.message));
+    await page.setViewport({ width:1440, height:1000 });
+    await page.goto(base + '/applicant-schedules', { waitUntil:'networkidle0' });
+    await page.waitForSelector('tr[data-grid-row-clickable=true]');
+    await page.click('tr[data-grid-row-clickable=true]');
+    await page.waitForSelector('#applicantScheduleModal:not(.hidden)');
+    assert.equal(await page.$eval('#applicantScheduleModalTitle', node => node.textContent), '전형 상세설정');
+    const field = name => `[data-applicant-schedule-input="${name}"]`;
+    assert.equal(await page.$eval(field('admitCardTemplateId'), node => node.value), ticketA.id);
+    assert(await page.$eval(field('applicantSubmissionEditEnabled'), node => node.type === 'checkbox' && node.closest('[data-schedule-period=applicantSchedule]')));
+    await page.focus(field('applicantSubmissionEditEnabled')); await page.keyboard.press('Space'); await page.keyboard.press('Space');
+    await page.$eval(field('examNoDigitCount'), node => { node.value = '6'; node.dispatchEvent(new Event('input', {bubbles:true})); });
+    for (let i=0;i<5;i++) await page.select(field('examNoComponent'+i), i===0 ? 'sequence' : '');
+    await page.screenshot({ path:path.join(artifacts,'admission-modal-desktop.png') });
+    await page.click('#applicantScheduleModalSaveButton');
+    await page.waitForSelector('#applicantScheduleModal.hidden');
+    first = (await applicants.getApplicantSchedules())[0];
+    assert.equal(first.examNoSettings.digitCount,6);
+    assert.deepEqual(first.examNoSettings.components,['sequence','','','','']);
+    await page.goto(base+'/templates', { waitUntil:'networkidle0' });
+    assert.equal(await page.$('[data-template-schedule-link]'),null);
+    assert.equal(await page.$('[data-template-apply]'),null);
+    await page.click(`[data-template-edit="${ticketA.id}"]`);
+    await page.waitForSelector('#templateEditorRuntimeHost .template-editor-surface');
+    await page.waitForFunction(() => globalThis.ApplyHubExamListEditor?.instance);
+    assert(new URL(page.url()).pathname.endsWith('/edit'));
+    await page.goto(base+'/system-settings', { waitUntil:'networkidle0' });
+    assert.equal(await page.$('#systemSettingsApplicantSubmissionEditEnabled'),null);
+    assert.equal(await page.$('#systemSettingsApplicantExamNoDigitCount'),null);
+    await page.goto(base+'/applicant-schedules', { waitUntil:'networkidle0' });
+    await page.click('tr[data-grid-row-clickable=true]');
+    await page.waitForSelector('#applicantScheduleModal:not(.hidden)');
+    await page.setViewport({ width:390,height:844 });
+    assert(await page.$eval('#applicantScheduleModal .modal-sheet', node => node.getBoundingClientRect().width <= innerWidth));
+    await page.screenshot({ path:path.join(artifacts,'admission-modal-mobile.png') });
+    assert.deepEqual(errors,[]);
+  } finally { await browser.close(); }
+  // A second initialization must not overwrite individually saved settings.
+  await services.initializeApplicationData();
+  assert.equal((await applicants.getApplicantSchedules())[0].examNoSettings.digitCount,6);
+  const savedSystem = await call('/api/system-settings', { initialPassword:system.initialPassword, autoLogoutMinutes:system.autoLogoutMinutes, admissionHomepageUrl:system.admissionHomepageUrl, applicantSubmissionEditEnabled:false, applicantExamNoDigitCount:30, applicantExamNoComponents:['sequence'] }, login.cookie, 'PUT');
+  assert.equal(savedSystem.status,403,'Basic system settings are now restricted to super administrators');
+  assert.equal((await applicants.getApplicantSchedules())[0].examNoSettings.digitCount,6);
+
+  const editPayload = { ...application, answers:{ 'applicant-name':signup.name, birth:signup.profile.birth } };
+  let edited = await call('/api/public/applications', editPayload, memberCookie, 'PUT');
+  assert.equal(edited.status,200,JSON.stringify(edited));
+  assert.equal(edited.body.examineeNo,submission.examineeNo,'Changing rules does not renumber existing applications');
+  await applicants.saveApplicantSchedule({ ...first, applicantSubmissionEditEnabled:false });
+  const denied = await call('/api/public/applications',editPayload,memberCookie,'PUT');
+  assert.equal(denied.body.code,'APPLICANT_SUBMISSION_EDIT_DISABLED');
+  await applicants.saveApplicantSchedule({ ...first, applicantSubmissionEditEnabled:true });
+  const blockedDestination = await call('/api/public/applications', { ...editPayload, selectionAnswers:{ ...editPayload.selectionAnswers, track:'정시', admission:'특별' } }, memberCookie, 'PUT');
+  assert.equal(blockedDestination.body.code, 'APPLICANT_SUBMISSION_EDIT_DISABLED', 'Moving an application cannot bypass the destination admission policy');
+  const beforeBulk = await applicants.getApplicantSchedules();
+  await applicants.saveApplicantSchedules({ schedules:beforeBulk.map(s => ({ trackName:s.trackName, admissionCode:s.admissionCode, admissionName:s.admissionName, documentSubmissionScheduleEnabled:false })) });
+  const afterBulk = await applicants.getApplicantSchedules();
+  for (let i=0;i<beforeBulk.length;i++) {
+    assert.equal(afterBulk[i].admitCardTemplateId,beforeBulk[i].admitCardTemplateId);
+    assert.equal(afterBulk[i].applicantSubmissionEditEnabled,beforeBulk[i].applicantSubmissionEditEnabled);
+    assert.deepEqual(afterBulk[i].examNoSettings,beforeBulk[i].examNoSettings);
+  }
+  await applicants.deleteApplicantSubmission(submission.id);
+  const freshA = await call('/api/public/applications',editPayload,memberCookie);
+  assert.equal(freshA.status,200,JSON.stringify(freshA));
+  assert.match(freshA.body.examineeNo,/^\d{6}$/);
+  assert.equal((await templates.getActiveTemplate({track:'수시',admission:'일반'})).id,ticketA.id);
+  await applicants.deleteApplicantSubmission(freshA.body.id);
+  const freshB = await call('/api/public/applications',{ ...editPayload, selectionAnswers:{...editPayload.selectionAnswers,track:'정시',admission:'특별'} },memberCookie);
+  assert.equal(freshB.status,200,JSON.stringify(freshB));
+  assert.match(freshB.body.examineeNo,/^9\d{6}$/);
+  assert.equal((await templates.getActiveTemplate({track:'정시',admission:'특별'})).id,ticketB.id);
+  const bEdit = await call('/api/public/applications',{...editPayload,selectionAnswers:{...editPayload.selectionAnswers,track:'정시',admission:'특별'}},memberCookie,'PUT');
+  assert.equal(bEdit.body.code,'APPLICANT_SUBMISSION_EDIT_DISABLED');
+  const pdfResponse = await fetch(base+`/api/public/applications/${freshB.body.id}/admit-card.pdf`,{headers:{Cookie:memberCookie}});
+  assert.equal(pdfResponse.status,200);
+  assert.equal((await PDFDocument.load(await pdfResponse.arrayBuffer())).getPageCount(),1);
+  await applicants.saveApplicantSchedule({ ...secondTarget, admitCardTemplateId:ticketA.id });
+  assert.equal((await templates.getEditorContext(ticketA.id)).schedules.length,2,'One template may serve multiple admissions');
+  await assert.rejects(() => templates.deleteTemplate(ticketA.id),/사용 중/);
+  console.log('PASS: migration, independent admission rules, modal save, unrestricted editor, preserved exam numbers, shared templates and PDF');
+}
+module.exports = { verifyAdmissionSettings };

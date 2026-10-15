@@ -18,6 +18,13 @@ async function run() {
   assert(rendered.includes('김&lt;학생&gt;'));
   assert(rendered.includes('2026-09-15'));
   assert(!rendered.includes('@{'));
+  const importedToken = '<span class="template-token" data-template-tag-value="@{생년월일}" data-template-tag-label="생년월일" style="font-size:22pt;color:#ff0000"><svg viewBox="0 0 24 24"><path d="M1 1"></path></svg><b>생년월일</b></span>';
+  const importedRendered = await renderer.renderTemplateWithExaminee(importedToken, record);
+  assert(importedRendered.includes('font-size:22pt;color:#ff0000'));
+  assert(importedRendered.includes('<b><span class="template-data-fit"'));
+  assert(importedRendered.includes(record.birth));
+  assert(!importedRendered.includes('<svg'));
+  assert(!importedRendered.includes('data-template-tag-'));
   for (const label of ['시험날짜','고사건물','고사실','시간','교시','조']) {
     const oldMarkup = `<p>앞<span data-template-tag-value="@{${label}}"><b>#${label}</b></span>뒤</p><p>@{${label}} / #${label} / @${label}</p>`;
     const result = await renderer.renderTemplateWithExaminee(oldMarkup, {...record, room:'stale-room',time:'09:00',group:'A'});

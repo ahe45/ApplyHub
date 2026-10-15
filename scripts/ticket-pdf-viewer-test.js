@@ -110,16 +110,23 @@ async function run() {
     }
     pdfDelay = 200;
     const beforeReplacement = pdfRequests;
-    await page.evaluate(() => {
+    const placeholder = await page.evaluate(() => {
       const viewer = document.querySelector('ticket-pdf-viewer');
       const replacement = viewer.cloneNode(false);
       const url = new URL(viewer.getAttribute('src'), location.href);
       url.searchParams.set('render-test', 'replacement');
       replacement.setAttribute('src', url.href);
       viewer.replaceWith(replacement);
-      replacement.replaceWith(replacement.cloneNode(false));
+      const current = replacement.cloneNode(false);
+      replacement.replaceWith(current);
+      const shell = current.querySelector('.ticket-pdf-page.is-loading'), rect = shell.getBoundingClientRect();
+      return { width: rect.width, height: rect.height, animation: getComputedStyle(shell.querySelector('.ticket-pdf-progress'), '::after').animationName, busy: current.getAttribute('aria-busy') };
     });
+    assert.equal(placeholder.busy, 'true');
+    assert(placeholder.width > 0 && Math.abs(placeholder.height - placeholder.width * 297 / 210) < 3, 'The document area is reserved before the PDF arrives');
+    assert.equal(placeholder.animation, 'ticket-pdf-progress', 'An indeterminate progress animation appears in the reserved area');
     await ready();
+    assert.equal(await page.$('ticket-pdf-viewer .is-loading, ticket-pdf-viewer .ticket-pdf-progress'), null, 'Loading placeholders are replaced by rendered pages');
     assert.equal(pdfRequests - beforeReplacement, 1, 'Immediate UI replacement shares one PDF request');
     pdfDelay = 0;
     const cdp = await page.createCDPSession();

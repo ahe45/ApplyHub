@@ -2,6 +2,7 @@ const { createBatchAdmitCardJobController } = require("./admit-card-jobs");
 const { createAdmitCardPdfService } = require("./admit-card-pdf");
 
 function createAdmitCardService({
+  rootDir,
   batchAdmitCardJobTtlMs,
   createHttpError,
   createTemplateExamineeRenderer,
@@ -15,6 +16,7 @@ function createAdmitCardService({
   translateDatabaseError,
 }) {
   const admitCardPdfService = createAdmitCardPdfService({
+    rootDir,
     createHttpError,
     createTemplateExamineeRenderer,
     browserExecutablePaths,

@@ -25,18 +25,23 @@
         </article>
         <div class="applicant-settings-side"><article class="form-card applicant-field-editor-panel ${draft ? '' : 'is-disabled'}">
           <div class="section-header"><div><h3>${draft ? isNew ? '약관 추가' : '약관 수정' : '약관 카드 선택'}</h3><p>${draft ? '약관 제목, 내용, 필수 동의와 사용 여부를 설정합니다.' : '약관 카드를 선택하거나 새 약관을 추가하면 수정할 수 있습니다.'}</p></div></div>
-          <form data-term-form class="applicant-field-editor-form">
+          <form data-term-form class="applicant-field-editor-form" data-language-editor>
+            <applyhub-language-menu editor-key="signup-terms"></applyhub-language-menu>
             <div class="signup-term-language-grid">
-              <div class="signup-term-language-column">
+              <div class="signup-term-language-column" data-edit-language="ko">
                 <label class="field"><span>제목(한국어)</span><input data-term-input="title" value="${esc(draft?.title)}" placeholder="예: 개인정보 수집 및 이용 동의" maxlength="100" required ${disabled} /></label>
                 <label class="field"><span>내용(한국어)</span><textarea data-term-input="text" rows="12" maxlength="30000" placeholder="수험생에게 안내할 한국어 약관 내용을 입력하세요." ${draft?.enabled ? 'required' : ''} ${disabled}>${esc(draft?.text)}</textarea></label>
               </div>
-              <div class="signup-term-language-column">
+              <div class="signup-term-language-column" data-edit-language="en">
                 <label class="field"><span>제목(영어)</span><input data-term-input="titleEn" value="${esc(draft?.titleEn)}" placeholder="예: Consent to Personal Data Collection and Use" maxlength="100" ${disabled} /></label>
                 <label class="field"><span>내용(영어)</span><textarea data-term-input="textEn" rows="12" maxlength="30000" placeholder="수험생에게 안내할 영어 약관 내용을 입력하세요." ${disabled}>${esc(draft?.textEn)}</textarea></label>
               </div>
+              <div class="signup-term-language-column" data-edit-language="mn">
+                <label class="field"><span>제목(몽골어)</span><input data-term-input="titleMn" value="${esc(draft?.titleMn)}" placeholder="예: Consent to Personal Data Collection and Use" maxlength="100" ${disabled} /></label>
+                <label class="field"><span>내용(몽골어)</span><textarea data-term-input="textMn" rows="12" maxlength="30000" placeholder="수험생에게 안내할 몽골어 약관 내용을 입력하세요." ${disabled}>${esc(draft?.textMn)}</textarea></label>
+              </div>
             </div>
-            <p class="muted applicant-answer-type-help">영어 제목이나 내용을 비워두면 해당 항목은 한국어로 표시됩니다.</p>
+            <p class="muted applicant-answer-type-help">선택한 언어의 제목이나 내용을 비워두면 해당 항목은 한국어로 표시됩니다.</p>
             <label class="checkbox-field applicant-required-field"><input data-term-input="required" type="checkbox" ${draft?.required ? 'checked' : ''} ${disabled} /><span>필수 동의 항목으로 설정</span></label>
             <label class="checkbox-field applicant-required-field"><input data-term-input="enabled" type="checkbox" ${draft?.enabled ? 'checked' : ''} ${disabled} /><span>회원가입 화면에서 사용</span></label>
             <div class="form-actions"><button type="button" class="ghost-button" data-term-cancel ${disabled}>선택 해제</button><button class="primary-button" type="submit" ${disabled}>${isNew ? '약관 추가' : '약관 저장'}</button></div>
@@ -50,7 +55,7 @@
     const markup = scope.AdmitCardTemplateManagementRenderers.renderApplicantFieldSettingsPanel({
       title: '회원가입', description: '회원가입에 표시할 질문과 답변 종류를 관리합니다. 이메일·비밀번호·이름은 필수이며 인증한 이메일로 로그인합니다.',
       fileUploadScope: 'signup',
-      fields: settings.questions.map((q, index) => ({ ...q, id: q.key, questionText: q.label, questionDescription: q.description, questionTextEn: q.labelEn, questionDescriptionEn: q.descriptionEn, locked: coreKeys.includes(q.key), orderLocked: coreKeys.includes(q.key),
+      fields: settings.questions.map((q, index) => ({ ...q, id: q.key, questionText: q.label, questionDescription: q.description, questionTextEn: q.labelEn, questionDescriptionEn: q.descriptionEn, questionTextMn:q.labelMn, questionDescriptionMn:q.descriptionMn, locked: coreKeys.includes(q.key), orderLocked: coreKeys.includes(q.key),
         moveUpDisabled: index === 0 || coreKeys.includes(settings.questions[index - 1]?.key), moveDownDisabled: index === settings.questions.length - 1,
         answerTypeLabel: ({password: '비밀번호', email: '이메일'})[q.inputType], systemLabel: coreKeys.includes(q.key) ? '기본 항목 · 순서 고정' : '일반 항목' })), editorState: editor, lockedCore: coreKeys.includes(editor.editingId),
       inputTypeOptions: scope.AdmitCardApplicantFormConfig.signupAnswerTypeOptions,
@@ -74,24 +79,31 @@
       ${[['application', '원서접수'], ['documents', '서류제출'], ['signup', '회원가입'], ['terms', '약관관리']].map(([key, label]) => `<button class="template-management-tab ${active === key ? 'active' : ''}" id="question-tab-${key}" type="button" role="tab" aria-selected="${active === key}" aria-controls="question-management-panel" data-question-scope="${key}">${label}</button>`).join('')}
       </div><div id="question-management-panel" role="tabpanel" aria-labelledby="question-tab-${active}">${['signup', 'terms'].includes(active) ? (canManageSignup ? renderSettings(active) : '<article class="form-card">회원가입 질문과 약관은 관리자만 설정할 수 있습니다.</article>') : renderApplication(active)}</div></section>`;
   }
-  async function persist(next, message) {
+  async function persist(next, message, { toast = false } = {}) {
     busy = true; redraw();
-    try { settings = await api(next); status = message; return true; }
-    catch (error) { status = error.message; return false; }
+    try { settings = await api(next); status = toast ? '' : message; if (toast) scope.AdmitCardSettingsFeedback.notify(message); return true; }
+    catch (error) { status = toast ? '' : error.message; if (toast) scope.AdmitCardSettingsFeedback.notify(error.message || '질문을 저장하지 못했습니다.', 'error'); return false; }
     finally { busy = false; redraw(); }
+  }
+  function selectQuestion(q) {
+    editor = { ...q, options: [...q.options], optionsEn: { ...q.optionsEn }, optionsMn:{ ...q.optionsMn }, editingId: q.key, questionText: q.label, questionDescription: q.description, questionTextEn: q.labelEn, questionDescriptionEn: q.descriptionEn, questionTextMn:q.labelMn, questionDescriptionMn:q.descriptionMn, isActive: true, isDraft: false };
   }
   async function saveQuestion() {
     if (!editor.isActive || busy) return;
     let choice = {};
     try { if (['select', 'multiselect'].includes(editor.inputType)) choice = scope.AdmitCardApplicantFormConfig.resolveChoiceOptionEdits(editor); }
     catch (error) { status = error.message; redraw(); return; }
-    const q = { key: editor.editingId || `extra_${crypto.randomUUID()}`, label: editor.questionText, description: editor.questionDescription, labelEn: editor.questionTextEn || '', descriptionEn: editor.questionDescriptionEn || '',
-      inputType: editor.inputType, required: editor.required, options: editor.options, optionsEn: editor.optionsEn || {}, customOptionLabel: editor.customOptionLabel || '',
+    const q = { key: editor.editingId || `extra_${crypto.randomUUID()}`, label: editor.questionText, description: editor.questionDescription, labelEn: editor.questionTextEn || '', descriptionEn: editor.questionDescriptionEn || '', labelMn:editor.questionTextMn || '', descriptionMn:editor.questionDescriptionMn || '',
+      inputType: editor.inputType, showCountryCode: editor.inputType === 'phone' && editor.showCountryCode === true, required: editor.required, options: editor.options, optionsEn: editor.optionsEn || {}, optionsMn:editor.optionsMn || {}, customOptionLabel: editor.customOptionLabel || '',
       ...(['date', 'daterange'].includes(editor.inputType) ? { dateParts: editor.dateParts || ['year', 'month', 'day'] } : {}),
       fileNamePattern: editor.fileNamePattern || '', allowedExtensions: editor.allowedExtensions || [], ...choice };
     delete q.optionKoreanEdits;
     const questions = editor.editingId ? settings.questions.map(old => old.key === editor.editingId ? q : old) : [...settings.questions, q];
-    if (await persist({ ...settings, questions }, '회원가입 질문을 저장했습니다.')) { editor = {}; redraw(); }
+    if (await persist({ ...settings, questions }, '회원가입 질문을 저장했습니다.', { toast: true })) {
+      const savedQuestion = settings.questions.find(question => question.key === q.key);
+      if (savedQuestion) selectQuestion(savedQuestion);
+      redraw();
+    }
   }
   async function move(key, target, placement) {
     if (busy || key === target || coreKeys.includes(key) || coreKeys.includes(target)) return;
@@ -111,7 +123,7 @@
     if (target.closest('#signup-terms-editor')) {
       if (busy) return;
       if (target.closest('[data-term-preview]')) { window.open('/applicant/signup?preview=1', '_blank', 'noopener'); return; }
-      if (target.closest('[data-term-add]')) { termEditor = { id: crypto.randomUUID(), title: '', text: '', titleEn: '', textEn: '', required: true, enabled: true }; status = ''; redraw(); return; }
+      if (target.closest('[data-term-add]')) { termEditor = { id: crypto.randomUUID(), title: '', text: '', titleEn: '', textEn: '', titleMn:'', textMn:'', required: true, enabled: true }; status = ''; redraw(); return; }
       if (target.closest('[data-term-cancel]')) { termEditor = null; redraw(); return; }
       const remove = target.closest('[data-term-delete]');
       if (remove) {
@@ -166,7 +178,7 @@
     const card = target.closest('[data-signup-field-select]');
     if (card) {
       const q = settings.questions.find(q => q.key === card.dataset.signupFieldSelect);
-      if (q) editor = { ...q, options: [...q.options], optionsEn: { ...q.optionsEn }, editingId: q.key, questionText: q.label, questionDescription: q.description, questionTextEn: q.labelEn, questionDescriptionEn: q.descriptionEn, isActive: true, isDraft: false };
+      if (q) selectQuestion(q);
       status = ''; redraw();
     }
   });
@@ -174,7 +186,11 @@
     const termInput = event.target.closest('[data-term-input]');
     if (termInput && termEditor && !busy) {
       termEditor[termInput.dataset.termInput] = termInput.type === 'checkbox' ? termInput.checked : termInput.value;
-      if (termInput.dataset.termInput === 'enabled') termInput.form.querySelector('[data-term-input=text]').required = termInput.checked;
+      if (termInput.dataset.termInput === 'enabled') {
+        const input = termInput.form.querySelector('[data-term-input=text]');
+        input.dataset.languageRequired = String(termInput.checked);
+        input.required = termInput.checked && termInput.form.dataset.activeLanguage === 'ko';
+      }
       return;
     }
     const input = event.target.closest('[data-signup-field-input]'); if (!input || busy) return;
@@ -189,8 +205,9 @@
     if (coreKeys.includes(editor.editingId) && ['required', 'inputType'].includes(key)) return;
     if (key.startsWith('optionKorean:')) { editor.optionKoreanEdits = { ...editor.optionKoreanEdits, [Number(key.split(':')[1])]: input.value }; return; }
     if (key.startsWith('optionEnglish:')) { const option = editor.options[Number(key.split(':')[1])]; if (option !== undefined) editor.optionsEn = { ...editor.optionsEn, [option]: input.value }; return; }
+    if (key.startsWith('optionMongolian:')) { const option = editor.options[Number(key.split(':')[1])]; if (option !== undefined) editor.optionsMn = { ...editor.optionsMn, [option]: input.value }; return; }
     editor[key] = input.type === 'checkbox' ? input.checked : input.value;
-    if (key === 'inputType') { if (!['select', 'multiselect'].includes(input.value)) { editor.options = []; editor.optionsEn = {}; editor.customOptionLabel = ''; } redraw(); }
+    if (key === 'inputType') { if (!['select', 'multiselect'].includes(input.value)) { editor.options = []; editor.optionsEn = {}; editor.optionsMn = {}; editor.customOptionLabel = ''; } redraw(); }
   }
   document.addEventListener('input', update);
   document.addEventListener('change', event => { if (event.target.tagName === 'SELECT' && event.target.isConnected) update(event); });

@@ -39,7 +39,7 @@ function createSystemSummaryService({
     const [examinees, printHistory, templates, accounts, summary, systemSettings, systemBackupAutomation, superAdminSettings, loginNoticeHtml, applicantNoticeHtml, applicantFormFields, applicantRecruitmentUnits, applicantSchedules, applicantSubmissions, applicantSettings] = await Promise.all([
       examineesPromise,
       !view ? examineesPromise.then(records => getPrintHistory(records)) : [],
-      !view || view === 'templateManagement' ? getTemplates() : [],
+      !view || view === 'templateManagement' || view === 'applicantScheduleManagement' ? getTemplates() : [],
       getAccounts(),
       getSummary(),
       getSystemSettings(),
@@ -74,7 +74,9 @@ function createSystemSummaryService({
       loginNoticeHtml,
       applicantNoticeHtml,
       loginNoticeHtmlEn: await getLoginNoticeHtml("login", "en"),
+      loginNoticeHtmlMn: await getLoginNoticeHtml("login", "mn"),
       applicantNoticeHtmlEn: await getLoginNoticeHtml("applicant", "en"),
+      applicantNoticeHtmlMn: await getLoginNoticeHtml("applicant", "mn"),
       serverDate: formatDateAsYmd(new Date()),
       serverTime: Date.now(),
     };

@@ -23,6 +23,7 @@
         const payload = await apiRequest("/api/login-notice");
         applyLoginNoticePayload(payload.html || payload.loginNoticeHtml || "", { scope: "login" });
         applyLoginNoticePayload(payload.htmlEn || "", { scope: "login", language: "en" });
+        applyLoginNoticePayload(payload.htmlMn || "", { scope: "login", language: "mn" });
         applySuperAdminPayload(payload.superAdminSettings || {});
         state.noticeManagement.scopes.login.admissionHomepageUrl = String(payload.admissionHomepageUrl || '').trim();
       } catch (error) {

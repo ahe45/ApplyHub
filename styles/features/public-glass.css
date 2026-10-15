@@ -75,8 +75,20 @@ public-school-header { display: block; width: 100%; min-width: 0; }
 .applicant-ticket-number-row p { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .applicant-public-body .applicant-ticket-download { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 ticket-pdf-viewer { display: grid; width: 100%; min-width: 0; gap: 12px; }
-ticket-pdf-viewer canvas { display: block; width: 100%; height: auto; background: #fff; }
+ticket-pdf-viewer canvas { display: block; box-sizing: border-box; width: 100%; height: auto; border: 1px solid var(--glass-muted); background: #fff; }
 ticket-pdf-viewer canvas[hidden] { display: none; }
+.ticket-pdf-page { width: 100%; min-width: 0; }
+.ticket-pdf-page.is-loading {
+  display: grid; place-items: center; box-sizing: border-box;
+  aspect-ratio: var(--ticket-pdf-page-ratio, 210 / 297);
+  border: 1px solid var(--glass-muted); background: #fff;
+}
+.ticket-pdf-loading { display: grid; align-self: start; justify-items: center; gap: 12px; width: 100%; margin-top: min(20vh, 25%); padding: 24px; }
+.ticket-pdf-loading .ticket-pdf-status { padding: 0; text-align: center; color: #64748b; }
+.ticket-pdf-progress { display: block; width: min(180px, 70%); height: 4px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
+.ticket-pdf-progress::after { content: ''; display: block; width: 40%; height: 100%; border-radius: inherit; background: var(--glass-primary); animation: ticket-pdf-progress 1.3s ease-in-out infinite; }
+@keyframes ticket-pdf-progress { from { transform: translateX(-100%); } to { transform: translateX(350%); } }
+@media (prefers-reduced-motion: reduce) { .ticket-pdf-progress::after { animation: none; width: 100%; opacity: .6; } }
 .ticket-pdf-status { margin: 0; padding: 20px 0; color: var(--glass-muted); font-size: 14px; line-height: 1.6; }
 
 .login-shell.common-login-stage > .login-notice-card,

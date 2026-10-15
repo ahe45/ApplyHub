@@ -148,11 +148,17 @@ function createSystemRoutes(deps) {
       if (authenticatedAccount?.role !== deps.superAdminRole) {
         payload.accounts = (payload.accounts || []).filter(account => account.role !== deps.superAdminRole);
         delete payload.systemBackupAutomation;
+        payload.systemSettings = {
+          autoLogoutMinutes: payload.systemSettings.autoLogoutMinutes,
+          admissionHomepageUrl: payload.systemSettings.admissionHomepageUrl,
+          // Account creation shows administrators the current initial password.
+          ...(authenticatedAccount?.role === '관리자' ? { initialPassword: payload.systemSettings.initialPassword } : {}),
+        };
       }
       return deps.sendJson(response, 200, payload);
     }),
     exactRoute("GET", "/api/system-settings", async ({ response, authenticatedAccount }) => {
-      requireSystemManager(authenticatedAccount);
+      requireSuperAdmin(authenticatedAccount);
       return deps.sendJson(response, 200, await deps.getSystemSettings());
     }),
     exactRoute("GET", "/api/super-admin/settings", async ({ response, authenticatedAccount }) => {
@@ -328,7 +334,7 @@ function createSystemRoutes(deps) {
       return deps.sendJson(response, 200, await deps.updateLoginNoticeHtml(body));
     }),
     exactRoute("PUT", "/api/system-settings", async ({ request, response, authenticatedAccount }) => {
-      requireSystemManager(authenticatedAccount);
+      requireSuperAdmin(authenticatedAccount);
       const body = await deps.readJsonBody(request);
       return deps.sendJson(response, 200, await deps.updateSystemSettings(body));
     }),

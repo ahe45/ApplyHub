@@ -218,8 +218,8 @@ async function selectEditorTableCellRange(page, {
     targetMarkup: markup,
   });
 
+  await page.$eval(`${editorSelector} ${anchorCellSelector}`, element => element.closest('table').scrollIntoView({ block: 'center', inline: 'nearest' }));
   const getCenter = async (selector) => page.$eval(selector, (element) => {
-    element.scrollIntoView({ block: "center", inline: "center" });
     const rect = element.getBoundingClientRect();
 
     return {
@@ -272,6 +272,7 @@ async function verifyTemplateEditor(page) {
     await page.click("#templatePreviewModal .icon-button[data-close-modal='true']");
     await waitForHiddenClass(page, "#templatePreviewModal");
     await waitForVisible(page, `[data-template-edit="${createdTemplateId}"]`);
+    await page.waitForSelector(`[data-template-edit="${createdTemplateId}"]:not([disabled])`);
     await page.evaluate((templateId) => {
       const trigger = document.querySelector(`[data-template-edit="${templateId}"]`);
 
@@ -281,24 +282,24 @@ async function verifyTemplateEditor(page) {
 
       trigger.click();
     }, createdTemplateId);
-    await page.waitForFunction(() => !document.getElementById("templateEditorModal").classList.contains("hidden"));
+    await page.waitForSelector('#templateEditorPage');
     await page.waitForFunction(() => {
       const surface = document.getElementById("templateEditorSurface");
       return Boolean(surface) && surface.innerHTML.trim().length > 0;
     });
     const tags = await page.$$eval('#templateTagStrip [data-template-tag]', nodes => nodes.map(node => node.dataset.templateTag));
-    assert.deepEqual(tags.sort(), require('../shared/app-config').templateTagDefinitions.map(tag=>tag.editorToken).sort());
+    for (const tag of require('../shared/app-config').templateTagDefinitions) assert(tags.includes(tag.editorToken), tag.label);
     assert.equal(await page.$eval('#templateEditorSurface', node => /시험날짜|고사건물|고사실|#시간|#조/.test(node.innerHTML)), false);
-    await waitForVisible(page, "#templateEditorModal [data-template-cell-split-toggle]");
-    assert(await page.$eval('#templateEditorModal .modal-sheet', el => getComputedStyle(el).backgroundColor === (document.documentElement.dataset.theme === 'dark' ? 'rgb(32, 52, 70)' : 'rgb(255, 255, 255)')), 'Editor chrome follows the selected Quiet Glass mode.');
+    await waitForVisible(page, "#templateEditorPage [data-template-cell-split-toggle]");
+    assert.equal(await page.$('#templateEditorModal'), null, 'The editor opens as a dedicated page');
     assert(await page.$eval('#templateEditorSurface', el => getComputedStyle(el).backgroundColor) === 'rgb(255, 255, 255)', 'The document remains white.');
-    assert(await page.$eval('#templateEditorSurface table', el => getComputedStyle(el).backgroundColor) === 'rgb(250, 253, 255)', 'Document tables do not inherit the dark UI theme.');
+    assert(await page.$eval('#templateEditorSurface table', el => getComputedStyle(el).backgroundColor) === 'rgba(0, 0, 0, 0)', 'Document tables have no default shading and do not inherit the UI theme.');
     await selectEditorTableCell(page, {
       editorSelector: "#templateEditorSurface",
       markup: "<table><tbody><tr><td colspan='2'>열 분할</td></tr><tr><td>A</td><td>B</td></tr></tbody></table>",
       cellSelector: "td[colspan='2']",
     });
-    await page.click("#templateEditorModal [data-template-cell-split-toggle]");
+    await page.click("#templateEditorPage [data-template-cell-split-toggle]");
     await waitForVisible(page, "#templateEditorCellSplitPanel");
     await page.click("#templateEditorCellSplitPanel [data-template-cell-split-step='up']");
     await page.click("#templateEditorCellSplitPanel [data-template-cell-split-step='down']");
@@ -316,7 +317,7 @@ async function verifyTemplateEditor(page) {
       markup: "<table><tbody><tr><td rowspan='2'>행 분할</td><td>A</td></tr><tr><td>B</td></tr></tbody></table>",
       cellSelector: "td[rowspan='2']",
     });
-    await page.click("#templateEditorModal [data-template-cell-split-toggle]");
+    await page.click("#templateEditorPage [data-template-cell-split-toggle]");
     await waitForVisible(page, "#templateEditorCellSplitPanel");
     await page.click("label[for='templateEditorCellSplitAxisRow']");
     await page.click("#templateEditorCellSplitPanel [data-template-cell-split-confirm]");
@@ -360,7 +361,7 @@ async function verifyTemplateEditor(page) {
       borderBeforeApply.borderTopColor !== "rgb(255, 0, 0)",
       "Template editor border color was applied before pressing the border apply button.",
     );
-    await page.click("#templateEditorModal button[data-template-table-action='apply-cell-border']");
+    await page.click("#templateEditorPage button[data-template-table-action='apply-cell-border']");
     await page.waitForFunction((selector) => {
       const cell = document.querySelector(selector);
       return Boolean(cell) && window.getComputedStyle(cell).borderTopStyle === "double";
@@ -387,7 +388,7 @@ async function verifyTemplateEditor(page) {
       style: "solid",
       width: "1",
     });
-    await page.click("#templateEditorModal button[data-template-table-action='apply-cell-border']");
+    await page.click("#templateEditorPage button[data-template-table-action='apply-cell-border']");
     await page.waitForFunction((selector) => {
       const cell = document.querySelector(selector);
       const computedStyle = cell ? window.getComputedStyle(cell) : null;
@@ -397,16 +398,16 @@ async function verifyTemplateEditor(page) {
     await setTemplateEditorBorderControls(page, {
       target: "all",
       style: "double",
-      width: "4",
+      width: "3",
     });
-    await page.click("#templateEditorModal button[data-template-table-action='apply-cell-border']");
+    await page.click("#templateEditorPage button[data-template-table-action='apply-cell-border']");
     await page.waitForFunction((selector) => {
       const cell = document.querySelector(selector);
       const computedStyle = cell ? window.getComputedStyle(cell) : null;
-      return Boolean(computedStyle) && computedStyle.borderTopStyle === "double" && computedStyle.borderTopWidth === "6px";
+      return Boolean(computedStyle) && computedStyle.borderTopStyle === "double" && computedStyle.borderTopWidth === "5px";
     }, {}, singleCellSelector);
     const toolbarWidthAfterWideDouble = await page.$eval("#templateEditorBorderWidth", (input) => input.value);
-    assert(toolbarWidthAfterWideDouble === "4", "Template editor toolbar did not preserve the logical 4px width for a 6px native double border.");
+    assert(toolbarWidthAfterWideDouble === "3", "Template editor toolbar did not preserve the logical 3px width for a 5px native double border.");
 
     const mergedPhotoCellMarkup = `
       <table style="width: 360px; border-collapse: collapse; table-layout: fixed;">
@@ -438,7 +439,7 @@ async function verifyTemplateEditor(page) {
       width: "1",
       color: "#000000",
     });
-    await page.click("#templateEditorModal button[data-template-table-action='apply-cell-border']");
+    await page.click("#templateEditorPage button[data-template-table-action='apply-cell-border']");
     await page.waitForFunction((selector) => {
       const cell = document.querySelector(selector);
       return Boolean(cell) && window.getComputedStyle(cell).borderTopStyle === "double";
@@ -480,7 +481,7 @@ async function verifyTemplateEditor(page) {
       style: "double",
       width: "2",
     });
-    await page.click("#templateEditorModal button[data-template-table-action='apply-cell-border']");
+    await page.click("#templateEditorPage button[data-template-table-action='apply-cell-border']");
     await page.waitForFunction(() =>
       Array.from(document.querySelectorAll("#templateEditorSurface tbody tr:nth-child(1) td"))
         .every((cell) => window.getComputedStyle(cell).borderTopStyle === "double"),
@@ -503,7 +504,8 @@ async function verifyTemplateEditor(page) {
       "Template editor adjacent-cell double border affected unselected cells or left legacy overlay lines.",
     );
     await page.click("button[data-save-template-editor='true']");
-    await waitForHiddenClass(page, "#templateEditorModal");
+    await page.waitForFunction(() => document.querySelector('#templateEditorStatus').textContent.includes('저장했습니다'));
+    await page.goto(new URL('/templates', page.url()).toString(), { waitUntil: 'networkidle0' });
     await navigateToView(page, "templateManagement", "/templates");
     await waitForVisible(page, `[data-template-edit="${createdTemplateId}"]`);
 

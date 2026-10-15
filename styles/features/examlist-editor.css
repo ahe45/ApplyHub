@@ -1,0 +1,131 @@
+#templateEditorPage {
+  --muted: var(--text-dim);
+  --line: var(--border-color, #dfe5f0);
+  --accent: var(--primary-color, #2563eb);
+  font-family: "Manrope", "Noto Sans KR", sans-serif;
+  font-size: 16px;
+  line-height: normal;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+#viewRoot:has(> #templateEditorPage) {
+  overflow: hidden;
+  padding-bottom: 0;
+}
+.template-editor-page-header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.template-editor-page-header h2 { margin:0; font-size:1.15rem; }
+.admin-ui #templateEditorPage .template-tag-view-switch { word-break: keep-all; }
+.template-recruitment-link { margin: 12px 0; }
+.template-recruitment-link select { width:100%; }
+#templateEditorPage .template-editor-modal-sheet {
+  background: rgb(var(--glass-surface-rgb));
+  border-radius: 20px;
+  box-shadow: 0 24px 80px #0003;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: min(94vh, 1400px);
+  min-width: 0;
+  width: min(98vw, 1800px);
+  max-width: 98vw;
+  overflow: hidden;
+}
+#templateEditorPage .applyhub-editor-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+  gap: 8px;
+  overflow: hidden;
+}
+#templateEditorPage .applyhub-editor-shell {
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 0;
+  overflow: auto;
+}
+#templateEditorPage #templateEditorRuntimeHost {
+  height: 100%;
+  min-height: 0;
+}
+#templateEditorPage .editor-canvas-column {
+  min-width: 0;
+  max-height: 100%;
+}
+#templateEditorPage .template-editor-surface {
+  flex-shrink: 0;
+  max-height: none;
+}
+#templateEditorPage .template-editor-surface table,
+#templateEditorPage .template-editor-surface tr:hover {
+  background: transparent;
+}
+#templateEditorPage .template-page-properties-column {
+  height: 100%;
+}
+#templateEditorPage .template-page-properties-panel {
+  grid-column: auto;
+  grid-row: auto;
+}
+#templateEditorPage .editor-toolbar-footer :is(.primary-button, .ghost-button) {
+  border-radius: 10px;
+  line-height: normal;
+}
+#templateEditorPage #templateEditorStatus { display: none; }
+#templateEditorPage .data-tag-format-modal-overlay,
+#templateEditorPage .examlist-generated-object-source-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #15243d66;
+  backdrop-filter: blur(4px);
+}
+#templateEditorPage .data-tag-format-modal-card,
+#templateEditorPage .examlist-generated-object-source-card {
+  background: #fff;
+  border-radius: 20px;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 20px;
+  width: min(600px, 92vw);
+}
+#templateEditorPage .data-tag-format-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+html[data-theme="dark"] #templateEditorPage :is(.editor-toolbar, .template-tag-panel, .template-page-properties-panel, .template-editor-toolbar-footer, .data-tag-format-modal-card, .examlist-generated-object-source-card) {
+  background: var(--glass-surface);
+  border-color: var(--glass-line);
+  color: var(--glass-ink);
+}
+html[data-theme="dark"] #templateEditorPage :is(.editor-toolbar, .template-tag-panel, .template-page-properties-panel, .data-tag-format-modal-card, .examlist-generated-object-source-card) :is(input, select, .template-toolbar-select, .template-toolbar-color-trigger, .template-tag-accordion-summary, .template-tag-accordion-button, .template-tag-search, .data-tag-format-preview, .data-tag-format-token-guide) {
+  background: var(--glass-bg);
+  border-color: var(--glass-line);
+  color: var(--glass-ink);
+}
+html[data-theme="dark"] #templateEditorPage :is(.editor-toolbar, .template-page-properties-panel, .data-tag-format-modal-card, .examlist-generated-object-source-card) button:not(.active):not(.selected):not(.is-active):not(.primary-button):not([aria-pressed="true"]),
+html[data-theme="dark"] #templateEditorPage .template-page-orientation-options input:not(:checked) + span {
+  background: var(--glass-tint);
+  border-color: var(--glass-line);
+  color: var(--glass-ink);
+}
+html[data-theme="dark"] #templateEditorPage .editor-canvas-column {
+  background: var(--glass-bg);
+}
+html[data-theme="dark"] #templateEditorPage #templatePagePropertiesPanel .template-page-property-control,
+html[data-theme="dark"] #templateEditorPage #templateEditorToolbarHost :is(.template-toolbar-select, .template-toolbar-color-trigger, .template-toolbar-number-input, .template-toolbar-input) {
+  background: var(--glass-tint) !important;
+  color: var(--glass-ink) !important;
+  border-color: var(--glass-line);
+}
+html[data-theme="dark"] #templateEditorPage .template-tag-view-switch {
+  color: var(--glass-ink);
+}

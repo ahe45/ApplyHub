@@ -9,7 +9,7 @@ function createDocumentStatusService({ query, getPool, getFields, getFieldsForSu
       const hasFile = answer?.hasFile === true;
       const status = statuses.get(Number(field.id)) || (hasFile ? 'submitted' : 'missing');
       return { fieldId: field.id, fieldKey: field.fieldKey, questionText: field.questionText,
-        questionTextEn: field.questionTextEn, required: field.required, hasFile,
+        questionTextEn: field.questionTextEn, questionTextMn: field.questionTextMn, required: field.required, hasFile,
         fileName: hasFile ? String(answer.fileName || '') : '', status, statusLabel: STATUS_LABELS[status] };
     });
   }

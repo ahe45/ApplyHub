@@ -17,16 +17,16 @@ async function verifyApplicationEdit({ services, query, base, call, submissionId
   const edit = (value = payload, cookie = memberCookie) => call('/api/public/applications', value, cookie, 'PUT');
   assert.equal((await edit(payload, '')).status, 401);
   assert.equal((await edit()).body.code, 'APPLICANT_SUBMISSION_EDIT_DISABLED');
-  assert.equal((await applicants.getApplicantPublicForm()).systemSettings.applicantSubmissionEditEnabled, false);
+  assert.equal((await applicants.getApplicantSchedules())[0].applicantSubmissionEditEnabled, false);
 
   const adminLogin = await call('/api/auth/login', { id: 'admin', password: '1111' });
   const setup = await call('/api/auth/password/setup', { password: 'EditTest12345', passwordConfirm: 'EditTest12345' }, adminLogin.cookie);
   assert.equal(setup.status, 200);
   const adminCookie = setup.cookie || adminLogin.cookie;
-  const settings = (await call('/api/system-settings', null, adminCookie, 'GET')).body;
+  const settings = (await applicants.getApplicantSchedules())[0];
   assert.equal(settings.applicantSubmissionEditEnabled, false);
-  assert.equal((await call('/api/system-settings', { ...settings, applicantSubmissionEditEnabled: true }, memberCookie, 'PUT')).status, 401);
-  const setEnabled = enabled => call('/api/system-settings', { ...settings, applicantSubmissionEditEnabled: enabled }, adminCookie, 'PUT');
+  assert.equal((await call('/api/applicant-schedules', { ...settings, applicantSubmissionEditEnabled: true }, memberCookie, 'PUT')).status, 401);
+  const setEnabled = enabled => call('/api/applicant-schedules', { ...settings, applicantSubmissionEditEnabled: enabled }, adminCookie, 'PUT');
 
   const browser = await puppeteer.launch({ headless: true, executablePath: process.env.EDGE_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe' });
   const errors = [];
@@ -39,9 +39,11 @@ async function verifyApplicationEdit({ services, query, base, call, submissionId
     }
     const staffPage = await staffContext.newPage();
     staffPage.on('pageerror', error => errors.push(error.message));
-    await staffPage.goto(base + '/system-settings', { waitUntil: 'networkidle2' });
-    await staffPage.waitForSelector('#systemSettingsApplicantSubmissionEditEnabled');
-    assert.equal(await staffPage.$eval('#systemSettingsApplicantSubmissionEditEnabled', el => el.value), 'false');
+    await staffPage.goto(base + '/applicant-schedules', { waitUntil: 'networkidle2' });
+    await staffPage.click('tr[data-grid-row-clickable=true]');
+    await staffPage.waitForSelector('#applicantScheduleModal:not(.hidden)');
+    const editSelect = '[data-applicant-schedule-input="applicantSubmissionEditEnabled"]';
+    assert.equal(await staffPage.$eval(editSelect, el => el.checked), false);
     const page = await memberContext.newPage();
     page.on('pageerror', error => errors.push(error.message));
     const editButton = '[data-applicant-action="edit-application"]';
@@ -51,14 +53,15 @@ async function verifyApplicationEdit({ services, query, base, call, submissionId
     assert.equal(await page.$eval(editButton, el => el.disabled), true);
     const summaryUrl = page.url();
 
-    await staffPage.select('#systemSettingsApplicantSubmissionEditEnabled', 'true');
-    await staffPage.waitForFunction(() => !document.querySelector('[data-system-settings-action="save"]').disabled);
-    const savedSettings = staffPage.waitForResponse(response => response.url().endsWith('/api/system-settings') && response.request().method() === 'PUT');
-    await staffPage.click('[data-system-settings-action="save"]');
+    await staffPage.focus(editSelect); await staffPage.keyboard.press('Space');
+    const savedSettings = staffPage.waitForResponse(response => response.url().endsWith('/api/applicant-schedules') && response.request().method() === 'PUT');
+    await staffPage.click('#applicantScheduleModalSaveButton');
     assert.equal((await savedSettings).status(), 200);
     await staffPage.reload({ waitUntil: 'networkidle2' });
-    assert.equal(await staffPage.$eval('#systemSettingsApplicantSubmissionEditEnabled', el => el.value), 'true');
-    assert.equal((await applicants.getApplicantPublicForm()).systemSettings.applicantSubmissionEditEnabled, true);
+    await staffPage.click('tr[data-grid-row-clickable=true]');
+    await staffPage.waitForSelector('#applicantScheduleModal:not(.hidden)');
+    assert.equal(await staffPage.$eval(editSelect, el => el.checked), true);
+    assert.equal((await applicants.getApplicantSchedules())[0].applicantSubmissionEditEnabled, true);
 
     assert.equal((await edit({ ...payload, submissionId: submissionId + 100 })).body.code, 'APPLICANT_SUBMISSION_FORBIDDEN');
     assert.equal((await call('/api/public/applications', payload, memberCookie)).status, 409, 'Create still rejects duplicate submissions while edits are enabled');

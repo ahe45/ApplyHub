@@ -3,6 +3,9 @@ function createTemplatePhotoMarkupService({
   escapeHtml,
 }) {
   function buildExamineePhotoMarkup(examinee) {
+    if (examinee?.useTemplatePreviewPhoto === true) {
+      return '<img class="examinee-photo-token-image" src="/client/assets/template-preview-photo.png" alt="샘플 수험생 사진" />';
+    }
     if (!examinee?.photoBlob || !examinee?.photoMime) {
       return '<span class="examinee-photo-placeholder">사진 미등록</span>';
     }

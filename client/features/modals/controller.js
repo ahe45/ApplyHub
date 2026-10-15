@@ -87,6 +87,7 @@
       }
 
       if (modalId === "templateEditorModal") {
+        globalThis.ApplyHubExamListEditor?.destroy();
         clearTemplateEditorImageSelection();
         releaseTemplateEditorTableResizeSession({ sync: false });
         releaseTemplateEditorTableSelectionSession({ keepSelection: false });

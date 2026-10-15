@@ -1,6 +1,7 @@
 const { randomUUID } = require("crypto");
 
 const { createTemplateRenderingService } = require("./rendering");
+const { createTemplateContextService } = require('./context');
 
 function createTemplateService({
   createHttpError,
@@ -9,7 +10,12 @@ function createTemplateService({
   getPool,
   query,
   templateTagDefinitions,
+  getApplicantService,
+  getSignupSettings,
 }) {
+  const selectTemplate = `SELECT t.id, t.name, t.description, t.version_label AS version,
+    IF(EXISTS(SELECT 1 FROM app_schedule WHERE admit_card_template_id = t.id), 'used', 'unused') AS status,
+    t.content_html AS contentHtml FROM templates t`;
   const templateRenderingService = createTemplateRenderingService({
     createHttpError,
     escapeHtml,
@@ -24,7 +30,10 @@ function createTemplateService({
     const description = String(payload.description ?? existingTemplate.description ?? "").trim();
     const version = String(payload.version ?? existingTemplate.version ?? "").trim();
     const status = payload.status ?? existingTemplate.status ?? "unused";
-    const contentHtml = String(payload.contentHtml ?? existingTemplate.contentHtml ?? "");
+    const contentHtml = String(payload.contentHtml ?? existingTemplate.contentHtml ?? "")
+      .replace(/<span\b[^>]*\sdata-template-tag-value=(["'])[^"']*\1[^>]*>/gi, tag => tag
+        .replace(/\sdata-template-tag-example=(["'])[^"']*\1/gi, '')
+        .replace(/\stitle=(["'])[^"']*\1/gi, ''));
 
     if (!name) {
       throw createHttpError(400, "양식 이름이 필요합니다.");
@@ -53,32 +62,12 @@ function createTemplateService({
   }
 
   async function getTemplates() {
-    return query(`
-      SELECT
-        id,
-        name,
-        description,
-        version_label AS version,
-        status,
-        content_html AS contentHtml
-      FROM templates
-      ORDER BY created_at ASC, updated_at ASC
-    `);
+    return query(`${selectTemplate} ORDER BY t.created_at ASC, t.updated_at ASC`);
   }
 
   async function getTemplatesById(templateId) {
     return query(
-      `
-        SELECT
-          id,
-          name,
-          description,
-          version_label AS version,
-          status,
-          content_html AS contentHtml
-        FROM templates
-        WHERE id = ?
-      `,
+      `${selectTemplate} WHERE t.id = ?`,
       [templateId],
     );
   }
@@ -94,7 +83,7 @@ function createTemplateService({
       [template.id, template.name, template.description, template.version, template.status, template.contentHtml],
     );
 
-    return template;
+    return (await getTemplatesById(template.id))[0];
   }
 
   async function updateTemplate(templateId, payload) {
@@ -105,7 +94,6 @@ function createTemplateService({
     }
 
     const template = normalizeTemplatePayload(payload, existingTemplate);
-
     await query(
       `
         UPDATE templates
@@ -120,33 +108,11 @@ function createTemplateService({
       [template.name, template.description, template.version, template.status, template.contentHtml, templateId],
     );
 
-    return template;
+    return (await getTemplatesById(templateId))[0];
   }
 
-  async function activateTemplate(templateId) {
-    const connection = await getPool().getConnection();
-
-    try {
-      await connection.beginTransaction();
-
-      const [templateRows] = await connection.query(`SELECT id FROM templates WHERE id = ?`, [templateId]);
-
-      if (templateRows.length === 0) {
-        throw createHttpError(404, "적용할 양식을 찾을 수 없습니다.");
-      }
-
-      await connection.query(`UPDATE templates SET status = 'unused'`);
-      await connection.query(`UPDATE templates SET status = 'used' WHERE id = ?`, [templateId]);
-
-      await connection.commit();
-
-      return getTemplates();
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
+  async function activateTemplate() {
+    throw createHttpError(409, '전형 상세설정의 적용 템플릿에서 수험표 양식을 선택하세요.', 'TEMPLATE_SELECT_IN_ADMISSION_SETTINGS');
   }
 
   async function deleteTemplate(templateId) {
@@ -164,26 +130,24 @@ function createTemplateService({
     return { id: templateId };
   }
 
-  async function getActiveTemplate() {
-    const [template] = await query(`
-      SELECT
-        id,
-        name,
-        description,
-        version_label AS version,
-        status,
-        content_html AS contentHtml
-      FROM templates
-      WHERE status = 'used'
-      ORDER BY updated_at DESC
-      LIMIT 1
-    `);
+  async function getActiveTemplate(record = {}) {
+    const schedules = await getApplicantService().getApplicantSchedules();
+    const schedule = schedules.find(s => s.trackName === String(record.track || '') && s.admissionName === String(record.admission || '') && (!record.admissionCode || s.admissionCode === record.admissionCode));
+    const [template] = schedule?.admitCardTemplateId ? await getTemplatesById(schedule.admitCardTemplateId) : [];
 
     if (!template) {
-      throw createHttpError(404, "사용중인 수험표 양식을 찾을 수 없습니다.");
+      throw createHttpError(404, "전형 상세설정에서 수험표 양식을 선택하세요.");
     }
 
     return template;
+  }
+
+  const context = createTemplateContextService({ createHttpError, getApplicantService, getSignupSettings, templateTagDefinitions,
+    getTemplate: async id => (await getTemplatesById(id))[0] });
+  async function previewTemplate(templateId, html = '') {
+    const data = await context.getEditorContext(templateId);
+    const renderedHtml = await renderTemplateWithExaminee(html || data.template.contentHtml, { ...data.previewRecord, templateTags: data.tags, useTemplatePreviewPhoto: true });
+    return { renderedHtml, previewSource: data.previewSource, schedule: data.schedule };
   }
 
   return Object.freeze({
@@ -194,6 +158,8 @@ function createTemplateService({
     deleteTemplate,
     getActiveTemplate,
     getTemplates,
+    getEditorContext: context.getEditorContext,
+    previewTemplate,
     normalizeTemplatePayload,
     renderTemplateWithExaminee,
     updateTemplate,

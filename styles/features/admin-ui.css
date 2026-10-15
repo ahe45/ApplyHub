@@ -1,0 +1,228 @@
+/* Administrative typography follows the existing grid body (0.85rem).
+   Scope the chrome independently of applicant pages and document contents. */
+.admin-ui {
+  --admin-font-size: var(--grid-body-font-size);
+  --admin-heading-size: 1rem;
+  --admin-title-size: 1.125rem;
+  font-size: var(--admin-font-size);
+  line-height: 1.5;
+}
+
+.admin-ui :is(.sidebar, .topbar, #viewRoot, .modal, .toast-root, .document-management-dialog, .document-status-popover) {
+  font-size: var(--admin-font-size);
+}
+
+/* Equal-sized body text, captions, labels, tabs and controls throughout the
+   admin UI. Printable previews and authored notice content retain their size. */
+.admin-ui :is(button, input, select, textarea, label, legend, p, small, dt, dd, summary,
+  .muted, .badge, .nav-item, .nav-section-title, .template-modal-meta,
+  .field > span, .system-settings-label, .system-settings-help,
+  .language-menu, .language-menu-current, .template-management-tab,
+  .applicant-field-meta-chip, .applicant-field-card-title, .applicant-field-card-description,
+  .table-pagination-summary, .table-page-size > span, .member-list-summary,
+  .topbar-session-timer-label, .user-meta, .header-chip-label,
+  .dashboard-metric-label, .dashboard-metric-caption, .dashboard-date,
+  .dashboard-text-link, .dashboard-day-label, .dashboard-schedule-name,
+  .dashboard-schedule-date, .dashboard-status, .dashboard-day-count,
+  .table-cell-tooltip, .notice-active-label, .notice-language-description,
+  .system-data-delete-guard-hint > span, .system-data-delete-guard-hint > strong,
+  .applicant-answer-type-help, .document-management-grid-status,
+  .template-card-heading > p, .template-card-meta, .template-toolbar-label,
+  .system-backup-summary, .system-backup-meta, .system-backup-automation-status
+):not(:where(.paper *, .template-render-sheet *, .template-card-thumbnail *,
+  .template-preview-stage *, .template-editor-surface *, .examlist-editor-canvas *,
+  .examlist-editor-frame *, #templateEditorPage *, .dashboard-metric strong)) {
+  font-size: var(--admin-font-size);
+}
+
+.admin-ui :is(thead th, tbody td):not(:where(.paper *, .template-render-sheet *,
+  .template-card-thumbnail-sheet *, .template-preview-stage *, .template-editor-surface *, #templateEditorPage *)) {
+  font-size: var(--admin-font-size);
+}
+.admin-ui #viewRoot :is(span, a):not(:where(.paper *, .template-render-sheet *,
+  .template-card-thumbnail-sheet *, .template-preview-stage *, .template-editor-surface *,
+  .notice-canvas-preview *, #templateEditorPage *, h1 *, h2 *, h3 *, h4 *)),
+.admin-ui :is(.sidebar, .topbar, .modal, dialog[open]) :is(span, a):not(:where(
+  .paper *, .template-render-sheet *, .template-preview-stage *, .template-editor-surface *,
+  #templateEditorPage *, h1 *, h2 *, h3 *, h4 *)) { font-size: var(--admin-font-size); }
+.admin-ui :is(.section-header h3, .section-header h4, .menu-section-copy h3,
+  .system-settings-field h4, .applicant-schedule-period h4,
+  .applicant-schedule-templates h4, .notice-canvas-header h4, .template-card-heading h3) {
+  font-size: var(--admin-heading-size);
+  line-height: 1.5;
+}
+.admin-ui .modal-header h3 { font-size: var(--admin-title-size); line-height: 1.4; }
+.admin-ui .modal-header .icon-button { font-size: 1.75rem; line-height: 1; }
+.admin-ui :is(.archive-form h2, .document-management-dialog .modal-header h3) {
+  font-size: var(--admin-title-size); line-height: 1.4;
+}
+.admin-ui :is(.archive-form h3, .upload-card h4, .upload-preview-panel h4, .member-detail h4) {
+  font-size: var(--admin-heading-size); line-height: 1.5;
+}
+.admin-ui .applicant-archive-dialog .icon-button[aria-label="닫기"] {
+  font-size: 1.75rem; min-width: 38px; min-height: 38px; padding: 0; line-height: 1;
+}
+.admin-ui :is(.archive-tag-panel > summary > span, .archive-data-chip, .document-status-cell) {
+  font-size: var(--admin-font-size);
+}
+.admin-ui :is(.field, .form-grid, .search-grid, .section-header, .toolbar-actions,
+  .inline-actions, .panel-card, .form-card, .modal-header > div) { min-width: 0; }
+.admin-ui .field { align-content: start; gap: 6px; }
+.admin-ui .field :is(input, select, textarea) { min-width: 0; }
+.admin-ui .field :is(input:not([type="checkbox"]):not([type="radio"]), select) {
+  min-height: 40px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+  line-height: 1.5;
+}
+.admin-ui .field > span, .admin-ui .field label { font-weight: 600; }
+.admin-ui :is(input[type="checkbox"], input[type="radio"]) {
+  width: 16px; height: 16px; min-height: 0; padding: 0; flex-shrink: 0;
+}
+.admin-ui :is(.super-admin-switch, .applicant-schedule-use-switch) input,
+.admin-ui .field input.sr-only {
+  width: 1px; height: 1px; min-height: 0; padding: 0; border: 0;
+}
+.admin-ui :is(.section-header p, .template-modal-meta, .system-settings-help) {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.admin-ui :is(.primary-button, .ghost-button, .outline-button, .secondary-button) {
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.admin-ui .section-header { gap: 16px; flex-wrap: wrap; }
+.admin-ui .section-header > div:first-child { min-width: 0; }
+.admin-ui :is(.form-card, .panel-card) > .section-header { align-items: center; }
+.admin-ui .modal-sheet { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.admin-ui .modal-header {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  padding: 18px 22px; align-items: start;
+}
+.admin-ui .modal-header .toolbar-actions { align-items: center; flex-shrink: 0; }
+.admin-ui .modal-header .toolbar-actions > button { width: auto; flex: 0 0 auto; }
+.admin-ui .modal-body { min-height: 0; padding: 20px 22px 22px; overflow-y: auto; overscroll-behavior: contain; }
+.admin-ui .template-management-tabs { flex-wrap: wrap; height: auto; }
+.admin-ui .template-management-tab { min-height: 40px; }
+.admin-ui .language-menu-options { left: 0; right: auto; }
+.admin-ui .language-menu-current { font-weight: 500; }
+.admin-ui applyhub-language-menu.has-auto-translation { flex-wrap: wrap; gap: 10px; width: 100%; align-items: center; }
+.admin-ui .auto-translation-controls { display: contents; }
+.admin-ui .auto-translation-overwrite { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; font-weight: 400; }
+.admin-ui .auto-translation-status { flex-basis: 100%; color: var(--glass-muted); overflow-wrap: anywhere; }
+.admin-ui .auto-translation-status:empty { display: none; }
+.admin-ui .table-filter-search span { font-size: var(--admin-font-size); }
+.admin-ui .table-filter-menu-header strong { font-size: var(--admin-heading-size); }
+.admin-ui .table-filter-close { font-size: 1.5rem; }
+.admin-ui .table-filter-close { background: transparent; }
+.admin-ui .table-filter-menu .mini-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 36px; padding: 7px 12px; border: 1px solid var(--glass-line);
+  border-radius: 10px; background: var(--glass-surface); color: var(--glass-ink);
+  font-weight: 600; line-height: 1.4;
+}
+.admin-ui .table-filter-menu .mini-btn:hover { background: var(--glass-tint); }
+.admin-ui .applicant-option-language-fields { grid-template-columns: minmax(0, 1fr) auto; }
+.admin-ui [data-edit-language][hidden] { display: none !important; }
+.admin-ui [hidden] { display: none !important; }
+
+/* Recruitment codes and shared classification stay together. Only names
+   change language, so switching never reflows the shared fields. */
+.admin-ui #applicantRecruitmentUnitModal .modal-sheet { width: min(960px, calc(100vw - 48px)); }
+.admin-ui .recruitment-section {
+  min-width: 0; margin: 0; padding: 16px; border: 1px solid var(--glass-line);
+  border-radius: 16px; background: var(--glass-surface);
+}
+.admin-ui .recruitment-section h4 { margin: 0 0 14px; font-size: var(--admin-heading-size); }
+.admin-ui #applicantRecruitmentUnitModal .applicant-recruitment-modal-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 16px;
+}
+.admin-ui #applicantRecruitmentUnitModal label[for="applicantRecruitmentTrackName"] { grid-column: auto; }
+.admin-ui .recruitment-language-head {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;
+  margin-bottom: 14px;
+}
+.admin-ui .recruitment-language-head h4 { margin: 0; }
+.admin-ui .recruitment-language-note { margin: 12px 0 0; color: var(--glass-muted); }
+.admin-ui .applicant-recruitment-name-pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
+.admin-ui .recruitment-reference-name { display: block; color: var(--glass-muted); margin-top: 6px; overflow-wrap: anywhere; }
+.admin-ui .recruitment-reference-name:empty { display: none; }
+.admin-ui [data-active-language="ko"] .recruitment-reference-name { display: none; }
+.admin-ui :is(.system-backup-restore-asset-copy, .system-backup-automation-runtime-card,
+  .system-backup-restore-file-name, .system-backup-restore-summary,
+  .system-backup-restore-form, .system-backup-restore-card, .system-backup-automation-card) {
+  min-width: 0; overflow-wrap: anywhere;
+}
+.admin-ui :is(.system-backup-restore-asset-copy strong, .system-backup-restore-asset-copy span,
+  .system-backup-restore-file-name, .system-backup-automation-summary,
+  .system-backup-automation-runtime-card strong, .system-backup-automation-runtime-card span,
+  .system-backup-restore-selection-meta, .member-list-status,
+  .system-audit-log-summary, .system-audit-log-entry-meta, .system-audit-log-badge) {
+  font-size: var(--admin-font-size);
+}
+
+@media (max-width: 900px) {
+  .admin-ui .system-settings-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .admin-ui .applicant-settings-layout { grid-template-columns: minmax(0, 1fr); }
+  .admin-ui .system-settings-field-head .system-settings-help { flex-basis: 100%; }
+  .admin-ui .examinee-detail-layout { grid-template-columns: minmax(0, 1fr); }
+  .admin-ui .examinee-detail-field-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-ui .examinee-detail-photo-panel { max-width: 240px; justify-self: center; }
+}
+@media (max-width: 1100px) {
+  .admin-ui #applicantUnitUploadModal .modal-body.upload-modal-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-auto-rows: max-content;
+    align-content: start;
+    height: auto;
+  }
+}
+@media (max-width: 600px) {
+  .admin-ui .modal { padding: 12px; }
+  .admin-ui .modal-sheet,
+  .admin-ui #applicantRecruitmentUnitModal .modal-sheet {
+    width: calc(100vw - 24px); max-height: calc(100dvh - 24px);
+  }
+  .admin-ui .modal-header { padding: 16px; gap: 12px; }
+  .admin-ui .modal-header:has(.toolbar-actions) { grid-template-columns: minmax(0, 1fr); }
+  .admin-ui .modal-header .toolbar-actions { margin-left: auto; flex-direction: row; width: auto; }
+  .admin-ui .modal-body { padding: 16px; }
+  .admin-ui #applicantRecruitmentUnitModal .applicant-recruitment-modal-grid { grid-template-columns: minmax(0, 1fr); }
+  .admin-ui :is(.search-grid, .form-grid, .account-grid, .signup-settings-grid) { grid-template-columns: minmax(0, 1fr); }
+  .admin-ui .system-settings-control { flex-wrap: wrap; min-width: 0; }
+  .admin-ui .system-settings-field { padding: 16px; }
+  .admin-ui .topbar { display: flex; flex-wrap: wrap; padding: 10px 12px; gap: 8px; }
+  .admin-ui .topbar-center { flex: 0 0 auto; }
+  .admin-ui .topbar-right { margin-left: auto; min-width: 0; gap: 8px; flex-wrap: wrap; }
+  .admin-ui .topbar-right .user-meta { white-space: normal; max-width: 150px; }
+  .admin-ui .template-grid {
+    --template-card-scale: 0.34;
+    grid-template-columns: minmax(0, 1fr); max-width: 100%; gap: 18px;
+  }
+  .admin-ui .template-card { width: 100%; min-width: 0; padding: 14px; }
+  .admin-ui .template-card-header { flex-wrap: wrap; gap: 12px; }
+  .admin-ui .template-card-heading { flex: 1 1 180px; }
+  .admin-ui .template-card-header-tools { margin-left: auto; }
+  .admin-ui .template-preview { max-width: 100%; }
+  .admin-ui .template-management-header { flex-direction: column; align-items: stretch; }
+  .admin-ui .template-management-header .toolbar-actions { width: 100%; }
+  .admin-ui .system-backup-restore-file-row { grid-template-columns: minmax(0, 1fr); }
+  .admin-ui .examinee-detail-field-row { grid-template-columns: minmax(0, 1fr); }
+  .admin-ui .applicant-submission-detail-value-text { white-space: normal; overflow-wrap: anywhere; }
+  .admin-ui .applicant-submission-detail-label-text { white-space: normal; }
+}
+
+/* First-time staff password setup appears on the shared login page. */
+#passwordSetupModal { --admin-font-size: var(--grid-body-font-size); font-size: var(--admin-font-size); }
+#passwordSetupModal .modal-sheet { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+#passwordSetupModal .modal-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+#passwordSetupModal .modal-header h3 { font-size: 1.125rem; line-height: 1.4; }
+#passwordSetupModal :is(p, label, input, button) { font-size: var(--admin-font-size); }
+#passwordSetupModal .modal-header .icon-button { font-size: 1.75rem; }
+#passwordSetupModal .modal-body { padding: 20px 22px 22px; overflow: auto; }
+#passwordSetupModal .field input { min-height: 40px; padding: 9px 14px; }
+@media (max-width: 600px) {
+  #passwordSetupModal .modal-sheet { max-height: calc(100dvh - 24px); }
+  #passwordSetupModal .modal-body { padding: 16px; }
+}

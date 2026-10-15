@@ -52,6 +52,21 @@
     return responseText ? JSON.parse(responseText) : {};
   }
 
+  function createApiResponseError(status, contentType, responseText) {
+    let payload;
+    try { payload = parseApiPayload(contentType, responseText); } catch { /* A proxy can return HTML with a JSON content type. */ }
+    const message = typeof payload?.error === "string" ? payload.error : typeof payload === "string" ? payload : "";
+    const readableMessage = !/html/i.test(contentType) && message.trim().length <= 500 && !/<[^>]*>/.test(message);
+    const fallback = [502, 503, 504, 520, 521, 522, 523, 524].includes(status)
+      ? "서버 연결이 일시적으로 원활하지 않습니다. 잠시 후 다시 시도해 주세요."
+      : "요청 처리 중 오류가 발생했습니다.";
+    const error = new Error(readableMessage && message.trim() ? message.trim() : fallback);
+    error.status = status;
+    error.code = typeof payload?.code === "string" ? payload.code : "";
+    error.fieldKey = typeof payload?.fieldKey === "string" ? payload.fieldKey : "";
+    return error;
+  }
+
   async function apiRequest(resource, options = {}) {
     const requestOptions = {
       credentials: "same-origin",
@@ -63,17 +78,13 @@
     };
     const response = await fetch(buildApiUrl(resource), requestOptions);
     const contentType = response.headers.get("content-type") || "";
-    const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+    const responseText = await response.text();
 
     if (!response.ok) {
-      const error = new Error(payload?.error || payload || "요청 처리 중 오류가 발생했습니다.");
-      error.status = response.status;
-      error.code = payload?.code || "";
-      error.fieldKey = payload?.fieldKey || "";
-      throw error;
+      throw createApiResponseError(response.status, contentType, responseText);
     }
 
-    return payload;
+    return parseApiPayload(contentType, responseText);
   }
 
   function apiRequestWithUploadProgress(resource, options = {}, callbacks = {}) {
@@ -107,17 +118,12 @@
 
         try {
           const contentType = xhr.getResponseHeader("content-type") || "";
-          const payload = parseApiPayload(contentType, xhr.responseText || "");
-
           if (xhr.status < 200 || xhr.status >= 300) {
-            const error = new Error(payload?.error || payload || "요청 처리 중 오류가 발생했습니다.");
-            error.status = xhr.status;
-            error.code = payload?.code || "";
-            reject(error);
+            reject(createApiResponseError(xhr.status, contentType, xhr.responseText || ""));
             return;
           }
 
-          resolve(payload);
+          resolve(parseApiPayload(contentType, xhr.responseText || ""));
         } catch (error) {
           reject(error);
         }
@@ -203,11 +209,7 @@
 
           if (xhr.status < 200 || xhr.status >= 300) {
             const responseText = await responseBlob.text();
-            const payload = parseApiPayload(contentType, responseText);
-            const error = new Error(payload?.error || payload || "요청 처리 중 오류가 발생했습니다.");
-            error.status = xhr.status;
-            error.code = payload?.code || "";
-            reject(error);
+            reject(createApiResponseError(xhr.status, contentType, responseText));
             return;
           }
 

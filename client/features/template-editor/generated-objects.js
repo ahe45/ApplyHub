@@ -40,13 +40,13 @@
     objectSourceKey = "examineeNo",
     getObjectValue = null,
   } = {}) {
-    const resolveObjectValue = (examinee) => {
+    const resolveObjectValue = (examinee, sourceKey = objectSourceKey) => {
       if (typeof getObjectValue === "function") {
-        const customValue = String(getObjectValue(examinee) ?? "").trim();
+        const customValue = String(getObjectValue(examinee, sourceKey) ?? "").trim();
         return customValue || "-";
       }
 
-      const value = String(examinee?.[objectSourceKey] ?? "").trim();
+      const value = globalScope.ApplyHubTemplateData?.getObjectValue(examinee, sourceKey) || String(examinee?.[sourceKey] ?? "").trim();
       return value || "-";
     };
 
@@ -54,8 +54,8 @@
       return TEMPLATE_GENERATED_OBJECT_CONFIG[String(objectType || "").trim().toLowerCase()] || null;
     }
 
-    function getTemplateGeneratedObjectValue(examinee) {
-      return resolveObjectValue(examinee);
+    function getTemplateGeneratedObjectValue(examinee, sourceKey = objectSourceKey) {
+      return resolveObjectValue(examinee, sourceKey);
     }
 
     function resolveTemplateGeneratedObjectExaminee(examinee = null, getPreviewExaminee = null) {
@@ -70,14 +70,14 @@
       return {};
     }
 
-    function buildTemplateGeneratedObjectPreviewUrl(objectType, examinee) {
+    function buildTemplateGeneratedObjectPreviewUrl(objectType, examinee, sourceKey = objectSourceKey) {
       const objectConfig = getTemplateGeneratedObjectConfig(objectType);
 
       if (!objectConfig) {
         return "";
       }
 
-      const value = getTemplateGeneratedObjectValue(examinee);
+      const value = getTemplateGeneratedObjectValue(examinee, sourceKey);
       const query = new URLSearchParams({ value }).toString();
       return buildApiUrl(`/api/template-objects/${encodeURIComponent(objectType)}.svg?${query}`);
     }
@@ -102,11 +102,12 @@
       }
 
       const resolvedExaminee = resolveTemplateGeneratedObjectExaminee(examinee, getPreviewExaminee);
-      const value = getTemplateGeneratedObjectValue(resolvedExaminee);
-      const previewUrl = buildTemplateGeneratedObjectPreviewUrl(objectType, resolvedExaminee);
+      const sourceKey = imageElement.dataset.templateObjectSource || objectSourceKey;
+      const value = getTemplateGeneratedObjectValue(resolvedExaminee, sourceKey);
+      const previewUrl = buildTemplateGeneratedObjectPreviewUrl(objectType, resolvedExaminee, sourceKey);
 
       imageElement.classList.add("template-generated-object", objectConfig.className);
-      imageElement.dataset.templateObjectSource = objectSourceKey;
+      imageElement.dataset.templateObjectSource = sourceKey;
       imageElement.alt = `${value} ${objectConfig.altSuffix}`;
       imageElement.title = objectConfig.label;
 

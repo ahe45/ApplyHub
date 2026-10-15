@@ -210,8 +210,11 @@
         questionText: field.questionText || "",
         questionDescription: field.questionDescription || "",
         questionTextEn: field.questionTextEn || "",
+        questionTextMn: field.questionTextMn || "",
         questionDescriptionEn: field.questionDescriptionEn || "",
+        questionDescriptionMn: field.questionDescriptionMn || "",
         inputType: field.inputType || "text",
+        showCountryCode: field.showCountryCode === true,
         dateParts: field.dateParts ? [...field.dateParts] : ['year', 'month', 'day'],
         fileNamePattern: field.fileNamePattern || "",
         allowedExtensions: (field.allowedExtensions || []).join(", "),
@@ -220,6 +223,7 @@
         optionDraft: "",
         optionDraftEn: "",
         optionsEn: { ...field.optionsEn },
+        optionsMn: { ...field.optionsMn },
         allowCustomOption: false,
         customOptionLabel: String(field.customOptionLabel || "").trim(),
         required: field.required === true,
@@ -252,9 +256,14 @@
         if (option !== undefined) editorState.optionsEn = { ...editorState.optionsEn, [option]: String(value || "") };
         return;
       }
+      if (fieldName.startsWith("optionMongolian:")) {
+        const option = editorState.options[Number(fieldName.split(":")[1])];
+        if (option !== undefined) editorState.optionsMn = { ...editorState.optionsMn, [option]: String(value || "") };
+        return;
+      }
 
       const normalizedValue =
-        fieldName === "required" || fieldName === "allowCustomOption"
+        fieldName === "required" || fieldName === "allowCustomOption" || fieldName === "showCountryCode"
           ? value === true || value === "true" || Number(value) === 1
           : String(value ?? "");
       const nextEditorState = {
@@ -314,12 +323,13 @@
         ? `/api/applicant-form-fields/${editorState.editingId}`
         : "/api/applicant-form-fields";
       const requestMethod = editorState.editingId ? "PUT" : "POST";
+      const existingIds = new Set(state.applicantManager.fields.map(field => field.id));
 
       try {
         const choice = ["select", "multiselect"].includes(editorState.inputType)
           ? globalScope.AdmitCardApplicantFormConfig.resolveChoiceOptionEdits(editorState)
-          : { options: [], optionsEn: {}, customOptionLabel: '' };
-        await apiRequest(requestPath, {
+          : { options: [], optionsEn: {}, optionsMn: {}, customOptionLabel: '' };
+        const savedFields = await apiRequest(requestPath, {
           method: requestMethod,
           body: JSON.stringify({
             formScope: editorState.formScope || 'application',
@@ -327,14 +337,18 @@
             questionText: editorState.questionText,
             questionDescription: editorState.questionDescription,
             questionTextEn: editorState.questionTextEn || "",
+            questionTextMn: editorState.questionTextMn || "",
             questionDescriptionEn: editorState.questionDescriptionEn || "",
+            questionDescriptionMn: editorState.questionDescriptionMn || "",
             inputType: editorState.inputType,
+            showCountryCode: editorState.inputType === 'phone' && editorState.showCountryCode === true,
             ...(['date', 'daterange'].includes(editorState.inputType) ? { dateParts: editorState.dateParts || ['year', 'month', 'day'] } : {}),
             fileNamePattern: editorState.fileNamePattern || "",
             allowedExtensions: editorState.allowedExtensions || "",
             systemFieldKey: editorState.systemFieldKey,
             options: choice.options,
             optionsEn: choice.optionsEn,
+            optionsMn: choice.optionsMn,
             allowCustomOption:
               Boolean(choice.customOptionLabel),
             customOptionLabel:
@@ -342,7 +356,13 @@
             required: editorState.required,
           }),
         });
-        resetApplicantFieldEditor({ render: false });
+        const savedField = savedFields.find(field => editorState.editingId
+          ? field.id === editorState.editingId
+          : !existingIds.has(field.id) && field.templateId === editorState.templateId);
+        if (savedField && state.applicantManager.fieldEditor === editorState) {
+          state.applicantManager.fields = savedFields;
+          startApplicantFieldEdit(savedField.id);
+        }
         await refreshApplicantBootstrap(editorState.editingId ? "접수 양식 항목을 수정했습니다." : "접수 양식 항목을 추가했습니다.");
       } catch (error) {
         if (handleAuthenticationFailure(error)) {
@@ -379,6 +399,7 @@
         ...editorState,
         options: [...existingOptions, nextOption],
         optionsEn: { ...editorState.optionsEn, [nextOption]: String(editorState.optionDraftEn || "").trim() },
+        optionsMn: { ...editorState.optionsMn, [nextOption]: String(editorState.optionDraftMn || "").trim() },
         optionDraft: "",
         optionDraftEn: "",
         allowCustomOption: false,

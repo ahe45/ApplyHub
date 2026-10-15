@@ -22,7 +22,7 @@ async function prepareRecruitmentLanguageChecks({ services, query }) {
   const expectedColumnOrder = [
     'id', 'track_name', 'admission_code', 'admission_name', 'admission_name_en',
     'series_code', 'series_name', 'unit_code', 'unit_name', 'unit_name_en',
-    'major_code', 'major_name', 'major_name_en', 'sort_order', 'created_at', 'updated_at',
+    'major_code', 'major_name', 'major_name_en', 'sort_order', 'admission_name_mn', 'unit_name_mn', 'major_name_mn', 'created_at', 'updated_at',
   ];
   const beforeReorder = await query('SELECT * FROM app_unit ORDER BY id');
   await query(`ALTER TABLE app_unit
@@ -57,8 +57,8 @@ async function prepareRecruitmentLanguageChecks({ services, query }) {
   await exported.xlsx.load(await service.buildApplicantRecruitmentUnitExportBuffer(await service.getApplicantRecruitmentUnits()));
   const headers = exported.worksheets[0].getRow(1).values;
   assert.deepEqual(headers.slice(1), [
-    '모집시기', '전형코드', '전형명(한글)', '전형명(영어)', '계열코드', '계열',
-    '모집단위코드', '모집단위명(한글)', '모집단위명(영어)', '전공코드', '전공명(한글)', '전공명(영어)',
+    '모집시기', '전형코드', '전형명(한글)', '전형명(영어)', '전형명(몽골어)', '계열코드', '계열',
+    '모집단위코드', '모집단위명(한글)', '모집단위명(영어)', '모집단위명(몽골어)', '전공코드', '전공명(한글)', '전공명(영어)', '전공명(몽골어)',
   ]);
   assert(headers.includes('전형명(영어)') && headers.includes('모집단위명(영어)') && headers.includes('전공명(영어)'));
   assert.equal(exported.worksheets[0].getRow(2).getCell(headers.indexOf('모집단위명(영어)')).text, 'Literature');
@@ -78,6 +78,8 @@ async function runRecruitmentLanguageUiChecks({ services, query, call, adminPage
   await adminPage.waitForSelector(row);
   await adminPage.click(row);
   await adminPage.waitForSelector('#applicantRecruitmentUnitModal:not(.hidden)');
+  await adminPage.click('[editor-key=recruitment-names] .language-menu-trigger');
+  await adminPage.click('[editor-key=recruitment-names] [data-language=en]');
   const translations = { admission: 'International admission <2026>', unit: 'Literature & Languages', major: 'Korean Literature' };
   for (const key of fields) {
     const selector = `[data-applicant-recruitment-input=${key}NameEn]`;

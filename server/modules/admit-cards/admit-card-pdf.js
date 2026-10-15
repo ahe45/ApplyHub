@@ -9,6 +9,10 @@ const { PDFDocument } = require("pdf-lib");
 const puppeteer = require("puppeteer-core");
 
 const templatePageSettings = require("../../../client/features/template-editor/page-settings");
+const { inlineLocalTemplateImages } = require('./local-image-assets');
+const templateDocument = require('../../../shared/domain/template-document');
+const flowScript = fs.readFileSync(path.resolve(__dirname, '../../../client/examlist-editor/runtime/client/features/template-editor/object-flow-reflow.js'), 'utf8');
+const documentScript = fs.readFileSync(path.resolve(__dirname, '../../../shared/domain/template-document.js'), 'utf8');
 
 const PRINT_PAGE_WIDTH_PX = 794;
 const PRINT_PAGE_HEIGHT_PX = 1123;
@@ -30,6 +34,7 @@ const BATCH_ADMIT_CARD_CANCELLED_MESSAGE = "수험표 파일 생성을 취소했
 const ADMIT_CARD_PDF_RENDER_ROOT_ID = "admit-card-pdf-render-root";
 
 function createAdmitCardPdfService({
+  rootDir = path.resolve(__dirname, '../../..'),
   createHttpError,
   createTemplateExamineeRenderer,
   browserExecutablePaths,
@@ -405,7 +410,10 @@ function createAdmitCardPdfService({
         <head>
           <meta charset="UTF-8" />
           <title>${escapeHtml(title)}</title>
-          <style>${getTemplateDocumentStyles()}</style>
+          <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&amp;family=Noto+Sans+KR:wght@400;500;700&amp;display=swap" rel="stylesheet" />
+          <style>${getTemplateDocumentStyles()}\n${templateDocument.getStyles()}</style>
+          <script>${flowScript}</script>
+          <script>${documentScript}</script>
           <script>${getTemplateDocumentScript()}</script>
         </head>
         <body>
@@ -524,6 +532,7 @@ function createAdmitCardPdfService({
         await Promise.allSettled(pendingImages);
       }
 
+      window.ApplyHubTemplateDocument.syncLayout(document);
       if (typeof window.__admitCardFitTemplateData === "function") {
         window.__admitCardFitTemplateData();
       }
@@ -537,7 +546,14 @@ function createAdmitCardPdfService({
   }
 
   async function renderPdfDocumentInPage(page, title, renderedSheets) {
-    const sheetMarkup = buildAdmitCardDocumentSheetMarkup(renderedSheets);
+    let sheetMarkup;
+    try {
+      sheetMarkup = await inlineLocalTemplateImages(buildAdmitCardDocumentSheetMarkup(renderedSheets), { rootDir });
+    } catch (error) {
+      const imageError = createHttpError(500, '수험표의 로고 또는 이미지 파일을 불러오지 못했습니다. 관리자에게 문의해 주세요.', 'ADMIT_CARD_IMAGE_UNAVAILABLE');
+      imageError.cause = error;
+      throw imageError;
+    }
 
     await page.evaluate(
       ({ nextTitle, nextSheetMarkup, renderRootId }) => {
@@ -759,7 +775,7 @@ function createAdmitCardPdfService({
   }
 
   async function buildAdmitCardPdfBufferFromRecord(record = {}, options = {}) {
-    const template = await getActiveTemplate();
+    const template = await getActiveTemplate(record);
     const renderTemplate = createBatchTemplateRenderer(template.contentHtml);
     const title = String(options.title || `${record?.name || record?.examineeNo || "수험표"} 수험표`).trim() || "수험표";
     const renderedHtml = await renderTemplate(record || {});
@@ -777,8 +793,15 @@ function createAdmitCardPdfService({
   async function buildBatchAdmitCardFile(examineeNos, options = {}, zipped = false) {
     const numbers = normalizeExamineeNoList(examineeNos);
     if (!numbers.length || numbers.length > 2000) throw createHttpError(400, '출력 대상은 1~2,000명이어야 합니다.');
-    const template = await getActiveTemplate();
-    const renderTemplate = createBatchTemplateRenderer(template.contentHtml);
+    const renderersByTemplate = new Map();
+    const templatesByAdmission = new Map();
+    const renderTemplate = async record => {
+      const key = JSON.stringify([record.track || '', record.admission || '', record.admissionCode || '']);
+      if (!templatesByAdmission.has(key)) templatesByAdmission.set(key, getActiveTemplate(record));
+      const template = await templatesByAdmission.get(key);
+      if (!renderersByTemplate.has(template.id)) renderersByTemplate.set(template.id, createBatchTemplateRenderer(template.contentHtml));
+      return renderersByTemplate.get(template.id)(record);
+    };
     const { browser, page } = await openPdfBrowserPage();
     const combined = zipped ? null : await PDFDocument.create();
     const temporary = zipped && !options.outputPath ? await fs.promises.mkdtemp(path.join(os.tmpdir(), 'applyhub-pdf-result-')) : null;

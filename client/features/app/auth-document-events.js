@@ -600,7 +600,7 @@
       if (target?.id === "systemSettingsInitialPassword") {
         state.systemSettings.initialPassword = target.value;
         syncSystemSettingsDirtyState();
-        if (state.systemSettings.statusMessage) {
+        if (state.systemSettings.statusMessage || state.superAdmin?.statusMessage) {
           setSystemSettingsStatus("");
         }
         return true;
@@ -609,7 +609,7 @@
       if (target?.id === "systemSettingsAutoLogoutMinutes") {
         state.systemSettings.autoLogoutMinutes = target.value;
         syncSystemSettingsDirtyState();
-        if (state.systemSettings.statusMessage) {
+        if (state.systemSettings.statusMessage || state.superAdmin?.statusMessage) {
           setSystemSettingsStatus("");
         }
         return true;
@@ -618,7 +618,7 @@
       if (target?.id === "systemSettingsAdmissionHomepageUrl") {
         state.systemSettings.admissionHomepageUrl = target.value;
         syncSystemSettingsDirtyState();
-        if (state.systemSettings.statusMessage) {
+        if (state.systemSettings.statusMessage || state.superAdmin?.statusMessage) {
           setSystemSettingsStatus("");
         }
         return true;

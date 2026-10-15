@@ -42,6 +42,11 @@
           inputElement.value = fieldName ? String(editorState[fieldName] || "") : "";
           inputElement.disabled = !isEditorActive;
         });
+        modalForm.querySelectorAll('[data-recruitment-reference]').forEach(element => {
+          const name = String(editorState[element.dataset.recruitmentReference] || '');
+          element.textContent = name ? `한국어: ${name}` : '';
+        });
+        modalForm.querySelector('applyhub-language-menu')?.applyEditorLanguage();
       }
 
       if (deleteButton) {
@@ -90,14 +95,17 @@
         admissionCode: unit.admissionCode || "",
         admissionName: unit.admissionName || "",
         admissionNameEn: unit.admissionNameEn || "",
+        admissionNameMn: unit.admissionNameMn || "",
         seriesCode: unit.seriesCode || "",
         seriesName: unit.seriesName || "",
         unitCode: unit.unitCode || "",
         unitName: unit.unitName || "",
         unitNameEn: unit.unitNameEn || "",
+        unitNameMn: unit.unitNameMn || "",
         majorCode: unit.majorCode || "",
         majorName: unit.majorName || "",
         majorNameEn: unit.majorNameEn || "",
+        majorNameMn: unit.majorNameMn || "",
       };
       renderView();
       syncApplicantRecruitmentUnitModalForm();
@@ -115,6 +123,8 @@
         ...editorState,
         [fieldName]: String(value ?? ""),
       };
+      const reference = globalScope.document?.querySelector(`[data-recruitment-reference="${fieldName}"]`);
+      if (reference) reference.textContent = value ? `한국어: ${value}` : '';
     }
 
     async function saveApplicantRecruitmentUnit() {
@@ -138,14 +148,17 @@
             admissionCode: editorState.admissionCode,
             admissionName: editorState.admissionName,
             admissionNameEn: editorState.admissionNameEn,
+            admissionNameMn: editorState.admissionNameMn,
             seriesCode: editorState.seriesCode,
             seriesName: editorState.seriesName,
             unitCode: editorState.unitCode,
             unitName: editorState.unitName,
             unitNameEn: editorState.unitNameEn,
+            unitNameMn: editorState.unitNameMn,
             majorCode: editorState.majorCode,
             majorName: editorState.majorName,
             majorNameEn: editorState.majorNameEn,
+            majorNameMn: editorState.majorNameMn,
           }),
         });
         await requestCloseModal?.("applicantRecruitmentUnitModal");

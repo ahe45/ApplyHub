@@ -73,7 +73,9 @@ globalScope.AdmitCardApplicantSubmissionWorkflow);
       options: [],
       optionDraft: "",
       optionDraftEn: "",
+      optionDraftMn: "",
       optionsEn: {},
+      optionsMn: {},
       allowCustomOption: false,
       customOptionLabel: "",
       required: false,
@@ -88,14 +90,17 @@ globalScope.AdmitCardApplicantSubmissionWorkflow);
       admissionCode: "",
       admissionName: "",
       admissionNameEn: "",
+      admissionNameMn: "",
       seriesCode: "",
       seriesName: "",
       unitCode: "",
       unitName: "",
       unitNameEn: "",
+      unitNameMn: "",
       majorCode: "",
       majorName: "",
       majorNameEn: "",
+      majorNameMn: "",
     };
   }
 

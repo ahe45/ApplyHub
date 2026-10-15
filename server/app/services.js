@@ -29,6 +29,8 @@ const {
 const { createSystemService } = require("../modules/system/service");
 const { createTemplateBootstrapService } = require("../modules/templates/bootstrap");
 const { createTemplateService } = require("../modules/templates/service");
+const { createTranslationService } = require('../modules/system/service/translation');
+const { createTranslationSettingsService } = require('../modules/system/service/translation-settings');
 
 const DEFAULT_INITIAL_PASSWORD = "1111";
 const DEFAULT_AUTO_LOGOUT_MINUTES = 0;
@@ -90,7 +92,9 @@ function formatDateAsYmd(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function createApplicationServices({ env = process.env, fs, getPool, path, query, rootDir = process.cwd() }) {
+function createApplicationServices({ env = process.env, fs, getPool, path, query, rootDir = process.cwd(), translationFetch }) {
+  const translationSettings = createTranslationSettingsService({ query, rootDir, env, createHttpError });
+  const translationService = createTranslationService({ env, fetchImpl: translationFetch || globalThis.fetch, query, settings: translationSettings });
   const databaseName = env.DB_NAME || "applyhub";
   const passwordHelpers = createPasswordHelpers({
     passwordHashPrefix: DEFAULT_PASSWORD_HASH_PREFIX,
@@ -134,6 +138,8 @@ function createApplicationServices({ env = process.env, fs, getPool, path, query
     getPool,
     query,
     templateTagDefinitions,
+    getApplicantService: () => applicantService,
+    getSignupSettings: () => membershipService.getSettings(),
   });
   const {
     createTemplateExamineeRenderer,
@@ -155,6 +161,7 @@ function createApplicationServices({ env = process.env, fs, getPool, path, query
   const { normalizeExamineeNoList } = printHistoryService;
   const translateDatabaseError = createDatabaseErrorTranslator({ createHttpError });
   const admitCardService = createAdmitCardService({
+    rootDir,
     batchAdmitCardJobTtlMs: BATCH_ADMIT_CARD_JOB_TTL_MS,
     createHttpError,
     createTemplateExamineeRenderer,
@@ -326,6 +333,7 @@ function createApplicationServices({ env = process.env, fs, getPool, path, query
     await schemaBootstrapService.ensureSystemAuditLogSchema();
     await templateBootstrapService.migrateTemplateTagSchema();
     await templateBootstrapService.seedTemplates();
+    await templateBootstrapService.migrateAdmissionSettings();
     await schemaBootstrapService.ensureAccountSchema();
     await schemaBootstrapService.ensureSchemaColumnComments();
     await systemService.migrateLegacySeedAccountIds();
@@ -338,6 +346,7 @@ function createApplicationServices({ env = process.env, fs, getPool, path, query
 
   return Object.freeze({
     admitCardService,
+    translationService,
     applicantService,
     membershipService,
     authService,

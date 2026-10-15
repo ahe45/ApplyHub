@@ -9,6 +9,8 @@ async function runNoticeLanguageChecks({ services, call, adminPage, page, member
   }, html);
   const choose = async locale => {
     editor = locale === 'en' ? '#loginNoticeEditorEn' : '#loginNoticeEditor';
+    await adminPage.click('[editor-key=notice-editor] .language-menu-trigger');
+    await adminPage.click(`[editor-key=notice-editor] [data-language=${locale}]`);
     await adminPage.focus(editor);
     await adminPage.waitForSelector(`[data-notice-canvas=${locale}].is-active`);
   };
@@ -18,22 +20,20 @@ async function runNoticeLanguageChecks({ services, call, adminPage, page, member
       adminPage.click(`[data-notice-canvas=${editor.endsWith('En') ? 'en' : 'ko'}] [data-notice-action=save]`),
     ]);
     assert.equal(response.status(), 200);
-    await adminPage.waitForFunction(() => document.querySelectorAll('[data-notice-editor-language]').length === 2 && !document.activeElement.closest('[data-notice-editor-language]'));
+    await adminPage.waitForFunction(() => document.querySelectorAll('[data-notice-editor-language]').length === 3 && !document.activeElement.closest('[data-notice-editor-language]'));
     return response.json();
   };
   assert.equal((await call('/api/login-notice', { scope: 'login', language: 'en', html: 'unauthorized' }, '', 'PUT')).status, 401);
   await go(adminPage, '/login-notice');
   await adminPage.waitForSelector(editor);
   await adminPage.setViewport({ width: 1440, height: 1000 });
-  assert.equal(await adminPage.$$eval('[data-notice-editor-language]', elements => elements.filter(el => el.getClientRects().length).length), 2);
-  assert.equal(await adminPage.$('[data-notice-language]'), null, 'Languages are displayed together without tabs');
+  assert.equal(await adminPage.$$eval('[data-notice-editor-language]', elements => elements.filter(el => el.getClientRects().length).length), 1);
+  assert(await adminPage.$('[editor-key=notice-editor]'), 'A language dropdown selects the editing canvas');
   for (const width of [1280, 1440, 1920]) {
     await adminPage.setViewport({ width, height: 1000 });
     assert(await adminPage.evaluate(() => {
-      const ko = document.querySelector('[data-notice-canvas=ko]').getBoundingClientRect();
-      const en = document.querySelector('[data-notice-canvas=en]').getBoundingClientRect();
-      return Math.abs(ko.top - en.top) < 1 && en.left >= ko.right && document.documentElement.scrollWidth <= innerWidth + 1;
-    }), `Both canvases fit side by side at ${width}px`);
+      return [...document.querySelectorAll('[data-notice-canvas]')].filter(el => !el.hidden).length === 1 && document.documentElement.scrollWidth <= innerWidth + 1;
+    }), `The selected canvas fits at ${width}px`);
   }
   await adminPage.setViewport({ width: 1440, height: 1000 });
   for (const scope of ['login', 'applicant']) {
@@ -106,12 +106,10 @@ async function runNoticeLanguageChecks({ services, call, adminPage, page, member
   }
   await adminPage.setViewport({ width: 390, height: 844 });
   assert(await adminPage.evaluate(() => {
-    const ko = document.querySelector('[data-notice-canvas=ko]').getBoundingClientRect();
-    const en = document.querySelector('[data-notice-canvas=en]').getBoundingClientRect();
-    return en.top >= ko.bottom && document.documentElement.scrollWidth <= innerWidth + 1;
-  }), 'Narrow screens stack the canvases without overflow');
+    return [...document.querySelectorAll('[data-notice-canvas]')].filter(el => !el.hidden).length === 1 && document.documentElement.scrollWidth <= innerWidth + 1;
+  }), 'The selected canvas fits narrow screens');
   await adminPage.setViewport({ width: 1440, height: 1000 });
-  console.log('PASS: simultaneous bilingual notice canvases, focus and toolbar isolation, responsive layout, save/reload, public language switching and fallback');
+  console.log('PASS: selected language notice canvas, draft and toolbar isolation, responsive layout, save/reload, public language switching and fallback');
 }
 
 module.exports = { runNoticeLanguageChecks };

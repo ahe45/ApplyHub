@@ -724,8 +724,28 @@
 }
 
 .modal-sheet.applicant-schedule-modal-sheet {
-  width: min(680px, 100%);
+  width: min(1440px, calc(100vw - 48px));
   grid-template-rows: auto minmax(0, 1fr);
+}
+
+.applicant-schedule-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.applicant-schedule-settings-column,
+.applicant-schedule-periods-column {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  align-content: start;
+}
+
+@media (max-width: 1200px) {
+  .modal-sheet.applicant-schedule-modal-sheet { width: calc(100vw - 24px); }
+  .applicant-schedule-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
 }
 
 .applicant-schedule-modal-sheet .applicant-recruitment-modal-body {
@@ -749,7 +769,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
 }
+.applicant-schedule-period-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: flex-end; max-width: 100%; }
 
 .applicant-schedule-period-header h4 { margin: 0; font-size: 0.95rem; }
 .applicant-schedule-period-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -913,6 +935,15 @@
 .form-template-editor label { display: grid; gap: 8px; flex: 1; min-width: 200px; }
 .applicant-schedule-template-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .applicant-schedule-template-grid label { display: grid; gap: 8px; }
+.applicant-schedule-template-grid.applicant-schedule-template-row { grid-template-columns: repeat(3, minmax(140px, 1fr)); }
+.applicant-schedule-template-grid.applicant-schedule-exam-row { grid-template-columns: repeat(5, minmax(112px, 1fr)); }
+.applicant-schedule-exam-row > .field:first-child { grid-column: 1 / -1; }
+.applicant-schedule-exam-row > .field:first-child input { max-width: 160px; }
+.applicant-schedule-template-row, .applicant-schedule-exam-row { min-width: 0; max-width: 100%; overflow-x: auto; gap: 10px; padding-bottom: 4px; }
+.applicant-schedule-template-grid .field { min-width: 0; margin: 0; }
+.applicant-schedule-template-row select, .applicant-schedule-exam-row select, .applicant-schedule-exam-row input { min-width: 0; width: 100%; }
+.applicant-schedule-exam-row select { padding-left: 8px; padding-right: 26px; }
+.applicant-schedule-exam-row .field > span { white-space: nowrap; }
 .applicant-schedule-templates { padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; }
 .applicant-schedule-templates h4 { margin: 0 0 12px; }
 .applicant-schedule-templates .muted { margin: 10px 0 0; font-size: 12px; }

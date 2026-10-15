@@ -47,7 +47,7 @@ async function runPublicLanguageChecks({ services, members, query, base, call, m
   const errors = [];
   const attach = async context => { const page = await context.newPage(); page.on('pageerror', e => errors.push(e.message)); await page.setViewport({ width: 390, height: 844 }); return page; };
   const go = (page, pathname) => page.goto(base + pathname, { waitUntil: 'networkidle0' });
-  const language = async (page, value) => { await page.bringToFront(); await page.click(`[data-language="${value}"]`); await page.waitForFunction(locale => document.documentElement.lang === locale, { polling: 50 }, value); };
+  const language = async (page, value) => { await page.bringToFront(); await page.click('applyhub-language-toggle .language-menu-trigger'); await page.click(`applyhub-language-toggle [data-language="${value}"]`); await page.waitForFunction(locale => document.documentElement.lang === locale, { polling: 50 }, value); };
   async function audit(page, label) {
     const remaining = await page.evaluate(() => {
       const found = new Set();
@@ -230,9 +230,9 @@ async function runPublicLanguageChecks({ services, members, query, base, call, m
     assert.equal(await adminPage.$eval('.brand h1', el => el.textContent), '원서접수시스템', 'Hidden staff content was never translated on the login screen');
     await go(adminPage, '/applicant-schedules');
     assert.equal(await adminPage.$eval('html', el => el.lang), 'ko');
-    assert((await adminPage.title()).includes('일정 관리'));
+    assert((await adminPage.title()).includes('전형 관리'));
     assert.equal(await adminPage.$('applyhub-language-toggle'), null);
-    assert.equal(await adminPage.$eval('[data-view=applicantScheduleManagement]', el => el.textContent.trim()), '일정 관리');
+    assert.equal(await adminPage.$eval('[data-view=applicantScheduleManagement]', el => el.textContent.trim()), '전형 관리');
     await require('./notice-language-checks').runNoticeLanguageChecks({ services, call, adminPage, page, memberPage, go, language, artifacts });
     await recruitmentChecks.runRecruitmentLanguageUiChecks({ services, query, call, adminPage, memberPage, go, language, artifacts, submissionId, unit: bilingualRecruitmentUnit });
     // Save through the actual shared editor, reload, and verify both languages remain.
@@ -247,6 +247,8 @@ async function runPublicLanguageChecks({ services, members, query, base, call, m
       await adminPage.click(card);
       const titleInput = `[data-${prefix}-field-input=questionTextEn]`, descInput = `[data-${prefix}-field-input=questionDescriptionEn]`;
       assert.equal(await adminPage.$eval(titleInput, el => el.value), signup ? 'Preferred name' : `${formScope} English question`);
+      await adminPage.click('[data-language-editor] .language-menu-trigger');
+      await adminPage.click('[data-language-editor] [data-language=en]');
       await fill(titleInput, `${formScope} updated English title`);
       await fill(descInput, `${formScope} updated English description`);
       await Promise.all([adminPage.waitForResponse(r => r.request().method() === 'PUT' && r.url().includes(signup ? '/api/applicant-signup-settings' : `/api/applicant-form-fields/${field.id}`)), adminPage.click(`[data-${prefix}-field-form] button[type=submit]`)]);

@@ -137,6 +137,7 @@
       });
 
       const renderer = getViewRenderer(state.currentView);
+      if (state.currentView !== 'templateManagement') globalThis.ApplyHubExamListEditor?.destroy();
       viewRoot.innerHTML = renderer();
       decorateSelectFields();
       syncHeaderSelectOptions();

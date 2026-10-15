@@ -74,6 +74,9 @@ function createTemplateRenderingMarkupUtils({ escapeHtml }) {
     let nextMarkup = String(tokenMarkup || "");
 
     nextMarkup = nextMarkup.replace(/\sdata-template-tag-value=(["'])[^"']*\1/gi, "");
+    nextMarkup = nextMarkup.replace(/\sdata-template-tag-[\w-]+=(["'])[^"']*\1/gi, "");
+    nextMarkup = nextMarkup.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, "");
+    nextMarkup = nextMarkup.replace(/\stitle=(["'])[^"']*\1/gi, "");
     nextMarkup = nextMarkup.replace(/\sdata-template-token=(["'])[^"']*\1/gi, "");
     nextMarkup = nextMarkup.replace(/\sspellcheck=(["'])[^"']*\1/gi, "");
     nextMarkup = nextMarkup.replace(/\scontenteditable=(["'])[^"']*\1/gi, "");

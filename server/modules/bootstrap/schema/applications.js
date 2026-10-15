@@ -57,14 +57,17 @@ function createApplicantSchemaBootstrap({
         admission_code VARCHAR(30) NOT NULL,
         admission_name VARCHAR(100) NOT NULL,
         admission_name_en VARCHAR(200) NOT NULL DEFAULT '',
+        admission_name_mn VARCHAR(200) NOT NULL DEFAULT '',
         series_code VARCHAR(30) NOT NULL DEFAULT '',
         series_name VARCHAR(100) NOT NULL DEFAULT '',
         unit_code VARCHAR(30) NOT NULL,
         unit_name VARCHAR(100) NOT NULL,
         unit_name_en VARCHAR(200) NOT NULL DEFAULT '',
+        unit_name_mn VARCHAR(200) NOT NULL DEFAULT '',
         major_code VARCHAR(30) NOT NULL DEFAULT '',
         major_name VARCHAR(100) NOT NULL DEFAULT '',
         major_name_en VARCHAR(200) NOT NULL DEFAULT '',
+        major_name_mn VARCHAR(200) NOT NULL DEFAULT '',
         sort_order INT NOT NULL DEFAULT 0,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -232,7 +235,7 @@ function createApplicantSchemaBootstrap({
     await createApplicantRecruitmentUnitTable();
 
     const applicantUnitColumns = await getTableColumns("app_unit");
-    for (const column of ["admission_name_en", "unit_name_en", "major_name_en"]) {
+    for (const column of ["admission_name_en", "unit_name_en", "major_name_en", "admission_name_mn", "unit_name_mn", "major_name_mn"]) {
       if (!hasColumn(applicantUnitColumns, column)) {
         await query(`ALTER TABLE app_unit ADD COLUMN ${column} VARCHAR(200) NOT NULL DEFAULT ''`);
       }
@@ -583,6 +586,15 @@ function createApplicantSchemaBootstrap({
     for (const column of ['application_template_id', 'document_template_id']) {
       const [existing] = await query(`SHOW COLUMNS FROM app_schedule LIKE '${column}'`);
       if (!existing) await query(`ALTER TABLE app_schedule ADD COLUMN ${column} BIGINT UNSIGNED NULL`);
+    }
+    for (const [column, definition] of [
+      ['admit_card_template_id', 'VARCHAR(64) NULL'],
+      ['applicant_submission_edit_enabled', 'TINYINT(1) NULL'],
+      ['exam_no_settings_json', 'LONGTEXT NULL'],
+    ]) {
+      if (!(await query(`SHOW COLUMNS FROM app_schedule LIKE '${column}'`)).length) {
+        await query(`ALTER TABLE app_schedule ADD COLUMN ${column} ${definition}`);
+      }
     }
   }
 

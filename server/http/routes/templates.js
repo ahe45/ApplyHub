@@ -8,6 +8,12 @@ function decodeRouteParams(groups = {}) {
 
 function createTemplateRoutes(deps) {
   return [
+    regexRoute('GET', /^\/api\/templates\/(?<templateId>[^/]+)\/editor-context$/,
+      async ({ response, params }) => deps.sendJson(response, 200, await deps.getTemplateEditorContext(params.templateId)),
+      { getParams: match => decodeRouteParams(match.groups) }),
+    regexRoute('POST', /^\/api\/templates\/(?<templateId>[^/]+)\/preview$/,
+      async ({ request, response, params }) => { const body = await deps.readJsonBody(request); return deps.sendJson(response, 200, await deps.previewTemplate(params.templateId, body.contentHtml)); },
+      { getParams: match => decodeRouteParams(match.groups) }),
     regexRoute(
       "GET",
       /^\/api\/template-objects\/(?<objectType>barcode|qrcode)\.svg$/,

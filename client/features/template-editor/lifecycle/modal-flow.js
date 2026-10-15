@@ -91,11 +91,22 @@
 
     function openTemplateEditor(templateId) {
       const templateCard = findTemplateCard(templateId);
+      if (globalThis.ApplyHubExamListEditor) {
+        if (templateCard) window.location.assign(`/templates/${encodeURIComponent(templateId)}/edit`);
+        return;
+      }
       const templateEditorModal = getTemplateEditorModal();
       const templateEditorSurface = getTemplateEditorSurface();
 
       if (!templateCard || !templateEditorModal || !templateEditorSurface) {
         return;
+      }
+
+      if (globalThis.ApplyHubExamListEditor) {
+        return globalThis.ApplyHubExamListEditor.open({
+          state, card: templateCard, openModal, closeModal, apiRequest, updateTemplateCard, renderView,
+          getPreviewData: getTemplatePreviewExaminee, openPreview: openTemplatePreview,
+        });
       }
 
       const editorMarkup = prepareTemplateEditorContent(templateCard.contentHtml);
@@ -189,9 +200,9 @@
       updateTemplateTableControls();
     }
 
-    function openTemplatePreview(templateId, sourceHtml = "") {
+    async function openTemplatePreview(templateId, sourceHtml = "") {
       const templateCard = findTemplateCard(templateId);
-      const examinee = getTemplatePreviewExaminee();
+      let examinee = getTemplatePreviewExaminee();
       const templatePreviewStage = getTemplatePreviewStageElement();
       const previewName =
         state.templateEditor.activeTemplateId === templateId && String(state.templateEditor.name || "").trim()
@@ -202,7 +213,14 @@
         return;
       }
 
-      const renderedHtml = renderTemplateWithExaminee(sourceHtml || templateCard.contentHtml, examinee);
+      let renderedHtml;
+      if (templateCard) {
+        try {
+          const preview = await apiRequest(`/api/templates/${encodeURIComponent(templateId)}/preview`, { method: 'POST', body: JSON.stringify({ contentHtml: sourceHtml }) });
+          renderedHtml = preview.renderedHtml;
+          examinee = { name: preview.previewSource.kind === 'submission' ? preview.previewSource.name : '접수 데이터 없음', examineeNo: preview.previewSource.examineeNo || '' };
+        } catch (error) { window.alert(error.message); return; }
+      } else renderedHtml = renderTemplateWithExaminee(sourceHtml || templateCard.contentHtml, examinee);
 
       state.templatePreview = {
         activeTemplateId: templateId,
@@ -225,6 +243,7 @@
       templatePreviewStage.innerHTML = `<article class="template-render-sheet">${renderedHtml}</article>`;
       applyTemplatePageSettingsToRenderedSheet?.(templatePreviewStage.querySelector(".template-render-sheet"));
       openModal("templatePreviewModal");
+      await globalThis.ApplyHubTemplateDocument?.prepare(templatePreviewStage);
     }
 
     function previewTemplateEditorDraft() {
@@ -280,6 +299,7 @@
       })();
     }
 
+    globalThis.ApplyHubExamListEditor?.configure({ state, apiRequest, updateTemplateCard, renderView, getPreviewData: getTemplatePreviewExaminee, openPreview: openTemplatePreview });
     return Object.freeze({
       openTemplateEditor,
       openTemplatePreview,

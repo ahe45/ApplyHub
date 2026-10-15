@@ -11,11 +11,11 @@
   const TEMPLATE_EDITOR_DEFAULT_TABLE_BORDER = "1px solid #000000";
   const TEMPLATE_EDITOR_DEFAULT_TABLE_HEADER_BACKGROUND = "#f6f8fc";
   const TEMPLATE_EDITOR_DEFAULT_TABLE_CELL_PADDING = "5px 6px";
-  const TEMPLATE_EDITOR_DEFAULT_TABLE_STYLE = "width: 100%; border-collapse: collapse; table-layout: fixed;";
+  const TEMPLATE_EDITOR_DEFAULT_TABLE_STYLE = "width: 100%; border-collapse: collapse; table-layout: fixed; background: transparent;";
   const TEMPLATE_EDITOR_DEFAULT_TABLE_CELL_STYLE =
-    "border: 1px solid #000000; padding: 5px 6px; text-align: left; vertical-align: top;";
+    "border: 1px solid #000000; padding: 5px 6px; text-align: left; vertical-align: top; background: transparent;";
   const TEMPLATE_EDITOR_DEFAULT_TABLE_HEADER_STYLE =
-    "border: 1px solid #000000; padding: 5px 6px; text-align: left; vertical-align: top; background: #f6f8fc;";
+    "border: 1px solid #000000; padding: 5px 6px; text-align: left; vertical-align: top; background: transparent;";
 
   function normalizeTemplateEditorFontNodes(rootElement, { appliedFontSizePx = null } = {}) {
     if (!rootElement?.querySelectorAll) {

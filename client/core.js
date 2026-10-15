@@ -518,6 +518,9 @@ const {
   syncPasswordSetupModal,
   syncToast,
 } = authUiController;
+window.addEventListener('applyhub:settings-toast', event => {
+  if (typeof event.detail?.message === 'string') showToast(event.detail.message, event.detail.type || 'success', event.detail.type === 'error' || event.detail.type === 'warning' ? 6500 : 3200);
+});
 const autoLogoutController = createAutoLogoutController({
   apiRequest,
   autoLogoutCountdown,

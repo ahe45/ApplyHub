@@ -76,7 +76,22 @@
       status.className = 'ticket-pdf-status';
       status.setAttribute('role', 'status');
       status.textContent = '수험표를 불러오는 중입니다.';
-      this.append(status);
+      const createPlaceholder = (message = status.cloneNode(true)) => {
+        if (message !== status) message.removeAttribute('role');
+        const page = document.createElement('div');
+        page.className = 'ticket-pdf-page is-loading';
+        page.style.setProperty('--ticket-pdf-page-ratio', this.pageRatio || '210 / 297');
+        const loading = document.createElement('div');
+        loading.className = 'ticket-pdf-loading';
+        const progress = document.createElement('span');
+        progress.className = 'ticket-pdf-progress';
+        progress.setAttribute('aria-hidden', 'true');
+        loading.append(progress, message);
+        page.append(loading);
+        return page;
+      };
+      const pages = [createPlaceholder(status)];
+      this.append(pages[0]);
       try {
         const request = acquirePdf(this.getAttribute('src'));
         this.pdfRequest = request;
@@ -99,10 +114,22 @@
         this.pdfRequest = null;
         const pdf = await loadingTask.promise;
         if (!isCurrent()) return;
+        for (let number = 2; number <= pdf.numPages; number++) {
+          const placeholder = createPlaceholder();
+          pages.push(placeholder);
+          this.append(placeholder);
+        }
         for (let number = 1; number <= pdf.numPages; number++) {
           const page = await pdf.getPage(number);
           if (!isCurrent()) return;
           const original = page.getViewport({ scale: 1 });
+          const placeholder = pages[number - 1];
+          const ratio = `${original.width} / ${original.height}`;
+          placeholder.style.setProperty('--ticket-pdf-page-ratio', ratio);
+          if (number === 1) {
+            this.pageRatio = ratio;
+            pages.slice(1).forEach(shell => shell.style.setProperty('--ticket-pdf-page-ratio', ratio));
+          }
           // Keep text crisp while bounding canvas memory on high-DPI phones.
           const width = Math.min(1600, Math.max(1, this.clientWidth) * Math.min(devicePixelRatio || 1, 2));
           const scale = Math.min(width / original.width, Math.sqrt(4000000 / (original.width * original.height)));
@@ -113,12 +140,14 @@
           canvas.setAttribute('role', 'img');
           canvas.setAttribute('aria-label', `수험표 ${number} / ${pdf.numPages} 페이지`);
           canvas.hidden = true;
-          this.append(canvas);
+          placeholder.append(canvas);
           this.renderTask = page.render({ canvasContext: canvas.getContext('2d'), viewport, background: '#ffffff' });
           await this.renderTask.promise;
           if (!isCurrent()) return;
           this.renderTask = null;
           canvas.hidden = false;
+          placeholder.replaceChildren(canvas);
+          placeholder.classList.remove('is-loading');
           if (number === 1) {
             status.remove();
             // Let the first page paint before rendering any remaining pages.

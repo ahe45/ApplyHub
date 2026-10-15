@@ -85,7 +85,7 @@ async function runAdminMenuChecks({ services, query, base, call }) {
   const settings = await services.systemService.getSystemSettings();
   assert.equal(Object.hasOwn(settings, 'schoolName'), false);
   assert.equal(Object.hasOwn(settings, 'schoolLogoImageUrl'), false);
-  const settingsResponse = await call('/api/system-settings', { ...settings, schoolName: '변경 시도', schoolLogoImageUrl: '/wrong.png', admissionHomepageUrl: 'https://example.test/admission' }, adminCookie, 'PUT');
+  const settingsResponse = await call('/api/system-settings', { ...settings, schoolName: '변경 시도', schoolLogoImageUrl: '/wrong.png', admissionHomepageUrl: 'https://example.test/admission' }, superCookie, 'PUT');
   assert.equal(settingsResponse.status, 200);
   assert.equal(settingsResponse.body.admissionHomepageUrl, 'https://example.test/admission');
   assert.deepEqual(await services.systemService.getSuperAdminSettings(), branding, 'System settings must never overwrite super-admin branding');
@@ -118,7 +118,9 @@ async function runAdminMenuChecks({ services, query, base, call }) {
         await page.waitForSelector('#accountCreateModal:not(.hidden)');
         assert.equal(await page.$eval('#accountCreateRole', (el, superRole) => [...el.options].some(option => option.value === superRole), config.superAdminRole), isSuper);
         await page.goto(base + '/system-settings', { waitUntil: 'networkidle0' });
-        await page.waitForSelector('#systemSettingsAdmissionHomepageUrl');
+        if (isSuper) await page.waitForSelector('#systemSettingsAdmissionHomepageUrl');
+        else assert.equal(await page.$('#systemSettingsAdmissionHomepageUrl'),null);
+        assert.equal(await page.$('[data-view=systemSettings]'),null);
         assert.equal(await page.$('#systemSettingsSchoolName'), null);
         assert.equal(await page.$('#systemSettingsSchoolLogo'), null);
         assert.equal(await page.$('[data-school-logo-reset]'), null);

@@ -338,7 +338,7 @@
       syncLoginNoticeEditorDraft();
       const activeScope = getActiveNoticeScope();
       const activeScopeLabel = getActiveNoticeScopeLabel();
-      const language = state.noticeManagement.activeLanguage === "en" ? "en" : "ko";
+      const language = globalThis.ApplyHubLanguages.normalize(state.noticeManagement.activeLanguage);
       const submittedHtml = state.loginNotice.draftHtml;
 
       try {
@@ -356,7 +356,7 @@
           language,
         });
         renderView();
-        showToast(`${activeScopeLabel} ${language === "en" ? "영어" : "한국어"} 공지사항을 저장했습니다.`);
+        showToast(`${activeScopeLabel} ${language === "mn" ? "몽골어" : language === "en" ? "영어" : "한국어"} 공지사항을 저장했습니다.`);
       } catch (error) {
         if (handleAuthenticationFailure(error)) {
           return;

@@ -22,6 +22,7 @@
   --grid-row-line: var(--glass-line);
   --grid-hover: var(--glass-tint);
   --grid-row-height: 42px;
+  --grid-body-font-size: 0.85rem;
   --shadow: var(--glass-shadow);
   --radius-xl: 24px;
   --radius-lg: 24px;

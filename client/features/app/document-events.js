@@ -272,6 +272,7 @@
       }
 
       hideGridCellTooltip();
+      if (event.target.closest?.('#templateEditorRuntimeHost')) return;
       editorToolbarDocumentEventHandlers.prepareClick(event);
 
       if (gridDocumentEventHandlers.handlePriorityClick(event)) {

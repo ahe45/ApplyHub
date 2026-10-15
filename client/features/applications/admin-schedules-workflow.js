@@ -30,8 +30,9 @@
       "admitCardLookupScheduleEndAt",
     ]);
 
-    const scheduleTemplateFieldNames = ["applicationTemplateId", "documentTemplateId"];
+    const scheduleTemplateFieldNames = ["applicationTemplateId", "documentTemplateId", "admitCardTemplateId"];
     const scheduleEnabledFieldNames = Object.freeze(["applicantScheduleEnabled", "documentSubmissionScheduleEnabled", "documentReviewScheduleEnabled", "admitCardLookupScheduleEnabled"]);
+    const scheduleBooleanFieldNames = [...scheduleEnabledFieldNames, 'applicantSubmissionEditEnabled'];
 
     function isFormControlElement(element) {
       return (
@@ -109,6 +110,17 @@
             if (template.formScope === scope) select.add(new Option(template.name + (template.isDefault ? ' (기본)' : ''), String(template.id)));
           }
         }
+        const ticketSelect = modalForm.querySelector('[data-applicant-schedule-input="admitCardTemplateId"]');
+        ticketSelect.replaceChildren();
+        if (isBulk) ticketSelect.add(new Option('기존 양식 유지', '__keep__'));
+        ticketSelect.add(new Option('선택 안 함', ''));
+        for (const template of state.templateCards || []) ticketSelect.add(new Option(template.name, template.id));
+        for (let index = 0; index < 5; index++) {
+          const select = modalForm.querySelector('[data-applicant-schedule-input="examNoComponent' + index + '"]');
+          select.replaceChildren();
+          if (isBulk) select.add(new Option('기존 설정 유지', '__keep__'));
+          for (const [key,label] of [['','선택 안 함'],['admissionCode','전형코드'],['seriesCode','계열코드'],['unitCode','모집단위코드'],['nationalityCode','국적코드'],['sequence','순번']]) select.add(new Option(label,key));
+        }
         modalForm.querySelectorAll("[data-applicant-schedule-input]").forEach((inputElement) => {
           if (!isFormControlElement(inputElement)) {
             return;
@@ -116,9 +128,13 @@
 
           const fieldName = String(inputElement.dataset.applicantScheduleInput || "").trim();
           if (inputElement.type === 'checkbox') {
-            inputElement.checked = editorState[fieldName] !== false && editorState[fieldName] !== null;
+            inputElement.checked = editorState[fieldName] === true;
             inputElement.indeterminate = isBulk && editorState[fieldName] === null;
-            inputElement.closest('label').querySelector('[data-schedule-enabled-label]').textContent = inputElement.indeterminate ? '혼합 · 유지' : inputElement.checked ? '사용' : '미사용';
+            const label = inputElement.closest('label');
+            const enabledLabel = label.querySelector('[data-schedule-enabled-label]');
+            if (enabledLabel) enabledLabel.textContent = inputElement.indeterminate ? '혼합 · 유지' : inputElement.checked ? '사용' : '미사용';
+            const editLabel = label.querySelector('[data-schedule-edit-label]');
+            if (editLabel) editLabel.textContent = inputElement.indeterminate ? '수정 허용 · 유지' : '수정 허용';
           } else inputElement.value = fieldName ? String(editorState[fieldName] || "") : "";
           const period = inputElement.closest('[data-schedule-period]');
           const periodDisabled = period && editorState[period.dataset.schedulePeriod + 'Enabled'] === false;
@@ -129,17 +145,17 @@
 
       if (saveButton) {
         saveButton.disabled = !isEditorActive || isSaving;
-        saveButton.textContent = isSaving ? "저장 중..." : isBulk ? `${targetSchedules.length}개 일정 저장` : "저장";
+        saveButton.textContent = isSaving ? "저장 중..." : isBulk ? `${targetSchedules.length}개 전형 저장` : "저장";
       }
 
       if (modalTitle) {
-        modalTitle.textContent = isBulk ? "일정 일괄 설정" : "일정 상세정보";
+        modalTitle.textContent = isBulk ? "전형 일괄 설정" : "전형 상세설정";
       }
 
       if (modalDescription) {
         modalDescription.textContent = isBulk
-          ? "선택한 전형에 동일한 접수, 서류 제출, 서류 제출 확인, 수험표 조회 기간을 적용합니다."
-          : "모집시기와 전형별 접수, 서류 제출, 서류 제출 확인, 수험표 조회 기간을 설정합니다.";
+          ? "선택한 전형의 템플릿, 원서 수정, 수험번호 규칙과 운영 기간을 일괄 설정합니다."
+          : "전형별 적용 템플릿, 원서 수정, 수험번호 규칙과 운영 기간을 설정합니다.";
       }
 
       if (bulkSummary) {
@@ -187,6 +203,9 @@
         admissionCode: schedule.admissionCode || "",
         admissionName: schedule.admissionName || "",
         ...Object.fromEntries(scheduleTemplateFieldNames.map(key => [key, schedule[key] || ""])),
+        applicantSubmissionEditEnabled: schedule.applicantSubmissionEditEnabled === true,
+        examNoDigitCount: String(schedule.examNoSettings?.digitCount || 10),
+        ...Object.fromEntries(Array.from({length:5}, (_,index) => ['examNoComponent' + index, schedule.examNoSettings?.components?.[index] || ''])),
         ...Object.fromEntries(scheduleEnabledFieldNames.map(key => [key, schedule[key] !== false])),
         applicantScheduleStartAt: schedule.applicantScheduleStartAt || "",
         applicantScheduleEndAt: schedule.applicantScheduleEndAt || "",
@@ -221,7 +240,10 @@
         isSaving: false,
         targetScheduleKeys: selectedSchedules.map((schedule) => getApplicantScheduleKey(schedule)),
         ...sharedScheduleValues,
-        ...Object.fromEntries(scheduleTemplateFieldNames.map(key => [key, getSharedApplicantScheduleValue(selectedSchedules, key)])),
+        applicantSubmissionEditEnabled: (() => { const values = new Set(selectedSchedules.map(schedule => schedule.applicantSubmissionEditEnabled === true)); return values.size === 1 ? values.values().next().value : null; })(),
+        examNoDigitCount: '',
+        ...Object.fromEntries(Array.from({length:5}, (_,index) => ['examNoComponent' + index, '__keep__'])),
+        ...Object.fromEntries(scheduleTemplateFieldNames.map(key => [key, key === 'admitCardTemplateId' ? '__keep__' : getSharedApplicantScheduleValue(selectedSchedules, key)])),
         ...Object.fromEntries(scheduleEnabledFieldNames.map(key => { const values = new Set(selectedSchedules.map(schedule => schedule[key] !== false)); return [key, values.size === 1 ? values.values().next().value : null]; })),
       };
       renderView();
@@ -238,9 +260,21 @@
 
       state.applicantManager.scheduleEditor = {
         ...editorState,
-        [fieldName]: scheduleEnabledFieldNames.includes(fieldName) ? value === true : String(value ?? ""),
+        [fieldName]: scheduleBooleanFieldNames.includes(fieldName) ? value === true : String(value ?? ""),
       };
-      if (scheduleEnabledFieldNames.includes(fieldName)) syncApplicantScheduleModalForm();
+      if (scheduleBooleanFieldNames.includes(fieldName)) syncApplicantScheduleModalForm();
+    }
+
+    function buildAdmissionSettings(editorState, schedule = {}) {
+      const isBulk = editorState.isBulk === true;
+      return {
+        admitCardTemplateId: isBulk && editorState.admitCardTemplateId === '__keep__' ? schedule.admitCardTemplateId || null : editorState.admitCardTemplateId || null,
+        applicantSubmissionEditEnabled: isBulk && editorState.applicantSubmissionEditEnabled === null ? schedule.applicantSubmissionEditEnabled === true : editorState.applicantSubmissionEditEnabled === true,
+        examNoSettings: {
+          digitCount: Number(isBulk && !editorState.examNoDigitCount ? schedule.examNoSettings?.digitCount || 10 : editorState.examNoDigitCount),
+          components: Array.from({length:5}, (_,index) => isBulk && editorState['examNoComponent' + index] === '__keep__' ? schedule.examNoSettings?.components?.[index] || '' : editorState['examNoComponent' + index] || ''),
+        },
+      };
     }
 
     async function saveApplicantSchedule() {
@@ -283,7 +317,8 @@
                 admissionCode: schedule.admissionCode,
                 admissionName: schedule.admissionName,
                 ...scheduleValues,
-                ...Object.fromEntries(scheduleTemplateFieldNames.map(key => [key, Number(editorState[key] || schedule[key])])),
+                ...buildAdmissionSettings(editorState, schedule),
+                ...Object.fromEntries(scheduleTemplateFieldNames.filter(key => key !== 'admitCardTemplateId').map(key => [key, Number(editorState[key] || schedule[key])])),
                 ...Object.fromEntries(scheduleEnabledFieldNames.map(key => [key, editorState[key] === null ? schedule[key] !== false : editorState[key] !== false])),
               })),
             }),
@@ -303,7 +338,8 @@
               admissionCode: editorState.admissionCode,
               admissionName: editorState.admissionName,
               ...scheduleValues,
-              ...Object.fromEntries(scheduleTemplateFieldNames.map(key => [key, Number(editorState[key])])),
+              ...buildAdmissionSettings(editorState),
+              ...Object.fromEntries(scheduleTemplateFieldNames.filter(key => key !== 'admitCardTemplateId').map(key => [key, Number(editorState[key])])),
               ...Object.fromEntries(scheduleEnabledFieldNames.map(key => [key, editorState[key] !== false])),
             }),
           });
@@ -311,7 +347,7 @@
 
         await requestCloseModal?.("applicantScheduleModal");
         await refreshApplicantBootstrap(
-          editorState.isBulk === true ? `${targetSchedules.length}개 전형의 일정을 저장했습니다.` : "일정을 저장했습니다.",
+          editorState.isBulk === true ? `${targetSchedules.length}개 전형의 설정을 저장했습니다.` : "전형 설정을 저장했습니다.",
         );
       } catch (error) {
         if (handleAuthenticationFailure(error)) {

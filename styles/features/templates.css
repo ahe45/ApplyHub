@@ -1,4 +1,6 @@
 /* Template cards, previews, and editor surfaces */
+.template-recruitment-link { margin: 12px 0; }
+.template-recruitment-link select { width: 100%; }
 
 .template-grid {
   --template-card-scale: 0.56;

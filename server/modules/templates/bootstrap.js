@@ -15,6 +15,7 @@ function createTemplateBootstrapService({
         version_label VARCHAR(100) NOT NULL,
         status ENUM('used', 'unused') NOT NULL DEFAULT 'unused',
         content_html MEDIUMTEXT NOT NULL,
+        recruitment_schedule_id BIGINT UNSIGNED NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id)
@@ -28,6 +29,28 @@ function createTemplateBootstrapService({
         ALTER TABLE templates
         ADD COLUMN description VARCHAR(255) NOT NULL DEFAULT '' AFTER name
       `);
+    }
+    if (!(await query("SHOW COLUMNS FROM templates LIKE 'recruitment_schedule_id'")).length) {
+      await query('ALTER TABLE templates ADD COLUMN recruitment_schedule_id BIGINT UNSIGNED NULL AFTER content_html');
+    }
+  }
+
+  async function migrateAdmissionSettings() {
+    if (!(await query("SELECT setting_value FROM system_set WHERE setting_key = 'admissionTemplateSettingsMigrated'")).length) {
+      await query(`INSERT INTO app_schedule (track_name, admission_code, admission_name)
+        SELECT DISTINCT track_name, admission_code, admission_name FROM app_unit
+        ON DUPLICATE KEY UPDATE id = app_schedule.id`);
+      await query(`UPDATE app_schedule s SET
+        admit_card_template_id = COALESCE(
+          (SELECT id FROM templates WHERE recruitment_schedule_id = s.id AND status = 'used' ORDER BY updated_at DESC LIMIT 1),
+          (SELECT id FROM templates WHERE recruitment_schedule_id IS NULL AND status = 'used' ORDER BY updated_at DESC LIMIT 1)),
+        applicant_submission_edit_enabled = COALESCE((SELECT setting_value = 'true' FROM system_set WHERE setting_key = 'applicantSubmissionEditEnabled'), 0),
+        exam_no_settings_json = JSON_OBJECT(
+          'digitCount', COALESCE((SELECT CAST(setting_value AS UNSIGNED) FROM system_set WHERE setting_key = 'applicantExamNoDigitCount'), 10),
+          'components', JSON_EXTRACT(COALESCE((SELECT setting_value FROM system_set WHERE setting_key = 'applicantExamNoComponentsJson'), '["admissionCode","seriesCode","unitCode","sequence",""]'), '$'),
+          'examNoPattern', COALESCE((SELECT setting_value FROM system_set WHERE setting_key = 'applicantExamNoPattern'), '{SEQ:10}'),
+          'examNoSequenceStart', COALESCE((SELECT CAST(setting_value AS UNSIGNED) FROM system_set WHERE setting_key = 'applicantExamNoSequenceStart'), 1))`);
+      await query("INSERT INTO system_set (setting_key, setting_value) VALUES ('admissionTemplateSettingsMigrated', 'true')");
     }
   }
 
@@ -156,6 +179,7 @@ function createTemplateBootstrapService({
 
   return Object.freeze({
     ensureTemplateSchema,
+    migrateAdmissionSettings,
     migrateLegacyTemplateTagMarkup,
     migrateTemplateTagSchema,
     normalizeTemplateSeed,

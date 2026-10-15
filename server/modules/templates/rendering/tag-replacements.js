@@ -1,3 +1,4 @@
+const { formatDate, getTagValue } = require('../../../../shared/domain/template-data');
 function createTemplateTagReplacementService({
   buildExamineePhotoMarkup,
   escapeHtml,
@@ -6,7 +7,7 @@ function createTemplateTagReplacementService({
   stripTemplateTokenDecorationMarkup,
   templateTagDefinitions,
 }) {
-  function getTemplateTagReplacement(definition, examinee) {
+  function getTemplateTagReplacement(definition, examinee, dateFormat = '') {
     if (definition.token === "@{수험생사진}") {
       return buildExamineePhotoMarkup(examinee);
     }
@@ -22,10 +23,11 @@ function createTemplateTagReplacementService({
     };
 
     if (definition.examineeKey === "currentDate") {
-      return wrapTemplateTextValue(examinee?.currentDate || formatDateAsYmd(new Date()));
+      return wrapTemplateTextValue(formatDate(examinee?.currentDate || formatDateAsYmd(new Date()), dateFormat));
     }
 
-    return wrapTemplateTextValue(examinee[definition.examineeKey] ?? "");
+    const value = getTagValue(examinee, definition);
+    return wrapTemplateTextValue(formatDate(value, dateFormat));
   }
 
   function getTemplateTagEditorText(definition) {
@@ -45,7 +47,7 @@ function createTemplateTagReplacementService({
       return escapeHtml(String(examinee?.currentDate || formatDateAsYmd(new Date())));
     }
 
-    return escapeHtml(String(examinee[definition.examineeKey] ?? ""));
+    return escapeHtml(getTagValue(examinee, definition));
   }
 
   function findTemplateTagDefinitionByValue(rawValue) {
@@ -76,7 +78,8 @@ function createTemplateTagReplacementService({
       return buildExamineePhotoMarkup(examinee);
     }
 
-    const replacementMarkup = getTemplateTagReplacement(definition, examinee);
+    const dateFormat = /\bdata-template-tag-format=(["'])([^"']*)\1/i.exec(tokenMarkup)?.[2] || '';
+    const replacementMarkup = getTemplateTagReplacement(definition, examinee, dateFormat);
 
     if (!replacementMarkup) {
       return "";
@@ -85,11 +88,19 @@ function createTemplateTagReplacementService({
     const cleanedMarkup = stripTemplateTokenDecorationMarkup(tokenMarkup);
     const editorTagText = getTemplateTagEditorText(definition);
 
-    if (cleanedMarkup && editorTagText && cleanedMarkup.includes(editorTagText)) {
-      return cleanedMarkup.replaceAll(editorTagText, replacementMarkup);
+    for (const text of [editorTagText, escapeHtml(String(definition?.label || ''))].filter(Boolean)) {
+      let matched = false;
+      const styled = cleanedMarkup.replace(/>([^<>]*)</g, (markup, value) => {
+        if (!value.includes(text)) return markup;
+        matched = true;
+        return `>${value.replaceAll(text, replacementMarkup)}<`;
+      });
+      if (matched) return styled;
     }
 
-    return replacementMarkup;
+    // Preserve the outer token's formatting even when its displayed text is a sample.
+    const openingEnd = cleanedMarkup.indexOf('>');
+    return openingEnd >= 0 ? `${cleanedMarkup.slice(0, openingEnd + 1)}${replacementMarkup}</span>` : replacementMarkup;
   }
 
   function replaceStyledTemplateTagMarkup(markup, examinee) {

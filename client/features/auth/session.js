@@ -46,6 +46,7 @@
       const showAdminChrome = isAuthenticated && !isLoginPage();
 
       appShell?.classList.toggle("auth-locked", !showAdminChrome);
+      document.body.classList.toggle('admin-ui', showAdminChrome);
       pageShell?.classList.toggle("auth-only", !showAdminChrome);
       sidebar?.classList.toggle("hidden", !showAdminChrome);
       topbar?.classList.toggle("hidden", !showAdminChrome);

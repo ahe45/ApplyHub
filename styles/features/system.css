@@ -1,7 +1,7 @@
 /* System settings and control layouts */
 
 .notice-language-description { margin: 10px 0 16px; color: var(--glass-muted, #526070); font-size: 13px; }
-.notice-bilingual-canvases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; min-width: 0; align-items: start; }
+.notice-bilingual-canvases { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; align-items: start; }
 .notice-bilingual-shell > .editor-toolbar-column { grid-template-rows: auto auto; align-content: start; align-self: start; height: auto; }
 .notice-bilingual-shell > .editor-toolbar-column > .editor-toolbar { height: auto; }
 .notice-language-canvas { min-width: 0; border: 1px solid var(--glass-line, #d7dce2); border-radius: 20px; overflow: hidden; background: var(--glass-surface, #fff); }
@@ -1215,6 +1215,33 @@
   gap: 16px;
 }
 
+.super-admin-setting-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+  width: 100%;
+  max-width: 900px;
+}
+
+.super-admin-setting-row > .super-admin-setting-card { min-width: 0; align-content: start; }
+.super-admin-basic-settings { gap: 24px; }
+.super-admin-basic-settings .super-admin-setting-row > .super-admin-setting-card { border: 0; border-radius: 0; padding: 0; background: transparent; box-shadow: none; }
+.super-admin-basic-settings .super-admin-setting-row + .super-admin-setting-row { border-top: 1px solid rgba(var(--glass-line-rgb), .8); padding-top: 24px; }
+.super-admin-setting-row .system-settings-section-head { display: grid; gap: 4px; align-content: start; min-height: 68px; }
+.super-admin-setting-row .super-admin-text-field { width: 100%; max-width: 360px; }
+.super-admin-setting-row .field:has(#systemSettingsInitialPassword) { max-width: 240px; }
+.super-admin-setting-row .field:has(#systemSettingsAutoLogoutMinutes) { max-width: 160px; }
+.super-admin-image-row .super-admin-image-layout { grid-template-columns: minmax(0, 1fr); }
+.super-admin-image-field { min-width: 0; gap: 7px; }
+.super-admin-image-row :is(.super-admin-logo-preview, .super-admin-background-preview) { max-width: 360px; }
+.super-admin-image-row .super-admin-logo-preview { min-height: 220px; }
+.super-admin-image-row .super-admin-image-actions { display: flex; flex-wrap: wrap; }
+
+@media (max-width: 1000px) {
+  .super-admin-setting-row { grid-template-columns: minmax(0, 1fr); }
+}
+
 .super-admin-setting-card {
   display: grid;
   gap: 16px;
@@ -1522,13 +1549,14 @@
 .system-settings-view .section-header { gap: 12px 20px; }
 .system-settings-view .section-header > button { flex-shrink: 0; }
 .email-settings-layout { display: grid; gap: 20px; }
-.email-settings-card .settings-field-pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.email-settings-card .settings-field-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; max-width: 740px; }
 :is(.system-settings-view, .email-settings-card) .field { min-width: 0; gap: 7px; }
 .settings-field-label { font-size: .85rem; font-weight: 600; }
 .email-settings-card .field input, .email-settings-card .field select { width: 100%; min-width: 0; }
 .email-settings-card .field { width: 100%; max-width: 420px; }
 .email-settings-card .field:has([name="port"]) { max-width: 140px; }
 .email-settings-card .field:has([name="security"]) { max-width: 240px; }
+.email-settings-card .field:has([name="user"]),
 .email-settings-card .field:has([name="fromName"]) { max-width: 320px; }
 .settings-group-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 14px; }
 .system-settings-view .settings-group-heading h4 { margin: 0; }
@@ -1541,16 +1569,48 @@
 .settings-logo-actions input[type="file"] { width: 240px; max-width: 100%; min-width: 0; flex: 1 1 200px; font-size: .78rem; }
 .settings-logo-actions button { flex-shrink: 0; min-height: 34px; padding: 6px 10px; font-size: .76rem; }
 applyhub-email-settings { display: block; min-width: 0; }
+applyhub-translation-settings { display: block; min-width: 0; }
+.translation-settings-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.translation-settings-provider { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-bottom: 16px; }
+.translation-settings-card .field { max-width: 520px; min-width: 0; gap: 7px; }
+.translation-settings-card input { width: 100%; min-width: 0; }
+.translation-settings-fields .form-actions { justify-content: flex-start; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(var(--glass-line-rgb), .8); }
+.translation-settings-note { margin: 10px 0 0; line-height: 1.5; }
+.translation-settings-card .system-settings-status:empty { display: none; }
 .email-settings-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
-.email-settings-server-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.email-settings-server-row { display: grid; grid-template-columns: minmax(0, 140px) minmax(0, 240px); gap: 20px; max-width: 400px; }
+.email-settings-server-row .field:has([name="host"]) { grid-column: 1 / -1; }
 .email-password-help { margin: 8px 0 0; font-size: .76rem; line-height: 1.5; }
-.email-settings-fields .form-actions { margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(var(--glass-line-rgb), .8); }
+.email-settings-fields .form-actions { justify-content: flex-start; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(var(--glass-line-rgb), .8); }
 .email-settings-note { margin: 10px 0 0; font-size: .76rem; line-height: 1.5; }
 .email-settings-card .system-settings-status:empty { display: none; }
+.email-settings-card > .system-settings-section-head, .translation-settings-card > .system-settings-section-head { display: flex; align-items: center; justify-content: flex-start; gap: 8px 12px; }
+.email-settings-card > .system-settings-section-head small, .translation-settings-card > .system-settings-section-head small { flex-basis: 100%; }
+.settings-state-badge { display: inline-flex; align-items: center; width: fit-content; padding: 2px 9px; border: 1px solid rgba(var(--glass-line-rgb), .8); border-radius: 999px; font-size: inherit; font-weight: 600; white-space: nowrap; background: var(--glass-surface); color: var(--glass-muted); }
+.settings-state-badge.is-info { color: var(--glass-link); background: rgba(var(--glass-primary-rgb), .08); }
+.settings-state-badge.is-success { color: var(--glass-success); background: var(--glass-success-bg); }
+.settings-state-badge.is-warning { color: var(--glass-warning); background: var(--glass-warning-bg); }
+.settings-state-badge.is-error { color: var(--glass-error); background: var(--glass-error-bg); }
+.settings-secret-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; min-width: 0; }
+.settings-secret-field > .field { min-width: 0; max-width: none; }
+.settings-secret-field > button { width: fit-content; margin: 0; white-space: nowrap; }
+.translation-secret-field { width: 100%; max-width: 640px; }
+.secret-value-dialog { width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 24px; border: 1px solid rgba(var(--glass-line-rgb), .8); border-radius: 20px; background: var(--glass-surface); color: var(--text); box-shadow: var(--glass-shadow); }
+.secret-value-dialog::backdrop { background: rgba(15, 23, 42, .45); }
+.secret-value-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.secret-value-heading h3 { margin: 0; font-size: 1rem; }
+.secret-value-dialog form { display: grid; gap: 16px; }
+.secret-value-dialog .field { min-width: 0; }
+.secret-value-dialog input, .secret-value-dialog textarea { width: 100%; min-width: 0; }
+.secret-value-dialog textarea { overflow-wrap: anywhere; resize: vertical; }
+.secret-value-dialog .form-actions { justify-content: flex-start; }
+.secret-value-dialog [role=status] { margin: 0; }
+.secret-value-dialog [role=status]:empty { display: none; }
 @media (max-width: 1199px) {
   .settings-exam-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) {
+  .email-settings-card .settings-field-pair { grid-template-columns: minmax(0, 1fr); }
   .settings-exam-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .settings-logo-row { align-items: flex-start; gap: 10px; }
   .system-settings-view .section-header { align-items: flex-start; }

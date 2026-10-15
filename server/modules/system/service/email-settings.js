@@ -30,7 +30,7 @@ function createEmailSettingsService({ query, rootDir, env = process.env, createH
       cipher.setAuthTag(Buffer.from(value.tag, 'base64'));
       return Buffer.concat([cipher.update(Buffer.from(value.data, 'base64')), cipher.final()]).toString('utf8');
     } catch {
-      throw createHttpError(503, '저장된 메일 비밀번호를 읽을 수 없습니다. 시스템 설정에서 비밀번호를 다시 입력해 주세요.', 'EMAIL_PASSWORD_UNAVAILABLE');
+      throw createHttpError(503, '저장된 메일 비밀번호를 읽을 수 없습니다. 슈퍼관리자에서 비밀번호를 다시 입력해 주세요.', 'EMAIL_PASSWORD_UNAVAILABLE');
     }
   }
   async function read() {
@@ -115,6 +115,6 @@ function createEmailSettingsService({ query, rootDir, env = process.env, createH
     }
     return cachedSender({...message, schoolName: await getSchoolName()});
   }
-  return {getEmailSettings, updateEmailSettings, checkEmailSettings, sendVerificationEmail};
+  return {getEmailSettings, updateEmailSettings, checkEmailSettings, sendVerificationEmail, getStoredEmailPassword: async () => passwordOf(await read())};
 }
 module.exports = {createEmailSettingsService};

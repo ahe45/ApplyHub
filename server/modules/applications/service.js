@@ -4,6 +4,8 @@ const { allocateExamNumber } = require('./exam-number-sequence');
 const { insertRows } = require('../database/bulk-write');
 const { createFormTemplateService } = require('./form-templates');
 const applicantFormConfig = require("../../../shared/domain/applicant-form");
+const { textValue } = require('../../../shared/domain/template-data');
+const { normalizeSignupSettings } = require('./membership');
 const { randomInt, randomUUID } = require("crypto");
 const AdmZip = require("adm-zip");
 const path = require("path");
@@ -390,10 +392,14 @@ function createApplicantService({
       return {
         items,
         optionsEn: applicantFormConfig.normalizeChoiceTranslations(items, parsedValue.optionsEn),
+        optionsMn: applicantFormConfig.normalizeChoiceTranslations(items, parsedValue.optionsMn),
+        questionTextMn: String(parsedValue.questionTextMn || '').trim(),
+        questionDescriptionMn: String(parsedValue.questionDescriptionMn || '').trim(),
         allowCustomOption,
         customOptionLabel,
         fileNamePattern: String(parsedValue.fileNamePattern || ""),
         dateParts: parsedValue.dateParts,
+        showCountryCode: parsedValue.showCountryCode === true,
         allowedExtensions: Array.isArray(parsedValue.allowedExtensions) ? parsedValue.allowedExtensions : [],
       };
     } catch (error) {
@@ -453,12 +459,16 @@ function createApplicantService({
       questionDescription: String(row.questionDescription || "").trim(),
       questionTextEn: String(row.questionTextEn || "").trim(),
       questionDescriptionEn: String(row.questionDescriptionEn || "").trim(),
+      questionTextMn: optionConfig.questionTextMn || '',
+      questionDescriptionMn: optionConfig.questionDescriptionMn || '',
       inputType: String(row.inputType || "text").trim(),
+      ...(row.inputType === 'phone' ? { showCountryCode: optionConfig.showCountryCode === true } : {}),
       ...(['date', 'daterange'].includes(row.inputType) ? { dateParts: applicantFormConfig.normalizeDateParts(optionConfig.dateParts) } : {}),
       systemFieldKey: String(row.systemFieldKey || "").trim(),
       options,
       optionValuesText: options.join("\n"),
       optionsEn: applicantFormConfig.normalizeChoiceTranslations(options, optionConfig.optionsEn),
+      optionsMn: applicantFormConfig.normalizeChoiceTranslations(options, optionConfig.optionsMn),
       fileNamePattern: optionConfig.fileNamePattern || "",
       allowedExtensions: optionConfig.allowedExtensions || [],
       allowCustomOption: optionConfig.allowCustomOption === true,
@@ -576,14 +586,17 @@ function createApplicantService({
       admissionCode: String(row.admissionCode || "").trim(),
       admissionName: String(row.admissionName || "").trim(),
       admissionNameEn: String(row.admissionNameEn || "").trim(),
+      admissionNameMn: String(row.admissionNameMn || "").trim(),
       seriesCode: String(row.seriesCode || "").trim(),
       seriesName: String(row.seriesName || "").trim(),
       unitCode: String(row.unitCode || "").trim(),
       unitName: String(row.unitName || "").trim(),
       unitNameEn: String(row.unitNameEn || "").trim(),
+      unitNameMn: String(row.unitNameMn || "").trim(),
       majorCode: String(row.majorCode || "").trim(),
       majorName: String(row.majorName || "").trim(),
       majorNameEn: String(row.majorNameEn || "").trim(),
+      majorNameMn: String(row.majorNameMn || "").trim(),
       sortOrder: Number(row.sortOrder || 0),
       createdAt: String(row.createdAt || "").trim(),
       updatedAt: String(row.updatedAt || "").trim(),
@@ -662,8 +675,11 @@ function createApplicantService({
   function normalizeApplicantRecruitmentUnitPayload(payload = {}, existingUnit = {}) {
     return {
       admissionNameEn: normalizeApplicantText(payload.admissionNameEn ?? existingUnit.admissionNameEn, "전형명(영어)", { required: false, maxLength: 200, errorCode: "APPLICANT_RECRUITMENT_ADMISSION_NAME_EN_INVALID" }),
+      admissionNameMn: normalizeApplicantText(payload.admissionNameMn ?? existingUnit.admissionNameMn, "전형명(몽골어)", { required: false, maxLength: 200, errorCode: "APPLICANT_RECRUITMENT_ADMISSION_NAME_MN_INVALID" }),
       unitNameEn: normalizeApplicantText(payload.unitNameEn ?? existingUnit.unitNameEn, "모집단위명(영어)", { required: false, maxLength: 200, errorCode: "APPLICANT_RECRUITMENT_UNIT_NAME_EN_INVALID" }),
+      unitNameMn: normalizeApplicantText(payload.unitNameMn ?? existingUnit.unitNameMn, "모집단위명(몽골어)", { required: false, maxLength: 200, errorCode: "APPLICANT_RECRUITMENT_UNIT_NAME_MN_INVALID" }),
       majorNameEn: normalizeApplicantText(payload.majorNameEn ?? existingUnit.majorNameEn, "전공명(영어)", { required: false, maxLength: 200, errorCode: "APPLICANT_RECRUITMENT_MAJOR_NAME_EN_INVALID" }),
+      majorNameMn: normalizeApplicantText(payload.majorNameMn ?? existingUnit.majorNameMn, "전공명(몽골어)", { required: false, maxLength: 200, errorCode: "APPLICANT_RECRUITMENT_MAJOR_NAME_MN_INVALID" }),
       trackName: normalizeApplicantText(payload.trackName ?? existingUnit.trackName, "모집시기", {
         required: false,
         maxLength: 100,
@@ -957,14 +973,17 @@ function createApplicantService({
           admissionCode: row.admissionCode,
           admissionName: row.admissionName,
           admissionNameEn: row.admissionNameEn,
+          admissionNameMn: row.admissionNameMn,
           seriesCode: row.seriesCode,
           seriesName: row.seriesName,
           unitCode: row.unitCode,
           unitName: row.unitName,
           unitNameEn: row.unitNameEn,
+          unitNameMn: row.unitNameMn,
           majorCode: row.majorCode,
           majorName: row.majorName,
           majorNameEn: row.majorNameEn,
+          majorNameMn: row.majorNameMn,
         });
       }
     });
@@ -1214,6 +1233,9 @@ function createApplicantService({
       id: Number(row.id || 0),
       applicationTemplateId: Number(row.applicationTemplateId || 0),
       documentTemplateId: Number(row.documentTemplateId || 0),
+      admitCardTemplateId: String(row.admitCardTemplateId || ''),
+      applicantSubmissionEditEnabled: row.applicantSubmissionEditEnabled === true || Number(row.applicantSubmissionEditEnabled) === 1,
+      examNoSettings: row.examNoSettings || {},
       scheduleKey: buildApplicantAdmissionScheduleKey(trackName, admissionCode, admissionName),
       trackName,
       admissionCode,
@@ -1299,6 +1321,12 @@ function createApplicantService({
   }
 
   function normalizeApplicantSchedulePayload(payload = {}, existingSchedule = {}) {
+    if (payload.examNoSettings?.components !== undefined) {
+      const components = payload.examNoSettings.components;
+      if (!Array.isArray(components) || components.length > 5 || components.some(key => key && !APPLICANT_EXAM_NO_COMPONENT_TYPES.includes(key)) || components.filter(key => key === 'sequence').length !== 1) {
+        throw createHttpError(400, '수험번호 조합에는 유효한 코드와 순번을 한 번 포함해야 합니다.', 'APPLICANT_EXAM_NO_COMPONENT_SEQUENCE_REQUIRED');
+      }
+    }
     const trackName = normalizeApplicantText(payload.trackName ?? existingSchedule.trackName, "모집시기", {
       required: false,
       maxLength: 100,
@@ -1346,6 +1374,13 @@ function createApplicantService({
       admissionName,
       applicationTemplateId: payload.applicationTemplateId ?? existingSchedule.applicationTemplateId ?? null,
       documentTemplateId: payload.documentTemplateId ?? existingSchedule.documentTemplateId ?? null,
+      admitCardTemplateId: payload.admitCardTemplateId === undefined ? existingSchedule.admitCardTemplateId || null : String(payload.admitCardTemplateId || '').trim() || null,
+      applicantSubmissionEditEnabled: normalizeScheduleEnabled(payload.applicantSubmissionEditEnabled, existingSchedule.applicantSubmissionEditEnabled === true),
+      examNoSettings: {
+        ...existingSchedule.examNoSettings,
+        digitCount: normalizeApplicantExamNoDigitCount(payload.examNoSettings?.digitCount ?? existingSchedule.examNoSettings?.digitCount ?? APPLICANT_DEFAULT_EXAM_NO_DIGIT_COUNT),
+        components: normalizeApplicantExamNoComponents(payload.examNoSettings?.components ?? existingSchedule.examNoSettings?.components ?? APPLICANT_DEFAULT_EXAM_NO_COMPONENTS),
+      },
       applicantScheduleEnabled: normalizeScheduleEnabled(payload.applicantScheduleEnabled, existingSchedule.applicantScheduleEnabled),
       applicantScheduleStartAt: applicantScheduleRange.startAt,
       applicantScheduleEndAt: applicantScheduleRange.endAt,
@@ -1555,7 +1590,7 @@ function createApplicantService({
         setting_key AS settingKey,
         setting_value AS settingValue
       FROM system_set
-      WHERE setting_key IN ('applicantNoticeHtml', 'applicantNoticeHtmlEn')
+      WHERE setting_key IN ('applicantNoticeHtml', 'applicantNoticeHtmlEn', 'applicantNoticeHtmlMn')
     `);
     const rowsByKey = new Map(rows.map((row) => [String(row.settingKey || "").trim(), String(row.settingValue || "")]));
     const storedHtml = String(rowsByKey.get("applicantNoticeHtml") || "");
@@ -1563,6 +1598,7 @@ function createApplicantService({
     return {
       noticeHtml: storedHtml.trim() ? storedHtml : String(getDefaultApplicantNoticeHtml() || "").trim(),
       noticeHtmlEn: String(rowsByKey.get("applicantNoticeHtmlEn") || ""),
+      noticeHtmlMn: String(rowsByKey.get("applicantNoticeHtmlMn") || ""),
     };
   }
 
@@ -1672,14 +1708,17 @@ function createApplicantService({
           admission_code AS admissionCode,
           admission_name AS admissionName,
           admission_name_en AS admissionNameEn,
+          admission_name_mn AS admissionNameMn,
           series_code AS seriesCode,
           series_name AS seriesName,
           unit_code AS unitCode,
           unit_name AS unitName,
           unit_name_en AS unitNameEn,
+          unit_name_mn AS unitNameMn,
           major_code AS majorCode,
           major_name AS majorName,
           major_name_en AS majorNameEn,
+          major_name_mn AS majorNameMn,
           sort_order AS sortOrder,
           COALESCE(DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
           COALESCE(DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), '') AS updatedAt
@@ -1697,6 +1736,9 @@ function createApplicantService({
       `
         SELECT
           COALESCE(schedule.id, 0) AS id,
+          schedule.admit_card_template_id AS admitCardTemplateId,
+          COALESCE(schedule.applicant_submission_edit_enabled, (SELECT setting_value = 'true' FROM system_set WHERE setting_key = 'applicantSubmissionEditEnabled'), 0) AS applicantSubmissionEditEnabled,
+          schedule.exam_no_settings_json AS examNoSettingsJson,
           COALESCE(schedule.application_template_id, (SELECT id FROM app_form_template WHERE form_scope = 'application' AND is_default = 1)) AS applicationTemplateId,
           COALESCE(schedule.document_template_id, (SELECT id FROM app_form_template WHERE form_scope = 'documents' AND is_default = 1)) AS documentTemplateId,
           grouped_units.track_name AS trackName,
@@ -1739,7 +1781,12 @@ function createApplicantService({
       `,
     );
 
-    return rows.map(normalizeApplicantScheduleRecord);
+    const defaults = await getApplicantSettings({ queryable: options.queryable || query });
+    return rows.map(row => {
+      let overrides = {};
+      try { overrides = JSON.parse(row.examNoSettingsJson || '{}'); } catch {}
+      return normalizeApplicantScheduleRecord({ ...row, examNoSettings: { ...defaults, ...overrides } });
+    });
   }
 
   async function getApplicantRecruitmentUnitById(unitId, options = {}) {
@@ -1757,14 +1804,17 @@ function createApplicantService({
           admission_code AS admissionCode,
           admission_name AS admissionName,
           admission_name_en AS admissionNameEn,
+          admission_name_mn AS admissionNameMn,
           series_code AS seriesCode,
           series_name AS seriesName,
           unit_code AS unitCode,
           unit_name AS unitName,
           unit_name_en AS unitNameEn,
+          unit_name_mn AS unitNameMn,
           major_code AS majorCode,
           major_name AS majorName,
           major_name_en AS majorNameEn,
+          major_name_mn AS majorNameMn,
           sort_order AS sortOrder,
           COALESCE(DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
           COALESCE(DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s'), '') AS updatedAt
@@ -1786,6 +1836,9 @@ function createApplicantService({
   async function resolveScheduleTemplates(schedule) {
     schedule.applicationTemplateId = await formTemplates.resolve('application', schedule.applicationTemplateId);
     schedule.documentTemplateId = await formTemplates.resolve('documents', schedule.documentTemplateId);
+    if (schedule.admitCardTemplateId && !(await query('SELECT id FROM templates WHERE id = ?', [schedule.admitCardTemplateId])).length) {
+      throw createHttpError(400, '수험표 양식을 찾을 수 없습니다.', 'ADMIT_CARD_TEMPLATE_INVALID');
+    }
   }
 
   async function saveApplicantSchedule(payload = {}) {
@@ -1827,9 +1880,10 @@ function createApplicantService({
           document_review_schedule_end_at,
           admit_card_lookup_schedule_enabled,
           admit_card_lookup_schedule_start_at,
-          admit_card_lookup_schedule_end_at
+          admit_card_lookup_schedule_end_at,
+          admit_card_template_id, applicant_submission_edit_enabled, exam_no_settings_json
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           application_template_id = VALUES(application_template_id),
           document_template_id = VALUES(document_template_id),
@@ -1844,7 +1898,10 @@ function createApplicantService({
           document_review_schedule_end_at = VALUES(document_review_schedule_end_at),
           admit_card_lookup_schedule_enabled = VALUES(admit_card_lookup_schedule_enabled),
           admit_card_lookup_schedule_start_at = VALUES(admit_card_lookup_schedule_start_at),
-          admit_card_lookup_schedule_end_at = VALUES(admit_card_lookup_schedule_end_at)
+          admit_card_lookup_schedule_end_at = VALUES(admit_card_lookup_schedule_end_at),
+          admit_card_template_id = VALUES(admit_card_template_id),
+          applicant_submission_edit_enabled = VALUES(applicant_submission_edit_enabled),
+          exam_no_settings_json = VALUES(exam_no_settings_json)
       `,
       [
         normalizedPayload.applicationTemplateId,
@@ -1864,6 +1921,9 @@ function createApplicantService({
         normalizedPayload.admitCardLookupScheduleEnabled ? 1 : 0,
         normalizedPayload.admitCardLookupScheduleStartAt || null,
         normalizedPayload.admitCardLookupScheduleEndAt || null,
+        normalizedPayload.admitCardTemplateId,
+        normalizedPayload.applicantSubmissionEditEnabled ? 1 : 0,
+        JSON.stringify(normalizedPayload.examNoSettings),
       ],
     );
 
@@ -1951,9 +2011,10 @@ function createApplicantService({
               document_review_schedule_end_at,
               admit_card_lookup_schedule_enabled,
               admit_card_lookup_schedule_start_at,
-              admit_card_lookup_schedule_end_at
+              admit_card_lookup_schedule_end_at,
+              admit_card_template_id, applicant_submission_edit_enabled, exam_no_settings_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
               application_template_id = VALUES(application_template_id),
               document_template_id = VALUES(document_template_id),
@@ -1968,7 +2029,10 @@ function createApplicantService({
               document_review_schedule_end_at = VALUES(document_review_schedule_end_at),
               admit_card_lookup_schedule_enabled = VALUES(admit_card_lookup_schedule_enabled),
               admit_card_lookup_schedule_start_at = VALUES(admit_card_lookup_schedule_start_at),
-              admit_card_lookup_schedule_end_at = VALUES(admit_card_lookup_schedule_end_at)
+              admit_card_lookup_schedule_end_at = VALUES(admit_card_lookup_schedule_end_at),
+              admit_card_template_id = VALUES(admit_card_template_id),
+              applicant_submission_edit_enabled = VALUES(applicant_submission_edit_enabled),
+              exam_no_settings_json = VALUES(exam_no_settings_json)
           `,
           [
             normalizedSchedule.applicationTemplateId,
@@ -1988,6 +2052,9 @@ function createApplicantService({
             normalizedSchedule.admitCardLookupScheduleEnabled ? 1 : 0,
             normalizedSchedule.admitCardLookupScheduleStartAt || null,
             normalizedSchedule.admitCardLookupScheduleEndAt || null,
+            normalizedSchedule.admitCardTemplateId,
+            normalizedSchedule.applicantSubmissionEditEnabled ? 1 : 0,
+            JSON.stringify(normalizedSchedule.examNoSettings),
           ],
         );
       }
@@ -2117,6 +2184,9 @@ function createApplicantService({
     const required = payload.required ?? existingField.required ?? false;
     const options = normalizeApplicantOptionValues(payload, existingField);
     const optionsEn = applicantFormConfig.normalizeChoiceTranslations(options, payload.optionsEn ?? existingField.optionsEn);
+    const optionsMn = applicantFormConfig.normalizeChoiceTranslations(options, payload.optionsMn ?? existingField.optionsMn);
+    const questionTextMn = normalizeApplicantText(payload.questionTextMn ?? existingField.questionTextMn, '질문 제목 (몽골어)', { required:false,maxLength:255 });
+    const questionDescriptionMn = normalizeApplicantText(payload.questionDescriptionMn ?? existingField.questionDescriptionMn, '질문 설명 (몽골어)', { required:false,maxLength:500 });
     const customOptionLabel = normalizeApplicantCustomOptionLabel(payload, existingField);
     const allowCustomOption = normalizeApplicantAllowCustomOption(payload, existingField) || Boolean(customOptionLabel);
     const fieldKey = String(existingField.fieldKey || payload.fieldKey || `${buildApplicantFieldKey(questionText).slice(0, 45)}-${randomUUID().slice(0, 8)}`).trim();
@@ -2175,12 +2245,16 @@ function createApplicantService({
       questionDescription,
       questionTextEn,
       questionDescriptionEn,
+      questionTextMn,
+      questionDescriptionMn,
       inputType,
       ...fileSettings,
       ...dateSettings,
+      ...(inputType === 'phone' ? { showCountryCode: (payload.showCountryCode ?? existingField.showCountryCode) === true } : {}),
       systemFieldKey,
       options,
       optionsEn,
+      optionsMn,
       allowCustomOption,
       customOptionLabel,
       required: required === true || required === "true" || Number(required) === 1,
@@ -2228,7 +2302,11 @@ function createApplicantService({
         JSON.stringify({
           items: normalizedPayload.options,
           dateParts: normalizedPayload.dateParts,
+          showCountryCode: normalizedPayload.showCountryCode === true,
           optionsEn: normalizedPayload.optionsEn,
+          optionsMn: normalizedPayload.optionsMn,
+          questionTextMn: normalizedPayload.questionTextMn,
+          questionDescriptionMn: normalizedPayload.questionDescriptionMn,
           allowCustomOption: normalizedPayload.allowCustomOption === true,
           customOptionLabel: normalizedPayload.customOptionLabel,
           fileNamePattern: normalizedPayload.fileNamePattern,
@@ -2279,7 +2357,11 @@ function createApplicantService({
         JSON.stringify({
           items: normalizedPayload.options,
           dateParts: normalizedPayload.dateParts,
+          showCountryCode: normalizedPayload.showCountryCode === true,
           optionsEn: normalizedPayload.optionsEn,
+          optionsMn: normalizedPayload.optionsMn,
+          questionTextMn: normalizedPayload.questionTextMn,
+          questionDescriptionMn: normalizedPayload.questionDescriptionMn,
           allowCustomOption: normalizedPayload.allowCustomOption === true,
           customOptionLabel: normalizedPayload.customOptionLabel,
           fileNamePattern: normalizedPayload.fileNamePattern,
@@ -2409,31 +2491,37 @@ function createApplicantService({
           admission_code,
           admission_name,
           admission_name_en,
+          admission_name_mn,
           series_code,
           series_name,
           unit_code,
           unit_name,
           unit_name_en,
+          unit_name_mn,
           major_code,
           major_name,
           major_name_en,
+          major_name_mn,
           sort_order
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         normalizedPayload.trackName,
         normalizedPayload.admissionCode,
         normalizedPayload.admissionName,
         normalizedPayload.admissionNameEn,
+        normalizedPayload.admissionNameMn,
         normalizedPayload.seriesCode,
         normalizedPayload.seriesName,
         normalizedPayload.unitCode,
         normalizedPayload.unitName,
         normalizedPayload.unitNameEn,
+        normalizedPayload.unitNameMn,
         normalizedPayload.majorCode,
         normalizedPayload.majorName,
         normalizedPayload.majorNameEn,
+        normalizedPayload.majorNameMn,
         nextSortOrder,
       ],
     );
@@ -2455,14 +2543,17 @@ function createApplicantService({
           admission_code = ?,
           admission_name = ?,
           admission_name_en = ?,
+          admission_name_mn = ?,
           series_code = ?,
           series_name = ?,
           unit_code = ?,
           unit_name = ?,
           unit_name_en = ?,
+          unit_name_mn = ?,
           major_code = ?,
           major_name = ?,
-          major_name_en = ?
+          major_name_en = ?,
+          major_name_mn = ?
         WHERE id = ?
       `,
       [
@@ -2470,14 +2561,17 @@ function createApplicantService({
         normalizedPayload.admissionCode,
         normalizedPayload.admissionName,
         normalizedPayload.admissionNameEn,
+        normalizedPayload.admissionNameMn,
         normalizedPayload.seriesCode,
         normalizedPayload.seriesName,
         normalizedPayload.unitCode,
         normalizedPayload.unitName,
         normalizedPayload.unitNameEn,
+        normalizedPayload.unitNameMn,
         normalizedPayload.majorCode,
         normalizedPayload.majorName,
         normalizedPayload.majorNameEn,
+        normalizedPayload.majorNameMn,
         existingUnit.id,
       ],
     );
@@ -2560,43 +2654,52 @@ function createApplicantService({
               admission_code,
               admission_name,
               admission_name_en,
+              admission_name_mn,
               series_code,
               series_name,
               unit_code,
               unit_name,
               unit_name_en,
+              unit_name_mn,
               major_code,
               major_name,
               major_name_en,
+              major_name_mn,
               sort_order
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
               track_name = VALUES(track_name),
               admission_name = VALUES(admission_name),
               admission_name_en = VALUES(admission_name_en),
+              admission_name_mn = VALUES(admission_name_mn),
               series_code = VALUES(series_code),
               series_name = VALUES(series_name),
               unit_code = VALUES(unit_code),
               unit_name = VALUES(unit_name),
               unit_name_en = VALUES(unit_name_en),
+              unit_name_mn = VALUES(unit_name_mn),
               major_code = VALUES(major_code),
               major_name = VALUES(major_name),
-              major_name_en = VALUES(major_name_en)
+              major_name_en = VALUES(major_name_en),
+              major_name_mn = VALUES(major_name_mn)
           `,
           [
             row.trackName,
             row.admissionCode,
             row.admissionName,
             row.admissionNameEn,
+            row.admissionNameMn,
             row.seriesCode,
             row.seriesName,
             row.unitCode,
             row.unitName,
             row.unitNameEn,
+            row.unitNameMn,
             row.majorCode,
             row.majorName,
             row.majorNameEn,
+            row.majorNameMn,
             nextSortOrder,
           ],
         );
@@ -2690,6 +2793,7 @@ function createApplicantService({
         fieldKey,
         questionText: String(syntheticSelectionField?.questionText || row.questionText || fieldKey).trim(),
         questionTextEn: String(row.questionTextEn || "").trim(),
+        questionTextMn: String(row.questionTextMn || "").trim(),
         inputType,
         systemFieldKey: String(syntheticSelectionField?.systemFieldKey || row.systemFieldKey || "").trim(),
         value: {
@@ -2716,6 +2820,7 @@ function createApplicantService({
         fieldKey,
         questionText: String(syntheticSelectionField?.questionText || row.questionText || fieldKey).trim(),
         questionTextEn: String(row.questionTextEn || "").trim(),
+        questionTextMn: String(row.questionTextMn || "").trim(),
         inputType,
         systemFieldKey: String(syntheticSelectionField?.systemFieldKey || row.systemFieldKey || "").trim(),
         value: {
@@ -2737,6 +2842,7 @@ function createApplicantService({
       fieldKey,
       questionText: String(syntheticSelectionField?.questionText || row.questionText || fieldKey).trim(),
       questionTextEn: String(row.questionTextEn || "").trim(),
+      questionTextMn: String(row.questionTextMn || "").trim(),
       inputType: syntheticSelectionField ? "text" : inputType,
       systemFieldKey: String(syntheticSelectionField?.systemFieldKey || row.systemFieldKey || "").trim(),
       value: inputType === "multiselect" ? applicantFormConfig.parseMultiSelectValue(row.answerData) : String(row.answerData ?? "").trim(),
@@ -2757,6 +2863,7 @@ function createApplicantService({
             fieldKey: String(answerItem.fieldKey || "").trim(),
             questionText: String(answerItem.questionText || answerItem.fieldKey || "").trim(),
             questionTextEn: String(answerItem.questionTextEn || "").trim(),
+            questionTextMn: String(answerItem.questionTextMn || "").trim(),
             inputType: "photo",
             systemFieldKey: String(answerItem.systemFieldKey || "").trim(),
             value: {
@@ -2774,6 +2881,7 @@ function createApplicantService({
             fieldKey: String(answerItem.fieldKey || "").trim(),
             questionText: String(answerItem.questionText || answerItem.fieldKey || "").trim(),
             questionTextEn: String(answerItem.questionTextEn || "").trim(),
+            questionTextMn: String(answerItem.questionTextMn || "").trim(),
             inputType: "file",
             systemFieldKey: String(answerItem.systemFieldKey || "").trim(),
             value: {
@@ -2788,6 +2896,7 @@ function createApplicantService({
           fieldKey: String(answerItem.fieldKey || "").trim(),
           questionText: String(answerItem.questionText || answerItem.fieldKey || "").trim(),
           questionTextEn: String(answerItem.questionTextEn || "").trim(),
+          questionTextMn: String(answerItem.questionTextMn || "").trim(),
           inputType: String(answerItem.inputType || "text").trim(),
           systemFieldKey: String(answerItem.systemFieldKey || "").trim(),
           value: answerItem.inputType === "multiselect" ? applicantFormConfig.parseMultiSelectValue(answerItem.value) : String(answerItem.value ?? "").trim(),
@@ -2842,6 +2951,16 @@ function createApplicantService({
     const photoAnswerItem = answerItems.find((answerItem) => answerItem.inputType === "photo") || null;
     const fieldOverrides = normalizeStoredTicketOverrides(firstRow.fieldOverridesJson);
     const systemValues = buildApplicantSystemValueMap(answerItems);
+    const memberProfile = JSON.parse(firstRow.memberProfileJson || '{}');
+    const signupSettings = normalizeSignupSettings(JSON.parse(firstRow.signupSettingsJson || '{}'));
+    const memberBirth = applicantFormConfig.getMemberBirthDate(
+      { profile: memberProfile }, signupSettings.questions || signupSettings.extraFields || [],
+    );
+    const signupAnswers = Object.fromEntries((signupSettings.questions || signupSettings.extraFields || [])
+      .filter(question => question.inputType !== 'password' && !['password', '__proto__', 'constructor', 'prototype'].includes(question.key))
+      .map(question => [question.key, textValue(question.key === 'name' ? firstRow.memberName || firstRow.applicantName : question.key === 'email' ? firstRow.memberEmail || firstRow.email : memberProfile[question.key])]));
+    const applicationAnswers = Object.fromEntries(answerItems.filter(answer => normalizedRows.some(row => row.fieldKey === answer.fieldKey && row.answerFormScope === 'application'))
+      .map(answer => [answer.fieldKey, textValue(answer.value)]));
 
     return {
       id: Number(firstRow.id || 0),
@@ -2855,7 +2974,9 @@ function createApplicantService({
       photoFileName: String(photoAnswerItem?.value?.fileName || "").trim(),
       createdAt: String(firstRow.createdAt || "").trim(),
       updatedAt: String(firstRow.updatedAt || "").trim(),
-      birth: systemValues.birth,
+      birth: memberBirth || systemValues.birth,
+      signupAnswers,
+      applicationAnswers,
       track: systemValues.track,
       admission: systemValues.admission,
       series: systemValues.series,
@@ -2919,10 +3040,14 @@ function createApplicantService({
           s.answer_data AS answerData,
           COALESCE(ff.question_text, s.field_key) AS questionText,
           COALESCE(ff.question_text_en, '') AS questionTextEn,
+          COALESCE(IF(JSON_VALID(ff.options_json), JSON_UNQUOTE(JSON_EXTRACT(ff.options_json,'$.questionTextMn')), ''), '') AS questionTextMn,
           COALESCE(ff.input_type, 'text') AS inputType,
           COALESCE(ff.system_field_key, '') AS systemFieldKey,
           COALESCE(meta.examinee_no, '') AS examineeNo,
           meta.member_id AS memberId,
+          member.profile_json AS memberProfileJson,
+          member.name AS memberName, member.email AS memberEmail, ff.form_scope AS answerFormScope,
+          signup.setting_value AS signupSettingsJson,
           COALESCE(meta.field_overrides_json, '') AS fieldOverridesJson,
           COALESCE(DATE_FORMAT(summary.created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
           COALESCE(DATE_FORMAT(summary.updated_at, '%Y-%m-%d %H:%i:%s'), '') AS updatedAt,
@@ -2940,6 +3065,8 @@ function createApplicantService({
           ON summary.id = s.id
         LEFT JOIN app_meta meta
           ON meta.id = s.id
+        LEFT JOIN applicant_members member ON member.id = meta.member_id
+        LEFT JOIN system_set signup ON signup.setting_key = 'applicantSignupSettings'
         LEFT JOIN app_form ff
           ON ff.field_key = s.field_key
         WHERE s.id = ?
@@ -2968,10 +3095,14 @@ function createApplicantService({
           s.answer_data AS answerData,
           COALESCE(ff.question_text, s.field_key) AS questionText,
           COALESCE(ff.question_text_en, '') AS questionTextEn,
+          COALESCE(IF(JSON_VALID(ff.options_json), JSON_UNQUOTE(JSON_EXTRACT(ff.options_json,'$.questionTextMn')), ''), '') AS questionTextMn,
           COALESCE(ff.input_type, 'text') AS inputType,
           COALESCE(ff.system_field_key, '') AS systemFieldKey,
           COALESCE(meta.examinee_no, '') AS examineeNo,
           meta.member_id AS memberId,
+          member.profile_json AS memberProfileJson,
+          member.name AS memberName, member.email AS memberEmail, ff.form_scope AS answerFormScope,
+          signup.setting_value AS signupSettingsJson,
           COALESCE(meta.field_overrides_json, '') AS fieldOverridesJson,
           COALESCE(DATE_FORMAT(summary.created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
           COALESCE(DATE_FORMAT(summary.updated_at, '%Y-%m-%d %H:%i:%s'), '') AS updatedAt,
@@ -2989,6 +3120,8 @@ function createApplicantService({
           ON summary.id = s.id
         LEFT JOIN app_meta meta
           ON meta.id = s.id
+        LEFT JOIN applicant_members member ON member.id = meta.member_id
+        LEFT JOIN system_set signup ON signup.setting_key = 'applicantSignupSettings'
         LEFT JOIN app_form ff
           ON ff.field_key = s.field_key
         WHERE s.id IN (${placeholders})
@@ -3111,10 +3244,14 @@ function createApplicantService({
           s.answer_data AS answerData,
           COALESCE(ff.question_text, s.field_key) AS questionText,
           COALESCE(ff.question_text_en, '') AS questionTextEn,
+          COALESCE(IF(JSON_VALID(ff.options_json), JSON_UNQUOTE(JSON_EXTRACT(ff.options_json,'$.questionTextMn')), ''), '') AS questionTextMn,
           COALESCE(ff.input_type, 'text') AS inputType,
           COALESCE(ff.system_field_key, '') AS systemFieldKey,
           COALESCE(meta.examinee_no, '') AS examineeNo,
           meta.member_id AS memberId,
+          member.profile_json AS memberProfileJson,
+          member.name AS memberName, member.email AS memberEmail, ff.form_scope AS answerFormScope,
+          signup.setting_value AS signupSettingsJson,
           COALESCE(meta.field_overrides_json, '') AS fieldOverridesJson,
           COALESCE(DATE_FORMAT(summary.created_at, '%Y-%m-%d %H:%i:%s'), '') AS createdAt,
           COALESCE(DATE_FORMAT(summary.updated_at, '%Y-%m-%d %H:%i:%s'), '') AS updatedAt,
@@ -3131,6 +3268,8 @@ function createApplicantService({
           ON summary.id = s.id
         LEFT JOIN app_meta meta
           ON meta.id = s.id
+        LEFT JOIN applicant_members member ON member.id = meta.member_id
+        LEFT JOIN system_set signup ON signup.setting_key = 'applicantSignupSettings'
         LEFT JOIN app_form ff
           ON ff.field_key = s.field_key
         ORDER BY summary.updated_at DESC, s.id DESC, COALESCE(ff.sort_order, 2147483647), s.field_key ASC
@@ -3428,9 +3567,8 @@ function createApplicantService({
     }
 
     if (field.inputType === "phone") {
-      return normalizeApplicantPhone(rawValue, field.questionText, {
-        required: field.required,
-      });
+      try { return applicantFormConfig.normalizePhoneValue(rawValue, field); }
+      catch (error) { throw createHttpError(400, `${field.questionText}: ${error.message}`, 'APPLICANT_PHONE_INVALID'); }
     }
 
     if (field.inputType === "nationality") {
@@ -3512,6 +3650,7 @@ function createApplicantService({
           fieldKey: field.fieldKey,
           questionText: field.questionText,
           questionTextEn: field.questionTextEn || "",
+          questionTextMn: field.questionTextMn || "",
           inputType: field.inputType,
           systemFieldKey: field.systemFieldKey,
           value: {
@@ -3543,6 +3682,7 @@ function createApplicantService({
           fieldKey: field.fieldKey,
           questionText: field.questionText,
           questionTextEn: field.questionTextEn || "",
+          questionTextMn: field.questionTextMn || "",
           inputType: field.inputType,
           systemFieldKey: field.systemFieldKey,
           value: {
@@ -3561,6 +3701,7 @@ function createApplicantService({
             fieldKey: field.fieldKey,
             questionText: field.questionText,
             questionTextEn: field.questionTextEn || "",
+            questionTextMn: field.questionTextMn || "",
             fileNamePattern: field.fileNamePattern,
             allowedExtensions: field.allowedExtensions,
             ...normalizedFileValue,
@@ -3575,6 +3716,7 @@ function createApplicantService({
         fieldKey: field.fieldKey,
         questionText: field.questionText,
         questionTextEn: field.questionTextEn || "",
+        questionTextMn: field.questionTextMn || "",
         inputType: field.inputType,
           systemFieldKey: field.systemFieldKey,
           value: normalizedValue,
@@ -3639,6 +3781,8 @@ function createApplicantService({
       }
 
       if (Object.hasOwn(systemValues, answerItem.systemFieldKey)) {
+        // The resolved birth value already includes the linked member's signup answer.
+        if (answerItem.systemFieldKey === 'birth' && submission.birth) return;
         systemValues[answerItem.systemFieldKey] = String(answerItem.value || "").trim();
       }
     });
@@ -3671,6 +3815,8 @@ function createApplicantService({
 
     return {
       ...applicationRecord,
+      signupAnswers: submission.signupAnswers || {},
+      applicationAnswers: submission.applicationAnswers || {},
       submissionId: normalizedSubmissionId,
       hasPhoto: submission.hasPhoto,
       photoVersion: Date.parse(submission.updatedAt) || 0,
@@ -3887,6 +4033,8 @@ function createApplicantService({
 
   async function prepareApplicantSubmissionExamNo(connection, submission = {}, settings = {}, options = {}) {
     const applicationRecord = buildApplicantSystemRecord(submission);
+    const admissionSchedule = findApplicantScheduleRecord(await getApplicantSchedules({ queryable: connection.query.bind(connection) }), applicationRecord);
+    settings = { ...settings, ...admissionSchedule?.examNoSettings };
     if (!submission.examineeNo && settings.components?.includes('nationalityCode') && !applicationRecord.nationality && submission.memberId) {
       const [rows] = await connection.query(`
         SELECT member.profile_json AS profileJson, settings.setting_value AS signupSettingsJson
@@ -4226,9 +4374,6 @@ function createApplicantService({
     if (accessRecord.memberId && accessRecord.submissionId && !editExisting) {
       throw createHttpError(409, "이미 접수가 완료된 계정입니다. 접수는 계정당 한 번만 가능합니다.", "APPLICANT_ALREADY_SUBMITTED");
     }
-    if (editExisting && !(await getApplicantPublicSystemSettings()).applicantSubmissionEditEnabled) {
-      throw createHttpError(403, "접수 후 수정이 허용되지 않습니다.", "APPLICANT_SUBMISSION_EDIT_DISABLED");
-    }
     const applicantName = normalizeApplicantText(accessRecord.name, "이름", { maxLength: 100 });
     const email = normalizeApplicantEmail(accessRecord.email);
     const recruitmentUnits = await getApplicantRecruitmentUnits();
@@ -4261,7 +4406,13 @@ function createApplicantService({
       existingSubmission = latestSubmission.id ? await getApplicantSubmissionById(latestSubmission.id, { includeInternal: true }) : null;
     }
 
-    if (editExisting) await assertApplicantSubmissionEntryIsOpen(buildApplicantSystemRecord(existingSubmission));
+    if (editExisting) {
+      const originalSchedule = findApplicantScheduleRecord(await getApplicantSchedules(), buildApplicantSystemRecord(existingSubmission));
+      if (!originalSchedule?.applicantSubmissionEditEnabled || !schedule?.applicantSubmissionEditEnabled) {
+        throw createHttpError(403, '접수 후 수정이 허용되지 않습니다.', 'APPLICANT_SUBMISSION_EDIT_DISABLED');
+      }
+      await assertApplicantSubmissionEntryIsOpen(buildApplicantSystemRecord(existingSubmission));
+    }
     await assertApplicantSubmissionEntryIsOpen(normalizedRecruitmentSelection.selection);
     const submissionArtifacts = buildApplicantSubmissionArtifacts(
       formFields,

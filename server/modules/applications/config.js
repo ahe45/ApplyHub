@@ -53,14 +53,17 @@ const APPLICANT_UNIT_TEMPLATE_COLUMNS = Object.freeze([
   Object.freeze({ key: "admissionCode", header: "전형코드", width: 16, sample: "SU" }),
   Object.freeze({ key: "admissionName", header: "전형명(한글)", aliases: ["전형"], width: 18, sample: "수시" }),
   Object.freeze({ key: "admissionNameEn", header: "전형명(영어)", aliases: ["전형 영어명"], width: 28, sample: "Early admission", optional: true }),
+  Object.freeze({ key: "admissionNameMn", header: "전형명(몽골어)", aliases: ["전형 몽골어명"], width: 28, sample: "Ерөнхий элсэлт", optional: true }),
   Object.freeze({ key: "seriesCode", header: "계열코드", width: 16, sample: "EN" }),
   Object.freeze({ key: "seriesName", header: "계열", width: 18, sample: "공학계열" }),
   Object.freeze({ key: "unitCode", header: "모집단위코드", width: 18, sample: "CSE" }),
   Object.freeze({ key: "unitName", header: "모집단위명(한글)", aliases: ["모집단위"], width: 24, sample: "컴퓨터공학부" }),
   Object.freeze({ key: "unitNameEn", header: "모집단위명(영어)", aliases: ["모집단위 영어명"], width: 32, sample: "Computer Science", optional: true }),
+  Object.freeze({ key: "unitNameMn", header: "모집단위명(몽골어)", aliases: ["모집단위 몽골어명"], width: 32, sample: "Компьютерын ухаан", optional: true }),
   Object.freeze({ key: "majorCode", header: "전공코드", width: 16, sample: "SE" }),
   Object.freeze({ key: "majorName", header: "전공명(한글)", aliases: ["전공"], width: 24, sample: "소프트웨어전공" }),
   Object.freeze({ key: "majorNameEn", header: "전공명(영어)", aliases: ["전공 영어명"], width: 32, sample: "Software Engineering", optional: true }),
+  Object.freeze({ key: "majorNameMn", header: "전공명(몽골어)", aliases: ["전공 몽골어명"], width: 32, sample: "Програм хангамж", optional: true }),
 ]);
 
 const STORED_TICKET_OVERRIDE_KEYS = Object.freeze([
@@ -71,6 +74,7 @@ const STORED_TICKET_OVERRIDE_KEYS = Object.freeze([
 ]);
 const APPLICANT_IMPORT_PREVIEW_ROW_LIMIT = 8;
 const APPLICANT_RECRUITMENT_IMPORT_COMPARE_FIELDS = Object.freeze([
+  "admissionNameMn", "unitNameMn", "majorNameMn",
   "admissionNameEn",
   "unitNameEn",
   "majorNameEn",

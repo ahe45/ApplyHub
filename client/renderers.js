@@ -121,7 +121,6 @@ const {
   renderSystemAuditLog,
   renderSuperAdminManagement,
   renderSystemBackupRestore,
-  renderSystemSettings,
   renderSystemDataDeletion,
 } = systemRenderers;
 const { renderAccountManagement, renderAccountRoleOptions } = accountRenderers;
@@ -600,7 +599,6 @@ const renderers = {
   templateManagement: renderTemplateManagement,
   accountManagement: renderAccountManagement,
   loginNoticeSettings: renderLoginNoticeSettings,
-  systemSettings: renderSystemSettings,
   systemDataDeletion: renderSystemDataDeletion,
   systemBackupRestore: renderSystemBackupRestore,
   superAdminManagement: renderSuperAdminManagement,

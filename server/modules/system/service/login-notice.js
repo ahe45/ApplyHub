@@ -54,14 +54,14 @@ function createSystemLoginNoticeService({
   function normalizeLoginNoticePayload(payload = {}) {
     return {
       scope: normalizeNoticeScope(payload.scope),
-      language: payload.language === "en" ? "en" : "ko",
+      language: require('../../../../shared/domain/languages').normalize(payload.language),
       html: String(payload.html ?? payload.loginNoticeHtml ?? ""),
     };
   }
 
   async function getLoginNoticeHtml(scope = "login", language = "ko") {
     const scopeConfig = getNoticeScopeConfig(scope);
-    const settingKey = scopeConfig.settingKey + (language === "en" ? "En" : "");
+    const settingKey = scopeConfig.settingKey + (language === "mn" ? "Mn" : language === "en" ? "En" : "");
     const rows = await query(
       `
         SELECT
@@ -75,7 +75,7 @@ function createSystemLoginNoticeService({
     const rowsByKey = new Map((Array.isArray(rows) ? rows : []).map((row) => [String(row.settingKey || ""), row.settingValue]));
     const initialPassword = parseSystemInitialPassword(rowsByKey.get("initialPassword"));
     const storedValue = rowsByKey.get(settingKey);
-    if (language === "en") return String(storedValue ?? "");
+    if (language !== "ko") return String(storedValue ?? "");
 
     return scopeConfig.settingKey === "applicantNoticeHtml"
       ? parseApplicantNoticeHtml(storedValue)
@@ -93,7 +93,7 @@ function createSystemLoginNoticeService({
         ON DUPLICATE KEY UPDATE
           setting_value = VALUES(setting_value)
       `,
-      [scopeConfig.settingKey + (nextNotice.language === "en" ? "En" : ""), nextNotice.html],
+      [scopeConfig.settingKey + (nextNotice.language === "mn" ? "Mn" : nextNotice.language === "en" ? "En" : ""), nextNotice.html],
     );
 
     const savedHtml = await getLoginNoticeHtml(nextNotice.scope, nextNotice.language);
@@ -102,7 +102,7 @@ function createSystemLoginNoticeService({
       scope: nextNotice.scope,
       language: nextNotice.language,
       html: savedHtml,
-      [scopeConfig.responseKey + (nextNotice.language === "en" ? "En" : "")]: savedHtml,
+      [scopeConfig.responseKey + (nextNotice.language === "mn" ? "Mn" : nextNotice.language === "en" ? "En" : "")]: savedHtml,
     };
   }
 
